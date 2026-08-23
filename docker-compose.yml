@@ -1,0 +1,66 @@
+name: booking-platform
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: booking-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-booking}
+      POSTGRES_USER: ${POSTGRES_USER:-booking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-booking}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-booking} -d ${POSTGRES_DB:-booking}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Local SMTP sink so notification emails can be inspected in a browser.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: booking-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  backend:
+    profiles: ["full"]
+    build:
+      context: ./backend
+    container_name: booking-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-booking}
+      DATABASE_USERNAME: ${POSTGRES_USER:-booking}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-booking}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me-please-32}
+      EMAIL_HOST: mailpit
+      EMAIL_PORT: 1025
+      EMAIL_FROM: ${EMAIL_FROM:-no-reply@bookingplatform.local}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+
+  frontend:
+    profiles: ["full"]
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ""
+    container_name: booking-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres-data:

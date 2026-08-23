@@ -1,0 +1,18 @@
+# Integration-test profile. The datasource comes from Testcontainers via
+# @ServiceConnection; everything here is about keeping tests deterministic.
+spring:
+  flyway:
+    # Schema only — no demo seed, so each test owns its data.
+    locations: classpath:db/migration
+
+app:
+  jwt:
+    secret: integration-test-secret-value-at-least-32-characters
+  notifications:
+    # Nothing is queued or sent: tests assert on bookings, not on mail.
+    enabled: false
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN

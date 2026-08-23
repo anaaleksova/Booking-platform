@@ -1,0 +1,10 @@
+# Local development profile.
+# Adds the seed migration location so the app is usable immediately on startup.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed
+
+logging:
+  level:
+    com.bookingsaas: DEBUG
+    org.hibernate.SQL: INFO

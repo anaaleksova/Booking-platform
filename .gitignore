@@ -1,0 +1,30 @@
+# Environment / secrets
+.env
+.env.local
+*.pem
+
+# Java / Maven
+backend/target/
+!backend/.mvn/wrapper/maven-wrapper.properties
+*.class
+*.log
+
+# Node
+node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+npm-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+.DS_Store
+
+# Test output
+backend/**/surefire-reports/
+frontend/test-results/
+frontend/playwright-report/
