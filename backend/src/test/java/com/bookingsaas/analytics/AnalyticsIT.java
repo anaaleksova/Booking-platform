@@ -1,12 +1,11 @@
 package com.bookingsaas.analytics;
 
 import com.bookingsaas.support.AbstractIntegrationTest;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
@@ -15,216 +14,166 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The reports endpoints: revenue totals, revenue by service and customer
- * spend, plus the two things every owner-only, tenant-scoped report must get
- * right — a staff account is refused, and another business's data never
- * leaks in.
+ * Revenue and analytics against real data, plus the two things every
+ * owner-only, tenant-scoped report must get right — a staff account is
+ * refused, and another business's data never leaks in.
  *
- * <p>Bookings are seeded directly through {@link JdbcTemplate} rather than the
- * dashboard booking API: the availability engine (staff eligibility, working
- * hours, buffers) is already covered elsewhere, and is orthogonal to whether
- * these aggregation queries sum and group correctly. Anchoring every booking
- * at local noon today keeps the numbers stable regardless of what time of day
- * the suite happens to run.
+ * <p>Reservations are inserted directly: the engine is covered elsewhere and
+ * is orthogonal to whether these queries sum and group correctly. Anchoring
+ * everything at local noon today keeps the numbers stable whatever time the
+ * suite runs.
  */
-@DisplayName("analytics reports")
+@DisplayName("analytics")
 class AnalyticsIT extends AbstractIntegrationTest {
 
     private static final ZoneId ZONE = ZoneId.of("Europe/Skopje");
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    @Autowired
     private PasswordEncoder passwordEncoder;
 
-    private String tokenA;
+    private String token;
     private Long businessId;
-    private Long haircutId;
     private Long massageId;
-    private Long aliceId;
-    private Long bobId;
-    private Instant anchor;
+    private Long facialId;
+    private LocalDate today;
 
     @BeforeEach
-    void setUpBusinessWithBookings() throws Exception {
-        tokenA = registerAndLogin("owner@example.com", "Reports Co");
-        businessId = currentBusinessId(tokenA);
+    void setUpReservations() throws Exception {
+        token = registerAndLogin("owner@example.com", "Reports Co");
+        businessId = send(get("/api/admin/business"), token, null, 200).get("id").asLong();
+        massageId = createService("Massage", "50.00");
+        facialId = createService("Facial", "30.00");
+        Long alice = createCustomer("Alice", "alice@example.com");
+        Long bob = createCustomer("Bob", "bob@example.com");
 
-        haircutId = createService(tokenA, "Haircut", "30.00");
-        massageId = createService(tokenA, "Massage", "50.00");
-        aliceId = createCustomer(tokenA, "Alice", "alice@example.com");
-        bobId = createCustomer(tokenA, "Bob", "bob@example.com");
+        today = LocalDate.now(ZONE);
+        Instant noon = today.atTime(12, 0).atZone(ZONE).toInstant();
 
-        anchor = LocalDate.now(ZONE).atTime(12, 0).atZone(ZONE).toInstant();
-
-        // Alice: two revenue-generating visits (one completed, one no-show) plus
-        // a completed massage — three non-cancelled bookings, no cancellations.
-        insertBooking(aliceId, haircutId, "COMPLETED", "30.00", anchor);
-        insertBooking(aliceId, massageId, "COMPLETED", "50.00", anchor.plusSeconds(600));
-        insertBooking(aliceId, haircutId, "NO_SHOW", "30.00", anchor.plusSeconds(2400));
-
-        // Bob: one upcoming booking, and one he cancelled — spends less than
-        // Alice, and is the only one with a cancellation.
-        insertBooking(bobId, haircutId, "CONFIRMED", "30.00", anchor.plusSeconds(1200));
-        insertBooking(bobId, haircutId, "CANCELLED", "30.00", anchor.plusSeconds(1800));
+        // Counted: CONFIRMED and COMPLETED.
+        insert(alice, massageId, "COMPLETED", "50.00", "0.00", noon);
+        insert(alice, massageId, "CONFIRMED", "50.00", "10.00", noon.plusSeconds(3600));
+        insert(bob, facialId, "COMPLETED", "30.00", "0.00", noon.plusSeconds(7200));
+        // Not counted: PENDING and CANCELLED.
+        insert(bob, facialId, "PENDING", "30.00", "0.00", noon.plusSeconds(10800));
+        insert(bob, massageId, "CANCELLED", "50.00", "0.00", noon.plusSeconds(14400));
     }
 
     @Test
-    void overview_totals_match_the_seeded_bookings() throws Exception {
-        // 5 bookings total; revenue excludes only the cancelled one:
-        // 30 + 50 + 30 (no-show) + 30 (confirmed) = 140, over 4 bookings.
-        mockMvc.perform(get("/api/analytics/overview").header(HttpHeaders.AUTHORIZATION, bearer(tokenA)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.revenueToday").value(140.0))
-                .andExpect(jsonPath("$.revenueThisWeek").value(140.0))
-                .andExpect(jsonPath("$.revenueThisMonth").value(140.0))
-                .andExpect(jsonPath("$.revenueThisYear").value(140.0))
-                .andExpect(jsonPath("$.currency").value("MKD"))
-                .andExpect(jsonPath("$.appointmentCount").value(5))
-                .andExpect(jsonPath("$.completedCount").value(2))
-                .andExpect(jsonPath("$.cancelledCount").value(1))
-                .andExpect(jsonPath("$.noShowCount").value(1))
-                .andExpect(jsonPath("$.averageBookingValue").value(35.0))
-                .andExpect(jsonPath("$.cancellationRate").value(0.2))
-                .andExpect(jsonPath("$.noShowRate").value(0.2));
+    void revenue_counts_only_confirmed_and_completed_reservations() throws Exception {
+        JsonNode summary = send(get("/api/admin/analytics/revenue?from=" + today + "&to=" + today), token, null, 200)
+                .get("summary");
+
+        assertThat(summary.get("reservations").asLong()).isEqualTo(3);
+        assertThat(summary.get("grossRevenue").decimalValue()).isEqualByComparingTo("130");
+        assertThat(summary.get("discounts").decimalValue()).isEqualByComparingTo("10");
+        assertThat(summary.get("netRevenue").decimalValue()).isEqualByComparingTo("120");
+        assertThat(summary.get("averageReservationValue").decimalValue()).isEqualByComparingTo("40");
     }
 
     @Test
-    void revenue_by_service_ranks_and_sums_correctly() throws Exception {
-        mockMvc.perform(get("/api/analytics/revenue-by-service").header(HttpHeaders.AUTHORIZATION, bearer(tokenA)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                // Haircut: completed + no-show + confirmed = 3 bookings, 90 revenue.
-                .andExpect(jsonPath("$[0].serviceId").value(haircutId))
-                .andExpect(jsonPath("$[0].appointmentCount").value(3))
-                .andExpect(jsonPath("$[0].revenue").value(90.0))
-                .andExpect(jsonPath("$[0].currency").value("MKD"))
-                // Massage: one completed booking, 50 revenue.
-                .andExpect(jsonPath("$[1].serviceId").value(massageId))
-                .andExpect(jsonPath("$[1].appointmentCount").value(1))
-                .andExpect(jsonPath("$[1].revenue").value(50.0));
+    void the_revenue_series_has_no_gaps() throws Exception {
+        JsonNode series = send(get("/api/admin/analytics/revenue?from=" + today.minusDays(6) + "&to=" + today),
+                token, null, 200).get("series");
+
+        assertThat(series).hasSize(7);
+        assertThat(series.get(6).get("netRevenue").decimalValue()).isEqualByComparingTo("120");
+        assertThat(series.get(0).get("netRevenue").decimalValue()).isEqualByComparingTo("0");
     }
 
     @Test
-    void customers_are_ranked_by_spend_with_favourite_service_and_cancellations() throws Exception {
-        mockMvc.perform(get("/api/analytics/customers").header(HttpHeaders.AUTHORIZATION, bearer(tokenA)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(2))
-                // Alice: 110 spent over 3 appointments, favourite is Haircut (2 vs 1), no cancellations.
-                .andExpect(jsonPath("$.content[0].customerId").value(aliceId))
-                .andExpect(jsonPath("$.content[0].totalSpent").value(110.0))
-                .andExpect(jsonPath("$.content[0].appointmentCount").value(3))
-                .andExpect(jsonPath("$.content[0].averageAppointmentValue").value(36.67))
-                .andExpect(jsonPath("$.content[0].favouriteServiceId").value(haircutId))
-                .andExpect(jsonPath("$.content[0].cancellationCount").value(0))
-                // Bob: 30 spent over 1 appointment, one cancellation.
-                .andExpect(jsonPath("$.content[1].customerId").value(bobId))
-                .andExpect(jsonPath("$.content[1].totalSpent").value(30.0))
-                .andExpect(jsonPath("$.content[1].appointmentCount").value(1))
-                .andExpect(jsonPath("$.content[1].cancellationCount").value(1));
+    void the_dashboard_and_periods_agree() throws Exception {
+        JsonNode dashboard = send(get("/api/admin/dashboard"), token, null, 200);
+        assertThat(dashboard.get("todayRevenue").decimalValue()).isEqualByComparingTo("120");
+        assertThat(dashboard.get("todayReservations").asLong()).isEqualTo(4);   // non-cancelled
+        assertThat(dashboard.get("totalCustomers").asLong()).isEqualTo(2);
+
+        JsonNode periods = send(get("/api/admin/analytics/revenue/periods"), token, null, 200);
+        assertThat(periods.get("today").get("netRevenue").decimalValue()).isEqualByComparingTo("120");
+        assertThat(periods.get("thisMonth").get("netRevenue").decimalValue()).isEqualByComparingTo("120");
+    }
+
+    @Test
+    void services_are_ranked_by_reservations_with_their_revenue() throws Exception {
+        JsonNode services = send(get("/api/admin/analytics/services?from=" + today + "&to=" + today),
+                token, null, 200);
+
+        assertThat(services).hasSize(2);
+        assertThat(services.get(0).get("serviceId").asLong()).isEqualTo(massageId);
+        assertThat(services.get(0).get("reservations").asLong()).isEqualTo(2);
+        assertThat(services.get(0).get("revenue").decimalValue()).isEqualByComparingTo("90");
+        assertThat(services.get(1).get("reservations").asLong()).isEqualTo(2);     // completed + pending
+        assertThat(services.get(1).get("revenue").decimalValue()).isEqualByComparingTo("30");
+    }
+
+    @Test
+    void customers_are_split_into_new_and_returning() throws Exception {
+        JsonNode report = send(get("/api/admin/analytics/customers?from=" + today + "&to=" + today),
+                token, null, 200);
+
+        assertThat(report.get("activeCustomers").asLong()).isEqualTo(2);
+        assertThat(report.get("newCustomers").asLong()).isEqualTo(2);
+        assertThat(report.get("topCustomers").get(0).get("name").asText()).isEqualTo("Alice");
     }
 
     @Test
     void a_staff_account_is_refused() throws Exception {
-        String staffToken = createStaffLogin("staff@example.com", businessId);
+        String staffToken = createStaffLogin("staff@example.com");
 
-        mockMvc.perform(get("/api/analytics/overview").header(HttpHeaders.AUTHORIZATION, bearer(staffToken)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
-        mockMvc.perform(get("/api/analytics/revenue-by-service").header(HttpHeaders.AUTHORIZATION, bearer(staffToken)))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/analytics/customers").header(HttpHeaders.AUTHORIZATION, bearer(staffToken)))
-                .andExpect(status().isForbidden());
+        send(get("/api/admin/analytics/revenue"), staffToken, null, 403);
+        send(get("/api/admin/dashboard"), staffToken, null, 403);
     }
 
     @Test
     void another_businesss_activity_never_appears() throws Exception {
         String tokenB = registerAndLogin("owner-b@example.com", "Other Business");
-        createService(tokenB, "Something Else", "999.00");
 
-        mockMvc.perform(get("/api/analytics/overview").header(HttpHeaders.AUTHORIZATION, bearer(tokenB)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.revenueToday").value(0))
-                .andExpect(jsonPath("$.appointmentCount").value(0));
-        mockMvc.perform(get("/api/analytics/customers").header(HttpHeaders.AUTHORIZATION, bearer(tokenB)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(0));
+        JsonNode summary = send(get("/api/admin/analytics/revenue"), tokenB, null, 200).get("summary");
+        assertThat(summary.get("reservations").asLong()).isZero();
+        assertThat(send(get("/api/admin/analytics/services"), tokenB, null, 200)).isEmpty();
     }
 
     // --- helpers -------------------------------------------------------
 
-    private Long currentBusinessId(String token) throws Exception {
-        String response = mockMvc.perform(get("/api/business").header(HttpHeaders.AUTHORIZATION, bearer(token)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        return json(response).get("id").asLong();
+    private Long createService(String name, String price) throws Exception {
+        return send(post("/api/admin/services"), token, """
+                {"name":"%s","durationMinutes":30,"price":%s,"pricePerParticipant":false,"maxParticipants":1,
+                 "bufferBeforeMinutes":0,"bufferAfterMinutes":0,"allowCustomerResourceSelection":false,
+                 "active":true,"requirements":[]}
+                """.formatted(name, price), 201).get("id").asLong();
     }
 
-    private Long createService(String token, String name, String price) throws Exception {
-        String response = mockMvc.perform(post("/api/services")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                        .contentType("application/json")
-                        .content("""
-                                {"name":"%s","durationMinutes":30,"price":%s,"currency":"MKD",
-                                 "bufferBeforeMinutes":0,"bufferAfterMinutes":0,
-                                 "requiresStaff":false,"requiresResource":false,"active":true}
-                                """.formatted(name, price)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return json(response).get("id").asLong();
+    private Long createCustomer(String firstName, String email) throws Exception {
+        return send(post("/api/admin/customers"), token, """
+                {"firstName":"%s","email":"%s"}""".formatted(firstName, email), 201).get("id").asLong();
     }
 
-    private Long createCustomer(String token, String name, String email) throws Exception {
-        String response = mockMvc.perform(post("/api/customers")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                        .contentType("application/json")
-                        .content("""
-                                {"name":"%s","email":"%s"}
-                                """.formatted(name, email)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return json(response).get("id").asLong();
-    }
-
-    private void insertBooking(Long customerId, Long serviceId, String status, String price, Instant start) {
+    private void insert(Long customerId, Long serviceId, String status, String price, String discount, Instant start) {
         Instant end = start.plusSeconds(1800);
+        BigDecimal original = new BigDecimal(price);
+        BigDecimal off = new BigDecimal(discount);
         jdbcTemplate.update("""
-                        INSERT INTO bookings (business_id, service_id, customer_id, start_date_time, end_date_time,
-                                               block_start_date_time, block_end_date_time, status, price, currency,
-                                               source)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'MKD', 'DASHBOARD')
+                        INSERT INTO reservation (business_id, customer_id, service_id, start_time, end_time,
+                                                 block_start_time, block_end_time, number_of_participants, status,
+                                                 original_price, discount_amount, final_price, currency, source)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 'EUR', 'ADMIN')
                         """,
-                businessId, serviceId, customerId, Timestamp.from(start), Timestamp.from(end),
-                Timestamp.from(start), Timestamp.from(end), status, new BigDecimal(price));
+                businessId, customerId, serviceId, Timestamp.from(start), Timestamp.from(end),
+                Timestamp.from(start), Timestamp.from(end), status, original, off, original.subtract(off));
     }
 
-    /** Adds a STAFF membership on the given business for a freshly created login account. */
-    private String createStaffLogin(String email, Long businessId) throws Exception {
-        String passwordHash = passwordEncoder.encode("password123");
+    /** Adds a STAFF membership on the business for a freshly created login account. */
+    private String createStaffLogin(String email) throws Exception {
         Long userId = jdbcTemplate.queryForObject("""
-                        INSERT INTO users (email, password_hash, full_name)
-                        VALUES (?, ?, 'Staff Member')
-                        RETURNING id
-                        """, Long.class, email, passwordHash);
-        jdbcTemplate.update("""
-                        INSERT INTO business_users (business_id, user_id, role)
-                        VALUES (?, ?, 'STAFF')
-                        """, businessId, userId);
-
-        String response = mockMvc.perform(post("/api/auth/login")
-                        .contentType("application/json")
-                        .content("""
-                                {"email":"%s","password":"password123"}
-                                """.formatted(email)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        return json(response).get("accessToken").asText();
+                INSERT INTO app_user (email, password_hash, full_name) VALUES (?, ?, 'Staff Member') RETURNING id
+                """, Long.class, email, passwordEncoder.encode("password123"));
+        jdbcTemplate.update("INSERT INTO business_user (business_id, user_id, role) VALUES (?, ?, 'STAFF')",
+                businessId, userId);
+        return send(post("/api/auth/login"), null, """
+                {"email":"%s","password":"password123"}""".formatted(email), 200).get("accessToken").asText();
     }
 }

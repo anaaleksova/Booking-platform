@@ -11,9 +11,9 @@ import java.util.Map;
  * {
  *   "timestamp": "2026-08-16T10:15:30Z",
  *   "status": 409,
- *   "code": "BOOKING_NOT_AVAILABLE",
- *   "message": "The selected time is no longer available.",
- *   "path": "/api/bookings",
+ *   "error": "RESOURCE_NOT_AVAILABLE",
+ *   "message": "The selected resources are no longer available.",
+ *   "path": "/api/public/businesses/serenity-studio/reservations",
  *   "fieldErrors": { "durationMinutes": "must be greater than 0" }
  * }
  * </pre>
@@ -21,7 +21,8 @@ import java.util.Map;
 public record ApiErrorResponse(
         Instant timestamp,
         int status,
-        String code,
+        /* Stable machine-readable code; clients branch on this, never on the message. */
+        String error,
         String message,
         String path,
         Map<String, String> fieldErrors,

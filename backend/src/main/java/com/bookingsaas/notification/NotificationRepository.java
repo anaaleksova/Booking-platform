@@ -18,7 +18,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
            """)
     List<Notification> findDue(@Param("now") Instant now, Pageable pageable);
 
-    boolean existsByBookingIdAndType(Long bookingId, NotificationType type);
+    boolean existsByReservationIdAndType(Long reservationId, NotificationType type);
 
-    List<Notification> findByBookingIdOrderByCreatedAtDesc(Long bookingId);
+    List<Notification> findByReservationIdOrderByCreatedAtDesc(Long reservationId);
 }

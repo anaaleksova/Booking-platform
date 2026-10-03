@@ -1,21 +1,22 @@
 package com.bookingsaas.availability.dto;
 
+import com.bookingsaas.availability.SlotEvaluation.RequirementOption;
+
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.List;
 
 /**
- * One bookable start time.
+ * One reservable start time.
  *
- * <p>The candidate staff and resources travel with the slot so that "any
- * available" can be resolved without a second round trip — although the final
- * choice is always re-made inside the booking transaction.
+ * <p>The free resources per requirement travel with the slot, so resource
+ * selection needs no second round trip — although the final choice is always
+ * re-validated inside the reservation transaction.
  */
 public record AvailableSlot(
         LocalTime time,
-        Instant startDateTime,
-        Instant endDateTime,
-        List<Long> availableStaffIds,
-        List<Long> availableResourceIds
+        Instant startTime,
+        Instant endTime,
+        List<RequirementOption> options
 ) {
 }

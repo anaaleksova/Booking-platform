@@ -1,9 +1,9 @@
 # Integration-test profile. The datasource comes from Testcontainers via
 # @ServiceConnection; everything here is about keeping tests deterministic.
 spring:
-  flyway:
+  liquibase:
     # Schema only — no demo seed, so each test owns its data.
-    locations: classpath:db/migration
+    contexts: test
 
 app:
   jwt:

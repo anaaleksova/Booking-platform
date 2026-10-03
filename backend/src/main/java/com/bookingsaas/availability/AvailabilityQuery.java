@@ -5,21 +5,16 @@ import java.time.LocalDate;
 /**
  * One availability question.
  *
- * @param staffId          restrict to a chosen staff member; null means "any available"
- * @param resourceId       restrict to a chosen resource; null means "any available"
- * @param excludeBookingId ignored when detecting conflicts — set while rescheduling
- *                         a booking so it does not block its own new time
+ * @param participants         group size; checked against the service maximum
+ *                             and against resource capacity
+ * @param excludeReservationId ignored when detecting conflicts — set while
+ *                             moving a reservation so it does not block itself
  */
 public record AvailabilityQuery(
         Long serviceId,
         LocalDate from,
         LocalDate to,
-        Long staffId,
-        Long resourceId,
-        Long excludeBookingId
+        int participants,
+        Long excludeReservationId
 ) {
-
-    public static AvailabilityQuery of(Long serviceId, LocalDate from, LocalDate to, Long staffId, Long resourceId) {
-        return new AvailabilityQuery(serviceId, from, to, staffId, resourceId, null);
-    }
 }

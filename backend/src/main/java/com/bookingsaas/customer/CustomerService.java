@@ -5,6 +5,8 @@ import com.bookingsaas.common.error.ErrorCode;
 import com.bookingsaas.common.security.CurrentTenant;
 import com.bookingsaas.customer.dto.CustomerRequest;
 import com.bookingsaas.customer.dto.CustomerResponse;
+import com.bookingsaas.customer.spi.CustomerActivity;
+import com.bookingsaas.customer.spi.CustomerActivityProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /** Customer records, always within one tenant. */
@@ -21,10 +24,14 @@ import java.util.Optional;
 public class CustomerService {
 
     private final CustomerRepository repository;
+    private final CustomerActivityProvider activityProvider;
     private final CurrentTenant currentTenant;
 
-    public CustomerService(CustomerRepository repository, CurrentTenant currentTenant) {
+    public CustomerService(CustomerRepository repository,
+                           CustomerActivityProvider activityProvider,
+                           CurrentTenant currentTenant) {
         this.repository = repository;
+        this.activityProvider = activityProvider;
         this.currentTenant = currentTenant;
     }
 
@@ -36,15 +43,20 @@ public class CustomerService {
                 .orElseThrow(() -> ApiException.notFound("Customer", customerId));
     }
 
+    @Transactional(readOnly = true)
+    public long countFor(Long businessId) {
+        return repository.countByBusinessId(businessId);
+    }
+
     /**
-     * Finds the existing customer behind a booking, or creates one.
+     * Finds the existing customer behind a reservation, or creates one.
      *
      * <p>Matching on email first, then phone, keeps a regular from accumulating
-     * a new row on every visit, while still working for the many customers who
-     * give only one of the two.
+     * a new row on every visit, while still working for customers who give
+     * only one of the two.
      */
     @Transactional
-    public Customer findOrCreate(Long businessId, String name, String phone, String email, String notes) {
+    public Customer findOrCreate(Long businessId, String firstName, String lastName, String email, String phone) {
         String cleanEmail = normalize(email);
         String cleanPhone = normalize(phone);
         if (cleanEmail == null && cleanPhone == null) {
@@ -58,12 +70,15 @@ public class CustomerService {
 
         if (existing.isPresent()) {
             Customer customer = existing.get();
-            // Fill in details we did not have before, but never overwrite what
-            // the business has already curated.
-            if (customer.getEmail() == null && cleanEmail != null) {
+            // Fill in details we did not have before — unless another record
+            // already holds them — but never overwrite what the business has
+            // already curated.
+            if (customer.getEmail() == null && cleanEmail != null
+                    && repository.findByEmail(businessId, cleanEmail).isEmpty()) {
                 customer.setEmail(cleanEmail);
             }
-            if (customer.getPhone() == null && cleanPhone != null) {
+            if (customer.getPhone() == null && cleanPhone != null
+                    && repository.findByBusinessIdAndPhone(businessId, cleanPhone).isEmpty()) {
                 customer.setPhone(cleanPhone);
             }
             return repository.save(customer);
@@ -71,46 +86,50 @@ public class CustomerService {
 
         Customer customer = new Customer();
         customer.setBusinessId(businessId);
-        customer.setName(name.trim());
+        customer.setFirstName(firstName.trim());
+        customer.setLastName(lastName == null ? "" : lastName.trim());
         customer.setEmail(cleanEmail);
         customer.setPhone(cleanPhone);
-        customer.setNotes(normalize(notes));
         return repository.save(customer);
     }
 
-    // --- dashboard API -----------------------------------------------------
+    // --- admin API ---------------------------------------------------------
 
     @Transactional(readOnly = true)
     public Page<CustomerResponse> search(String query, int page, int size) {
+        Long businessId = currentTenant.businessId();
         String term = query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
-        return repository.search(currentTenant.businessId(), term,
-                        PageRequest.of(page, Math.min(size, 100), Sort.by("name").ascending()))
-                .map(CustomerResponse::from);
+        Page<Customer> customers = repository.search(businessId, term,
+                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
+                        Sort.by("lastName").ascending().and(Sort.by("firstName").ascending())));
+
+        // One aggregate query for the whole page, not one per row.
+        Map<Long, CustomerActivity> activity = activityProvider.activityOf(businessId,
+                customers.getContent().stream().map(Customer::getId).toList());
+        return customers.map(customer -> CustomerResponse.from(customer, activity.get(customer.getId())));
     }
 
     @Transactional(readOnly = true)
     public CustomerResponse get(Long id) {
-        return CustomerResponse.from(requireForBusiness(currentTenant.businessId(), id));
-    }
-
-    @Transactional(readOnly = true)
-    public List<Customer> byIds(Long businessId, List<Long> ids) {
-        return ids.isEmpty() ? List.of() : repository.findByBusinessIdAndIdIn(businessId, ids);
+        Long businessId = currentTenant.businessId();
+        return toResponse(businessId, requireForBusiness(businessId, id));
     }
 
     @Transactional
     public CustomerResponse create(CustomerRequest request) {
+        Long businessId = currentTenant.businessId();
         Customer customer = new Customer();
-        customer.setBusinessId(currentTenant.businessId());
+        customer.setBusinessId(businessId);
         apply(customer, request);
-        return CustomerResponse.from(save(customer));
+        return toResponse(businessId, save(customer));
     }
 
     @Transactional
     public CustomerResponse update(Long id, CustomerRequest request) {
-        Customer customer = requireForBusiness(currentTenant.businessId(), id);
+        Long businessId = currentTenant.businessId();
+        Customer customer = requireForBusiness(businessId, id);
         apply(customer, request);
-        return CustomerResponse.from(save(customer));
+        return toResponse(businessId, save(customer));
     }
 
     @Transactional
@@ -122,8 +141,13 @@ public class CustomerService {
             repository.flush();
         } catch (DataIntegrityViolationException ex) {
             throw ApiException.of(ErrorCode.CUSTOMER_IN_USE,
-                    "This customer has bookings and cannot be deleted.");
+                    "This customer has reservations and cannot be deleted.");
         }
+    }
+
+    private CustomerResponse toResponse(Long businessId, Customer customer) {
+        return CustomerResponse.from(customer,
+                activityProvider.activityOf(businessId, List.of(customer.getId())).get(customer.getId()));
     }
 
     private Customer save(Customer customer) {
@@ -144,7 +168,8 @@ public class CustomerService {
         if (email == null && phone == null) {
             throw ApiException.validation("A phone number or an email address is required.");
         }
-        customer.setName(request.name().trim());
+        customer.setFirstName(request.firstName().trim());
+        customer.setLastName(request.lastName() == null ? "" : request.lastName().trim());
         customer.setEmail(email);
         customer.setPhone(phone);
         customer.setNotes(normalize(request.notes()));

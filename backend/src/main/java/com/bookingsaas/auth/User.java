@@ -16,7 +16,7 @@ import lombok.Setter;
  * their {@code business_users} memberships, not from this row.
  */
 @Entity
-@Table(name = "users")
+@Table(name = "app_user")
 @Getter
 @Setter
 @NoArgsConstructor

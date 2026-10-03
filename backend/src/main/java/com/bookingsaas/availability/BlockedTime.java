@@ -15,15 +15,14 @@ import lombok.Setter;
 import java.time.Instant;
 
 /**
- * A one-off hole in availability: vacation, a meeting, maintenance, a public
- * holiday.
+ * A one-off hole in availability: a holiday, maintenance, a closure.
  *
- * <p>Scope comes from which id is set — staff only, resource only, or (both
- * null) the entire business. One shape covers "Ana is on holiday", "Reformer 2
- * is being serviced" and "closed on 1 January".
+ * <p>Scope comes from the resource: set, it removes that one resource (an
+ * employee's day off, a machine being serviced — employees are resources too);
+ * null, it closes the entire business.
  */
 @Entity
-@Table(name = "blocked_times")
+@Table(name = "blocked_time")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -36,27 +35,24 @@ public class BlockedTime extends Auditable {
     @Column(name = "business_id", nullable = false)
     private Long businessId;
 
-    @Column(name = "staff_id")
-    private Long staffId;
-
     @Column(name = "resource_id")
     private Long resourceId;
 
-    @Column(name = "start_date_time", nullable = false)
-    private Instant startDateTime;
+    @Column(name = "start_time", nullable = false)
+    private Instant startTime;
 
-    @Column(name = "end_date_time", nullable = false)
-    private Instant endDateTime;
+    @Column(name = "end_time", nullable = false)
+    private Instant endTime;
 
     @Column(length = 255)
     private String reason;
 
     public TimeRange range() {
-        return TimeRange.of(startDateTime, endDateTime);
+        return TimeRange.of(startTime, endTime);
     }
 
     /** True when this block closes the business as a whole. */
     public boolean isBusinessWide() {
-        return staffId == null && resourceId == null;
+        return resourceId == null;
     }
 }

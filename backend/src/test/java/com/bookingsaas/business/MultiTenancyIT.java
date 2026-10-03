@@ -4,19 +4,17 @@ import com.bookingsaas.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * The mandatory security test: business A must not reach business B's data.
  *
- * <p>Every check here works by taking a real id belonging to B and presenting
- * it with A's token — the exact attack of "change the number in the URL".
+ * <p>Every check takes a real id belonging to B and presents it with A's
+ * token — the exact attack of "change the number in the URL".
  */
 @DisplayName("multi-tenant isolation")
 class MultiTenancyIT extends AbstractIntegrationTest {
@@ -25,124 +23,89 @@ class MultiTenancyIT extends AbstractIntegrationTest {
     private String tokenB;
     private Long serviceOfB;
     private Long customerOfB;
+    private Long resourceTypeOfB;
 
     @BeforeEach
     void setUpTwoBusinesses() throws Exception {
         tokenA = registerAndLogin("owner-a@example.com", "Business A");
         tokenB = registerAndLogin("owner-b@example.com", "Business B");
 
-        serviceOfB = createService(tokenB, "B's Service");
-        customerOfB = createCustomer(tokenB, "B's Customer", "b.customer@example.com");
+        serviceOfB = createService(tokenB, "B's Service", "[]");
+        customerOfB = send(post("/api/admin/customers"), tokenB, """
+                {"firstName":"B's Customer","email":"b.customer@example.com"}""", 201).get("id").asLong();
+        resourceTypeOfB = send(post("/api/admin/resource-types"), tokenB, """
+                {"name":"Room","active":true}""", 201).get("id").asLong();
     }
 
     @Test
     void a_service_of_another_business_is_not_found() throws Exception {
-        mockMvc.perform(get("/api/services/{id}", serviceOfB).header(HttpHeaders.AUTHORIZATION, bearer(tokenA)))
-                .andExpect(status().isNotFound());
+        send(get("/api/admin/services/" + serviceOfB), tokenA, null, 404);
     }
 
     @Test
     void a_customer_of_another_business_is_not_found() throws Exception {
-        mockMvc.perform(get("/api/customers/{id}", customerOfB).header(HttpHeaders.AUTHORIZATION, bearer(tokenA)))
-                .andExpect(status().isNotFound());
+        send(get("/api/admin/customers/" + customerOfB), tokenA, null, 404);
+        send(get("/api/admin/customers/" + customerOfB + "/reservations"), tokenA, null, 404);
     }
 
     @Test
     void another_business_cannot_be_edited_through_its_id() throws Exception {
-        // There is no /api/businesses/{id} route at all: the tenant comes from
+        // There is no /api/admin/businesses/{id} route: the tenant comes from
         // the token, so A editing "business 2" is not expressible.
-        mockMvc.perform(put("/api/business")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tokenA))
-                        .contentType("application/json")
-                        .content("""
-                                {"name":"Renamed by A","slug":"renamed-by-a","timezone":"Europe/Skopje"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Renamed by A"));
+        send(put("/api/admin/business"), tokenA, """
+                {"name":"Renamed by A","slug":"renamed-by-a","currency":"EUR","timezone":"Europe/Skopje"}
+                """, 200);
 
-        mockMvc.perform(get("/api/business").header(HttpHeaders.AUTHORIZATION, bearer(tokenB)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Business B"));
+        assertThat(send(get("/api/admin/business"), tokenB, null, 200).get("name").asText()).isEqualTo("Business B");
     }
 
     @Test
     void listings_contain_only_the_callers_own_rows() throws Exception {
-        createService(tokenA, "A's Service");
+        createService(tokenA, "A's Service", "[]");
 
-        mockMvc.perform(get("/api/services").header(HttpHeaders.AUTHORIZATION, bearer(tokenA)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].name").value("A's Service"));
+        var services = send(get("/api/admin/services"), tokenA, null, 200);
+        assertThat(services).hasSize(1);
+        assertThat(services.get(0).get("name").asText()).isEqualTo("A's Service");
     }
 
     @Test
-    void staff_cannot_be_assigned_a_service_belonging_to_another_business() throws Exception {
-        Long staffOfA = createStaff(tokenA, "A's Staff");
-
-        mockMvc.perform(put("/api/staff/{id}/services", staffOfA)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tokenA))
-                        .contentType("application/json")
-                        .content("[" + serviceOfB + "]"))
-                .andExpect(status().isBadRequest());
+    void a_service_cannot_require_another_businesss_resource_type() throws Exception {
+        send(post("/api/admin/services"), tokenA, serviceBody("Sneaky", """
+                [{"resourceTypeId":%d,"quantity":1,"required":true,"customerCanChoose":false}]
+                """.formatted(resourceTypeOfB)), 400);
     }
 
     @Test
-    void a_booking_cannot_be_created_against_another_businesss_service() throws Exception {
-        mockMvc.perform(post("/api/bookings")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tokenA))
-                        .contentType("application/json")
-                        .content("""
-                                {"serviceId":%d,
-                                 "customer":{"name":"Walk in","phone":"+38970000000"},
-                                 "startDateTime":"2026-09-10T10:00:00"}
-                                """.formatted(serviceOfB)))
-                .andExpect(status().isNotFound());
+    void an_employee_cannot_be_restricted_to_another_businesss_service() throws Exception {
+        send(post("/api/admin/employees"), tokenA, """
+                {"name":"A's Employee","active":true,"serviceIds":[%d]}""".formatted(serviceOfB), 400);
+    }
+
+    @Test
+    void a_reservation_cannot_be_created_against_another_businesss_service() throws Exception {
+        send(post("/api/admin/reservations"), tokenA, """
+                {"serviceId":%d,"participants":1,"startTime":"2026-12-10T10:00:00",
+                 "customer":{"firstName":"Walk in","email":"walk.in@example.com","phone":"+38970000000"}}
+                """.formatted(serviceOfB), 404);
     }
 
     @Test
     void an_unauthenticated_request_is_rejected() throws Exception {
-        mockMvc.perform(get("/api/services"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        assertThat(send(get("/api/admin/services"), null, null, 401).get("error").asText())
+                .isEqualTo("UNAUTHENTICATED");
     }
 
     // --- helpers -----------------------------------------------------------
 
-    private Long createService(String token, String name) throws Exception {
-        String response = mockMvc.perform(post("/api/services")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                        .contentType("application/json")
-                        .content("""
-                                {"name":"%s","durationMinutes":60,"price":500,"currency":"MKD",
-                                 "bufferBeforeMinutes":0,"bufferAfterMinutes":0,
-                                 "requiresStaff":true,"requiresResource":false,"active":true}
-                                """.formatted(name)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return json(response).get("id").asLong();
+    private Long createService(String token, String name, String requirements) throws Exception {
+        return send(post("/api/admin/services"), token, serviceBody(name, requirements), 201).get("id").asLong();
     }
 
-    private Long createStaff(String token, String name) throws Exception {
-        String response = mockMvc.perform(post("/api/staff")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                        .contentType("application/json")
-                        .content("""
-                                {"name":"%s","active":true}
-                                """.formatted(name)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return json(response).get("id").asLong();
-    }
-
-    private Long createCustomer(String token, String name, String email) throws Exception {
-        String response = mockMvc.perform(post("/api/customers")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                        .contentType("application/json")
-                        .content("""
-                                {"name":"%s","email":"%s"}
-                                """.formatted(name, email)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return json(response).get("id").asLong();
+    private static String serviceBody(String name, String requirements) {
+        return """
+                {"name":"%s","durationMinutes":60,"price":50,"pricePerParticipant":false,"maxParticipants":1,
+                 "bufferBeforeMinutes":0,"bufferAfterMinutes":0,"allowCustomerResourceSelection":false,
+                 "active":true,"requirements":%s}
+                """.formatted(name, requirements);
     }
 }

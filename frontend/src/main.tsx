@@ -37,7 +37,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
-            <BrowserRouter>
+            {/* Navigations run as transitions: the current page stays on screen until
+                the next one (and its lazily loaded code) is ready, so pages switch
+                in one step instead of flashing a loading screen. */}
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <AuthProvider>
                 <App />
               </AuthProvider>

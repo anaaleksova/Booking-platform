@@ -1,27 +1,45 @@
 package com.bookingsaas.service.dto;
 
+import com.bookingsaas.media.Media;
 import com.bookingsaas.service.BookableService;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 
 public record ServiceResponse(
         Long id,
         String name,
         String description,
+        String category,
+        UUID imageMediaId,
+        String imageUrl,
         int durationMinutes,
         BigDecimal price,
-        String currency,
+        boolean pricePerParticipant,
+        int maxParticipants,
         int bufferBeforeMinutes,
         int bufferAfterMinutes,
-        boolean requiresStaff,
-        boolean requiresResource,
-        boolean active
+        boolean allowCustomerResourceSelection,
+        boolean active,
+        List<RequirementResponse> requirements
 ) {
 
-    public static ServiceResponse from(BookableService service) {
+    public record RequirementResponse(
+            Long id,
+            Long resourceTypeId,
+            String resourceTypeName,
+            int quantity,
+            boolean required,
+            boolean customerCanChoose
+    ) {
+    }
+
+    public static ServiceResponse from(BookableService service, List<RequirementResponse> requirements) {
         return new ServiceResponse(service.getId(), service.getName(), service.getDescription(),
-                service.getDurationMinutes(), service.getPrice(), service.getCurrency(),
-                service.getBufferBeforeMinutes(), service.getBufferAfterMinutes(),
-                service.isRequiresStaff(), service.isRequiresResource(), service.isActive());
+                service.getCategory(), service.getImageMediaId(), Media.urlOf(service.getImageMediaId()),
+                service.getDurationMinutes(), service.getPrice(), service.isPricePerParticipant(),
+                service.getMaxParticipants(), service.getBufferBeforeMinutes(), service.getBufferAfterMinutes(),
+                service.isAllowCustomerResourceSelection(), service.isActive(), requirements);
     }
 }

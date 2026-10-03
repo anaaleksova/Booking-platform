@@ -8,7 +8,6 @@ public record BusinessSettingsResponse(
         int slotIntervalMinutes,
         boolean allowCustomerCancellation,
         int cancellationDeadlineHours,
-        Integer defaultAppointmentDurationMinutes,
         boolean emailNotificationsEnabled,
         boolean reminderNotificationsEnabled,
         int reminderLeadHours
@@ -21,7 +20,6 @@ public record BusinessSettingsResponse(
                 settings.getSlotIntervalMinutes(),
                 settings.isAllowCustomerCancellation(),
                 settings.getCancellationDeadlineHours(),
-                settings.getDefaultAppointmentDurationMinutes(),
                 settings.isEmailNotificationsEnabled(),
                 settings.isReminderNotificationsEnabled(),
                 settings.getReminderLeadHours());

@@ -17,7 +17,7 @@ import java.util.Map;
  * Drains the outbox on a timer.
  *
  * <p>Deliberately simple: one small batch per tick, retried on the next tick if
- * a send fails. No broker, no queue infrastructure — a booking MVP does not
+ * a send fails. No broker, no queue infrastructure — a reservation MVP does not
  * need one, and the outbox already provides the durability that matters.
  */
 @Component

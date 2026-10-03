@@ -11,7 +11,6 @@ public record UpdateBusinessSettingsRequest(
         @NotNull @Min(5) @Max(480) Integer slotIntervalMinutes,
         @NotNull Boolean allowCustomerCancellation,
         @NotNull @Min(0) @Max(720) Integer cancellationDeadlineHours,
-        @Min(1) @Max(1440) Integer defaultAppointmentDurationMinutes,
         @NotNull Boolean emailNotificationsEnabled,
         @NotNull Boolean reminderNotificationsEnabled,
         @NotNull @Min(1) @Max(168) Integer reminderLeadHours

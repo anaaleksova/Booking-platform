@@ -35,7 +35,7 @@ export function LoginPage() {
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: '', password: '' } });
 
   if (!initialising && isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   const onSubmit = handleSubmit(async (values) => {
@@ -43,14 +43,14 @@ export function LoginPage() {
     try {
       await login(values.email, values.password);
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from ?? '/dashboard', { replace: true });
+      navigate(from ?? '/admin', { replace: true });
     } catch (error) {
       setSubmitError(errorMessage(error, 'Could not sign in.'));
     }
   });
 
   return (
-    <AuthShell title="Welcome back" subtitle="Sign in to manage your bookings.">
+    <AuthShell title="Welcome back" subtitle="Sign in to manage your business.">
       <form onSubmit={onSubmit} noValidate>
         <Stack spacing={2.5}>
           {submitError ? <Alert severity="error">{submitError}</Alert> : null}

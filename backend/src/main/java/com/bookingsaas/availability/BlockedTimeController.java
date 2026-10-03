@@ -2,6 +2,7 @@ package com.bookingsaas.availability;
 
 import com.bookingsaas.availability.dto.BlockedTimeRequest;
 import com.bookingsaas.availability.dto.BlockedTimeResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -20,7 +21,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/blocked-times")
+@RequestMapping("/api/admin/blocked-times")
+@Tag(name = "Admin · Business")
 public class BlockedTimeController {
 
     private final BlockedTimeService blockedTimeService;

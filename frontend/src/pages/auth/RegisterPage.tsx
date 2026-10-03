@@ -56,14 +56,14 @@ export function RegisterPage() {
   });
 
   if (!initialising && isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
     try {
       await signUp(values);
-      navigate('/dashboard', { replace: true });
+      navigate('/admin', { replace: true });
     } catch (error) {
       setSubmitError(errorMessage(error, 'Could not create the account.'));
     }

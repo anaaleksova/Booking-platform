@@ -12,8 +12,8 @@ export function NotFoundPage() {
         <Typography color="text.secondary">
           The page you were looking for does not exist or has moved.
         </Typography>
-        <Button component={RouterLink} to="/dashboard" variant="contained">
-          Back to dashboard
+        <Button component={RouterLink} to="/" variant="contained">
+          Go to the home page
         </Button>
       </Stack>
     </Box>

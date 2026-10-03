@@ -1,30 +1,24 @@
 package com.bookingsaas.availability;
 
 import com.bookingsaas.common.domain.TimeRange;
-import com.bookingsaas.service.BookableService;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 /**
- * The only thing the engine needs to know about a service: how long it runs,
- * how much room it needs around itself, and what it must be paired with.
+ * What the engine needs to know about a service: how long it runs, how much
+ * room it needs around itself, and which resources it requires.
  *
- * <p>Keeping this separate from the entity lets the engine be unit-tested with
- * no persistence in sight.
+ * <p>Kept separate from the entity so the engine can be unit-tested with no
+ * persistence in sight.
  */
 public record ServiceSpec(
         Duration duration,
         Duration bufferBefore,
         Duration bufferAfter,
-        boolean requiresStaff,
-        boolean requiresResource
+        List<RequirementSpec> requirements
 ) {
-
-    public static ServiceSpec of(BookableService service) {
-        return new ServiceSpec(service.duration(), service.bufferBefore(), service.bufferAfter(),
-                service.isRequiresStaff(), service.isRequiresResource());
-    }
 
     /** The window the customer sees, and the one shown on the calendar. */
     public TimeRange appointmentRange(Instant start) {
@@ -39,7 +33,7 @@ public record ServiceSpec(
         return TimeRange.of(start.minus(bufferBefore), start.plus(duration).plus(bufferAfter));
     }
 
-    /** How far outside a query window a booking can still reach in. */
+    /** How far outside a query window a reservation can still reach in. */
     public Duration maxSpan() {
         return duration.plus(bufferBefore).plus(bufferAfter);
     }

@@ -46,7 +46,9 @@ services:
       EMAIL_HOST: mailpit
       EMAIL_PORT: 1025
       EMAIL_FROM: ${EMAIL_FROM:-no-reply@bookingplatform.local}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      # Not read from .env: there FRONTEND_URL is the Vite dev server (5173),
+      # but in this setup the SPA is the frontend container published on 3000.
+      FRONTEND_URL: http://localhost:3000
     ports:
       - "${SERVER_PORT:-8080}:8080"
 

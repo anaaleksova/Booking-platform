@@ -2,6 +2,7 @@ package com.bookingsaas.customer;
 
 import com.bookingsaas.customer.dto.CustomerRequest;
 import com.bookingsaas.customer.dto.CustomerResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -18,7 +19,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/customers")
+@RequestMapping("/api/admin/customers")
+@Tag(name = "Admin · Customers")
 public class CustomerController {
 
     private final CustomerService customerService;

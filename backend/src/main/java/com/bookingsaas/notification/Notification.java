@@ -18,12 +18,12 @@ import java.time.Instant;
 /**
  * One queued message.
  *
- * <p>An outbox row rather than a direct send: booking creation must not fail
+ * <p>An outbox row rather than a direct send: reservation creation must not fail
  * because an SMTP server is slow, and a message that could not be delivered
  * stays visible instead of vanishing into a log line.
  */
 @Entity
-@Table(name = "notifications")
+@Table(name = "notification")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -38,8 +38,8 @@ public class Notification extends Auditable {
     @Column(name = "business_id", nullable = false)
     private Long businessId;
 
-    @Column(name = "booking_id")
-    private Long bookingId;
+    @Column(name = "reservation_id")
+    private Long reservationId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)

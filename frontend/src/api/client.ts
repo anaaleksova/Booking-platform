@@ -40,10 +40,10 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
     const status = error.response?.status;
-    const code = error.response?.data?.code;
+    const code = error.response?.data?.error;
 
     // An expired or invalid token ends the session everywhere at once. Public
-    // booking pages never carry a token, so they are unaffected.
+    // customer pages never carry a token, so they are unaffected.
     if (status === 401 && (code === 'TOKEN_EXPIRED' || code === 'UNAUTHENTICATED')) {
       tokenStorage.clear();
       onSessionExpired?.();
@@ -73,5 +73,5 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
 }
 
 export function errorCode(error: unknown): string | undefined {
-  return axios.isAxiosError<ApiError>(error) ? error.response?.data?.code : undefined;
+  return axios.isAxiosError<ApiError>(error) ? error.response?.data?.error : undefined;
 }

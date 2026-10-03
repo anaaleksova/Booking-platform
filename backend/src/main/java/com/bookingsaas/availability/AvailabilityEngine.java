@@ -1,9 +1,12 @@
 package com.bookingsaas.availability;
 
+import com.bookingsaas.availability.ResourceAllocation.AllocatedResource;
+import com.bookingsaas.availability.SlotEvaluation.RequirementOption;
 import com.bookingsaas.availability.dto.AvailableSlot;
 import com.bookingsaas.availability.dto.DayAvailability;
 import com.bookingsaas.common.domain.DayInterval;
 import com.bookingsaas.common.domain.TimeRange;
+import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
 import org.springframework.stereotype.Component;
 
@@ -13,27 +16,38 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * The availability engine.
  *
  * <p>Pure computation over an {@link AvailabilityContext}: no repositories, no
- * clock of its own, no Spring beyond the stereotype. Every rule in the product
- * spec is one step here, in this order:
+ * clock of its own, no Spring beyond the stereotype. For a start time, in this
+ * order:
  *
  * <ol>
- *   <li>business working hours for the date, in the business timezone</li>
- *   <li>minus business-wide blocked time</li>
- *   <li>candidate starts on the configured slot grid</li>
- *   <li>the appointment must fit entirely inside an open window</li>
- *   <li>lead-time rules (minimum notice, maximum advance)</li>
- *   <li>at least one eligible staff member free, if the service needs one</li>
- *   <li>at least one eligible resource free, if the service needs one</li>
+ *   <li>lead-time rules (minimum notice, maximum advance) — customer-facing only</li>
+ *   <li>the business must be open for the whole appointment (opening hours
+ *       minus business-wide closures, in the business timezone)</li>
+ *   <li>for every resource requirement of the service: enough eligible
+ *       resources of the type must be free — inside their own schedule, with
+ *       no reservation or blocked time touching the block window — and
+ *       {@code quantity} of them must together have the capacity for the
+ *       group</li>
  * </ol>
  *
+ * <p>A <em>shared</em> resource is free while it has seats left: other
+ * bookings use up seats rather than the whole resource, and only the seats
+ * still free count towards the group. A private resource with a minimum group
+ * size is not offered to smaller groups.
+ *
  * <p>Two windows are involved throughout and must not be confused: the
- * <em>appointment</em> is what the customer books and must sit inside working
+ * <em>appointment</em> is what the customer books and must sit inside opening
  * hours; the <em>block</em> is the appointment plus buffers and is what must
  * not collide with anything else.
  */
@@ -67,8 +81,7 @@ public class AvailabilityEngine {
                         LocalTime.from(start.atZone(ctx.zone())),
                         start,
                         start.plus(ctx.service().duration()),
-                        evaluation.staffIds(),
-                        evaluation.resourceIds()));
+                        evaluation.options()));
             }
         }
         return new DayAvailability(date, slots);
@@ -76,13 +89,12 @@ public class AvailabilityEngine {
 
     /**
      * Candidate start times, stepped by the slot interval from the start of
-     * each working interval.
+     * each opening interval.
      *
-     * <p>The grid is generated from the raw working hours rather than from the
-     * windows left after blocked time, so a 12:00-12:40 meeting does not push
-     * the afternoon onto a 12:40, 12:55, … grid. Candidates that the blocked
-     * time actually invalidates are dropped a moment later by
-     * {@link #evaluate}.
+     * <p>The grid is generated from the raw opening hours rather than the
+     * windows left after closures, so a 12:00-12:40 closure does not push the
+     * afternoon onto a 12:40, 13:10, … grid. Candidates that the closure
+     * actually invalidates are dropped a moment later by {@link #evaluate}.
      */
     private List<Instant> candidateStarts(AvailabilityContext ctx, DaySchedule day) {
         Duration step = ctx.rules().slotInterval();
@@ -104,9 +116,9 @@ public class AvailabilityEngine {
     // --- single start time -------------------------------------------------
 
     /**
-     * The authoritative check for one exact start time. Booking creation and
-     * rescheduling both go through here, so a hand-typed 10:07 is validated by
-     * the same rules as a slot picked off the grid.
+     * The authoritative check for one exact start time. Reservation creation,
+     * rescheduling and resource reassignment all go through here, so a
+     * hand-typed 10:07 is validated by the same rules as a slot off the grid.
      */
     public SlotEvaluation evaluate(AvailabilityContext ctx, Instant start) {
         return evaluate(ctx, scheduleFor(ctx, LocalDate.ofInstant(start, ctx.zone())), start);
@@ -123,57 +135,242 @@ public class AvailabilityEngine {
         }
 
         if (!appointment.containedInAny(day.openWindows())) {
-            return SlotEvaluation.rejected(ErrorCode.BOOKING_OUTSIDE_WORKING_HOURS,
-                    "The business is not open for the whole of that appointment.");
+            return SlotEvaluation.rejected(ErrorCode.OUTSIDE_BUSINESS_HOURS,
+                    "The business is not open for the whole of that reservation.");
         }
 
-        List<Long> freeStaff = new ArrayList<>();
-        for (Long staffId : ctx.staffIds()) {
-            List<TimeRange> windows = day.staffWindows(staffId);
-            if (appointment.containedInAny(windows) && !block.overlapsAny(ctx.busyFor(ctx.staffBusy(), staffId))) {
-                freeStaff.add(staffId);
+        List<RequirementOption> options = new ArrayList<>();
+        for (RequirementSpec requirement : service.requirements()) {
+            List<ResourceSpec> free = new ArrayList<>();
+            Map<Long, Integer> seatsLeft = new HashMap<>();
+            for (Long resourceId : requirement.eligibleResourceIds()) {
+                ResourceSpec resource = ctx.resources().get(resourceId);
+                if (resource == null
+                        || !appointment.containedInAny(day.resourceWindows(ctx, resourceId))
+                        || block.overlapsAny(ctx.busyOf(resourceId))) {
+                    continue;
+                }
+                if (resource.shared() && resource.capacity() != null) {
+                    int left = resource.capacity() - peakSeats(ctx.seatsOf(resourceId), block);
+                    if (left > 0) {
+                        seatsLeft.put(resourceId, left);
+                        free.add(resource.withCapacity(left));
+                    }
+                } else if (!overlapsSeats(ctx.seatsOf(resourceId), block)
+                        && !keptForBiggerGroups(resource, ctx.participants())) {
+                    free.add(resource);
+                }
             }
-        }
-        if (service.requiresStaff() && freeStaff.isEmpty()) {
-            return SlotEvaluation.rejected(ErrorCode.NO_STAFF_AVAILABLE,
-                    "No staff member is available at that time.");
-        }
+            List<ResourceSpec> ordered = byPreference(ctx, free);
+            boolean satisfiable = bestFit(ordered, requirement.quantity(), ctx.participants()) != null;
 
-        List<Long> freeResources = new ArrayList<>();
-        for (Long resourceId : ctx.resourceIds()) {
-            // Resources have no schedule of their own: they are available
-            // whenever the business is open and nothing else holds them.
-            if (!block.overlapsAny(ctx.busyFor(ctx.resourceBusy(), resourceId))) {
-                freeResources.add(resourceId);
+            if (requirement.required() && !satisfiable) {
+                return SlotEvaluation.rejected(ErrorCode.RESOURCE_NOT_AVAILABLE,
+                        unavailableMessage(requirement, free.size(), ctx.participants()));
             }
+            options.add(new RequirementOption(requirement, ordered.stream().map(ResourceSpec::id).toList(),
+                    satisfiable, Map.copyOf(seatsLeft)));
         }
-        if (service.requiresResource() && freeResources.isEmpty()) {
-            return SlotEvaluation.rejected(ErrorCode.NO_RESOURCE_AVAILABLE,
-                    "No resource is available at that time.");
-        }
-
-        return SlotEvaluation.available(
-                service.requiresStaff() || !freeStaff.isEmpty() ? List.copyOf(freeStaff) : List.of(),
-                service.requiresResource() || !freeResources.isEmpty() ? List.copyOf(freeResources) : List.of());
+        return SlotEvaluation.available(List.copyOf(options));
     }
 
-    /** Minimum notice and maximum advance; skipped for bookings the business takes itself. */
+    // --- allocation --------------------------------------------------------
+
+    /**
+     * Validates a start time and fixes the concrete resources.
+     *
+     * @param chosen requirement id → resources picked by the customer or the
+     *               admin. Requirements not in the map are assigned
+     *               automatically, best fit first.
+     * @throws ApiException when the slot is not available or a choice is not
+     *                      valid for it
+     */
+    public ResourceAllocation allocate(AvailabilityContext ctx, Instant start, Map<Long, List<Long>> chosen) {
+        SlotEvaluation evaluation = evaluate(ctx, start);
+        if (!evaluation.available()) {
+            throw evaluation.toException();
+        }
+
+        Set<Long> knownRequirements = new HashSet<>();
+        List<AllocatedResource> allocated = new ArrayList<>();
+        for (RequirementOption option : evaluation.options()) {
+            RequirementSpec requirement = option.requirement();
+            knownRequirements.add(requirement.requirementId());
+            List<Long> picked = chosen.get(requirement.requirementId());
+
+            List<ResourceSpec> resources = picked == null || picked.isEmpty()
+                    ? autoAssign(ctx, option)
+                    : validateChoice(ctx, option, picked);
+            allocated.addAll(seat(requirement, resources, ctx.participants()));
+        }
+
+        for (Long requirementId : chosen.keySet()) {
+            if (!knownRequirements.contains(requirementId)) {
+                throw ApiException.of(ErrorCode.INVALID_RESOURCE_SELECTION,
+                        "The selection refers to a requirement this service does not have.");
+            }
+        }
+
+        TimeRange appointment = ctx.service().appointmentRange(start);
+        TimeRange block = ctx.service().blockRange(start);
+        return new ResourceAllocation(appointment.start(), appointment.end(), block.start(), block.end(),
+                List.copyOf(allocated));
+    }
+
+    private List<ResourceSpec> autoAssign(AvailabilityContext ctx, RequirementOption option) {
+        List<ResourceSpec> ordered = option.candidateIds().stream().map(id -> asSeen(ctx, option, id)).toList();
+        List<ResourceSpec> fit = bestFit(ordered, option.requirement().quantity(), ctx.participants());
+        // Only an optional requirement reaches here unsatisfied: skip it.
+        return fit == null ? List.of() : fit;
+    }
+
+    /**
+     * Seats the group: a shared resource holds only the seats the group still
+     * needs, the rest stay bookable; a private one is taken whole.
+     */
+    private static List<AllocatedResource> seat(RequirementSpec requirement, List<ResourceSpec> resources,
+                                                int participants) {
+        List<AllocatedResource> allocated = new ArrayList<>();
+        long unseated = participants;
+        for (ResourceSpec resource : resources) {
+            long used = Math.min(resource.effectiveCapacity(), Math.max(unseated, 0));
+            Integer seats = resource.shared() ? (int) Math.max(1, used) : null;
+            allocated.add(new AllocatedResource(requirement.requirementId(), resource.id(), seats));
+            unseated -= used;
+        }
+        return allocated;
+    }
+
+    /** The resource as it is at this time: a shared one with only its free seats. */
+    private static ResourceSpec asSeen(AvailabilityContext ctx, RequirementOption option, Long id) {
+        Integer left = option.seatsLeft().get(id);
+        ResourceSpec resource = ctx.resources().get(id);
+        return left == null ? resource : resource.withCapacity(left);
+    }
+
+    private static boolean keptForBiggerGroups(ResourceSpec resource, int participants) {
+        return !resource.shared() && resource.minPartySize() != null && participants < resource.minPartySize();
+    }
+
+    /** Whether any seat booking touches the window — a private resource then is not wholly free. */
+    private static boolean overlapsSeats(List<SeatUse> uses, TimeRange window) {
+        return uses.stream().anyMatch(use -> use.range().overlaps(window));
+    }
+
+    /**
+     * The most seats in use at any moment of the window. Occupancy only rises
+     * when a booking starts, so the window start and every start inside it are
+     * the moments to check.
+     */
+    static int peakSeats(List<SeatUse> uses, TimeRange window) {
+        List<SeatUse> overlapping = uses.stream().filter(use -> use.range().overlaps(window)).toList();
+        List<Instant> moments = new ArrayList<>();
+        moments.add(window.start());
+        overlapping.stream().map(use -> use.range().start())
+                .filter(start -> start.isAfter(window.start()) && start.isBefore(window.end()))
+                .forEach(moments::add);
+        int peak = 0;
+        for (Instant moment : moments) {
+            int load = overlapping.stream()
+                    .filter(use -> !use.range().start().isAfter(moment) && use.range().end().isAfter(moment))
+                    .mapToInt(SeatUse::seats)
+                    .sum();
+            peak = Math.max(peak, load);
+        }
+        return peak;
+    }
+
+    private List<ResourceSpec> validateChoice(AvailabilityContext ctx, RequirementOption option, List<Long> picked) {
+        RequirementSpec requirement = option.requirement();
+        String type = requirement.resourceTypeName();
+        Set<Long> distinct = new HashSet<>(picked);
+        if (distinct.size() != picked.size() || picked.size() != requirement.quantity()) {
+            throw ApiException.of(ErrorCode.INVALID_RESOURCE_SELECTION,
+                    "Select exactly " + requirement.quantity() + " × " + type + ".");
+        }
+        for (Long id : picked) {
+            if (!requirement.eligibleResourceIds().contains(id)) {
+                throw ApiException.of(ErrorCode.INVALID_RESOURCE_SELECTION,
+                        "The selected " + type + " cannot be used for this service.");
+            }
+            ResourceSpec resource = ctx.resources().get(id);
+            if (resource != null && keptForBiggerGroups(resource, ctx.participants())) {
+                throw ApiException.of(ErrorCode.INVALID_RESOURCE_SELECTION,
+                        "The selected " + type + " is kept for groups of " + resource.minPartySize() + " or more.");
+            }
+            if (!option.candidateIds().contains(id)) {
+                throw ApiException.of(ErrorCode.RESOURCE_NOT_AVAILABLE,
+                        "The selected " + type + " is no longer available at that time.");
+            }
+        }
+        List<ResourceSpec> seen = picked.stream().map(id -> asSeen(ctx, option, id)).toList();
+        long capacity = seen.stream().mapToLong(ResourceSpec::effectiveCapacity).sum();
+        if (capacity < ctx.participants()) {
+            throw ApiException.of(ErrorCode.INVALID_RESOURCE_SELECTION,
+                    "The selected " + type + " cannot accommodate " + ctx.participants() + " participants"
+                            + (seen.stream().anyMatch(ResourceSpec::shared) ? " — not enough seats are left." : "."));
+        }
+        return seen;
+    }
+
+    /**
+     * Smallest adequate combination: from resources sorted by ascending
+     * capacity, the first run of {@code quantity} whose combined capacity
+     * covers the group. A party of two gets the two-seat table, not the
+     * six-seat one; among equals, the least busy resource is used first.
+     *
+     * @return the chosen resources, or {@code null} when none suffices
+     */
+    static List<ResourceSpec> bestFit(List<ResourceSpec> orderedByCapacity, int quantity, int participants) {
+        if (orderedByCapacity.size() < quantity) {
+            return null;
+        }
+        for (int i = 0; i + quantity <= orderedByCapacity.size(); i++) {
+            List<ResourceSpec> window = orderedByCapacity.subList(i, i + quantity);
+            long capacity = window.stream().mapToLong(ResourceSpec::effectiveCapacity).sum();
+            if (capacity >= participants) {
+                return List.copyOf(window);
+            }
+        }
+        return null;
+    }
+
+    /** Ascending capacity (unlimited last), then least busy, then the incoming (alphabetical) order. */
+    private static List<ResourceSpec> byPreference(AvailabilityContext ctx, List<ResourceSpec> resources) {
+        List<ResourceSpec> sorted = new ArrayList<>(resources);
+        sorted.sort(Comparator.comparingLong(ResourceSpec::effectiveCapacity)
+                .thenComparingInt(resource -> ctx.busyOf(resource.id()).size()));
+        return sorted;
+    }
+
+    private static String unavailableMessage(RequirementSpec requirement, int freeCount, int participants) {
+        String type = requirement.resourceTypeName();
+        if (freeCount < requirement.quantity()) {
+            return requirement.quantity() == 1
+                    ? "No " + type + " is available at that time."
+                    : "Not enough " + type + " resources are available at that time ("
+                    + requirement.quantity() + " needed).";
+        }
+        return "No available " + type + " can accommodate " + participants + " participants at that time.";
+    }
+
+    /** Minimum notice and maximum advance; skipped for reservations the business takes itself. */
     private SlotEvaluation checkLeadTimes(AvailabilityContext ctx, Instant start) {
         if (!ctx.rules().enforceLeadTimes()) {
             return null;
         }
         if (start.isBefore(ctx.now())) {
-            return SlotEvaluation.rejected(ErrorCode.BOOKING_IN_THE_PAST, "That time has already passed.");
+            return SlotEvaluation.rejected(ErrorCode.RESERVATION_IN_THE_PAST, "That time has already passed.");
         }
         if (start.isBefore(ctx.now().plus(ctx.rules().minimumNotice()))) {
-            return SlotEvaluation.rejected(ErrorCode.BOOKING_TOO_SOON,
-                    "Bookings need at least " + describe(ctx.rules().minimumNotice()) + " notice.");
+            return SlotEvaluation.rejected(ErrorCode.RESERVATION_TOO_SOON,
+                    "Reservations need at least " + describe(ctx.rules().minimumNotice()) + " notice.");
         }
         LocalDate lastBookableDay = LocalDate.ofInstant(ctx.now(), ctx.zone())
                 .plusDays(ctx.rules().maximumAdvanceDays());
         if (LocalDate.ofInstant(start, ctx.zone()).isAfter(lastBookableDay)) {
-            return SlotEvaluation.rejected(ErrorCode.BOOKING_TOO_FAR_IN_ADVANCE,
-                    "Bookings can be made up to " + ctx.rules().maximumAdvanceDays() + " days ahead.");
+            return SlotEvaluation.rejected(ErrorCode.RESERVATION_TOO_FAR_IN_ADVANCE,
+                    "Reservations can be made up to " + ctx.rules().maximumAdvanceDays() + " days ahead.");
         }
         return null;
     }
@@ -186,19 +383,7 @@ public class AvailabilityEngine {
         List<TimeRange> openWindows = gridWindows.isEmpty()
                 ? List.of()
                 : TimeRange.subtractAll(gridWindows, ctx.businessBlocks());
-
-        java.util.Map<Long, List<TimeRange>> staffWindows = new java.util.HashMap<>();
-        for (Long staffId : ctx.staffIds()) {
-            List<DayInterval> personal = ctx.staffHours().get(staffId);
-            if (personal == null || personal.isEmpty()) {
-                // No personal schedule: the staff member follows the business.
-                staffWindows.put(staffId, openWindows);
-            } else {
-                List<TimeRange> own = TimeRange.merge(toRanges(ctx, date, personal));
-                staffWindows.put(staffId, own.isEmpty() ? List.of() : TimeRange.intersect(own, openWindows));
-            }
-        }
-        return new DaySchedule(gridWindows, openWindows, staffWindows);
+        return new DaySchedule(date, gridWindows, openWindows, new HashMap<>());
     }
 
     /**
@@ -225,15 +410,26 @@ public class AvailabilityEngine {
     }
 
     /**
-     * @param gridWindows working hours as configured, used to lay out the slot grid
-     * @param openWindows the same windows minus business-wide blocked time
+     * @param gridWindows opening hours as configured, used to lay out the slot grid
+     * @param openWindows the same windows minus business-wide closures
+     * @param resourceWindowCache each resource's windows for the day, computed on first use
      */
-    private record DaySchedule(List<TimeRange> gridWindows,
+    private record DaySchedule(LocalDate date,
+                               List<TimeRange> gridWindows,
                                List<TimeRange> openWindows,
-                               java.util.Map<Long, List<TimeRange>> staffWindowsById) {
+                               Map<Long, List<TimeRange>> resourceWindowCache) {
 
-        List<TimeRange> staffWindows(Long staffId) {
-            return staffWindowsById.getOrDefault(staffId, List.of());
+        /** When the resource can be used that day: its own hours within the open windows. */
+        List<TimeRange> resourceWindows(AvailabilityContext ctx, Long resourceId) {
+            return resourceWindowCache.computeIfAbsent(resourceId, id -> {
+                List<DayInterval> own = ctx.resourceHours().get(id);
+                if (own == null || own.isEmpty()) {
+                    // No schedule of its own: available whenever the business is.
+                    return openWindows;
+                }
+                List<TimeRange> ranges = TimeRange.merge(toRanges(ctx, date, own));
+                return ranges.isEmpty() ? List.of() : TimeRange.intersect(ranges, openWindows);
+            });
         }
     }
 

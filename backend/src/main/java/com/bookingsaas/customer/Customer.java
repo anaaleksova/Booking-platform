@@ -14,13 +14,13 @@ import lombok.Setter;
 /**
  * A customer of one business.
  *
- * <p>Tenant-scoped by design: the same person booking at a salon and at a
- * dentist is two unrelated rows, so no business can learn anything about
+ * <p>Tenant-scoped by design: the same person booking at a spa and at a
+ * restaurant is two unrelated rows, so no business can learn anything about
  * another's clientele. Customers have no login in the MVP — a name plus a way
- * to reach them is enough to take a booking.
+ * to reach them is enough to take a reservation.
  */
 @Entity
-@Table(name = "customers")
+@Table(name = "customer")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -33,15 +33,22 @@ public class Customer extends Auditable {
     @Column(name = "business_id", nullable = false)
     private Long businessId;
 
-    @Column(nullable = false, length = 160)
-    private String name;
+    @Column(name = "first_name", nullable = false, length = 80)
+    private String firstName;
 
-    @Column(length = 40)
-    private String phone;
+    @Column(name = "last_name", nullable = false, length = 80)
+    private String lastName = "";
 
     @Column(length = 320)
     private String email;
 
+    @Column(length = 40)
+    private String phone;
+
     @Column(columnDefinition = "text")
     private String notes;
+
+    public String fullName() {
+        return lastName == null || lastName.isBlank() ? firstName : firstName + " " + lastName;
+    }
 }

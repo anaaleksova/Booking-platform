@@ -8,13 +8,17 @@ import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
 import com.bookingsaas.common.security.BusinessRole;
 import com.bookingsaas.common.security.CurrentTenant;
+import com.bookingsaas.media.MediaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DateTimeException;
 import java.time.ZoneId;
+import java.util.Locale;
+import java.util.UUID;
 
 /**
  * Tenant profile and booking rules.
@@ -31,18 +35,24 @@ public class BusinessService {
     private final BusinessRepository businessRepository;
     private final BusinessSettingsRepository settingsRepository;
     private final BusinessUserRepository businessUserRepository;
-    private final WorkingHoursService workingHoursService;
+    private final OpeningHoursService openingHoursService;
+    private final MediaService mediaService;
+    private final ApplicationEventPublisher events;
     private final CurrentTenant currentTenant;
 
     public BusinessService(BusinessRepository businessRepository,
                            BusinessSettingsRepository settingsRepository,
                            BusinessUserRepository businessUserRepository,
-                           WorkingHoursService workingHoursService,
+                           OpeningHoursService openingHoursService,
+                           MediaService mediaService,
+                           ApplicationEventPublisher events,
                            CurrentTenant currentTenant) {
         this.businessRepository = businessRepository;
         this.settingsRepository = settingsRepository;
         this.businessUserRepository = businessUserRepository;
-        this.workingHoursService = workingHoursService;
+        this.openingHoursService = openingHoursService;
+        this.mediaService = mediaService;
+        this.events = events;
         this.currentTenant = currentTenant;
     }
 
@@ -64,7 +74,8 @@ public class BusinessService {
         settingsRepository.save(new BusinessSettings(saved.getId()));
         // A business with no opening hours would have no availability at all,
         // so onboarding starts from a weekday default the owner can edit.
-        workingHoursService.applyDefaultWeek(saved.getId());
+        openingHoursService.applyDefaultWeek(saved.getId());
+        events.publishEvent(new BusinessCreatedEvent(saved.getId()));
 
         log.info("Business created id={} slug={} owner={}", saved.getId(), saved.getSlug(), ownerUserId);
         return saved;
@@ -82,7 +93,7 @@ public class BusinessService {
     @Transactional(readOnly = true)
     public Business requireActiveBySlug(String slug) {
         return businessRepository.findBySlugAndActiveTrue(slug)
-                .orElseThrow(() -> ApiException.notFound("No business is published at /book/" + slug));
+                .orElseThrow(() -> ApiException.notFound("No business is published at /b/" + slug));
     }
 
     /**
@@ -100,6 +111,7 @@ public class BusinessService {
         return requireById(businessId).zoneId();
     }
 
+
     // --- dashboard API -----------------------------------------------------
 
     @Transactional(readOnly = true)
@@ -116,19 +128,40 @@ public class BusinessService {
         if (!business.getSlug().equals(request.slug())
                 && businessRepository.findBySlug(request.slug()).filter(b -> !b.getId().equals(businessId)).isPresent()) {
             throw ApiException.of(ErrorCode.SLUG_ALREADY_TAKEN,
-                    "The address /book/" + request.slug() + " is already in use.");
+                    "The address /b/" + request.slug() + " is already in use.");
         }
 
         business.setName(request.name().trim());
         business.setSlug(request.slug());
         business.setDescription(trimToNull(request.description()));
-        business.setLogoUrl(trimToNull(request.logoUrl()));
+        business.setTagline(trimToNull(request.tagline()));
+        if (request.accentColor() != null) {
+            business.setAccentColor(request.accentColor().toLowerCase(Locale.ROOT));
+        }
+        UUID previousLogo = business.getLogoMediaId();
+        UUID previousCover = business.getCoverMediaId();
+        business.setLogoMediaId(mediaService.requireOwned(businessId, request.logoMediaId()));
+        business.setCoverMediaId(mediaService.requireOwned(businessId, request.coverMediaId()));
+        business.setInstagramUrl(trimToNull(request.instagramUrl()));
+        business.setFacebookUrl(trimToNull(request.facebookUrl()));
+        business.setWebsiteUrl(trimToNull(request.websiteUrl()));
+        if (request.showMap() != null) {
+            business.setShowMap(request.showMap());
+        }
+        if (request.showGallery() != null) {
+            business.setShowGallery(request.showGallery());
+        }
         business.setPhone(trimToNull(request.phone()));
         business.setEmail(trimToNull(request.email()));
         business.setAddress(trimToNull(request.address()));
         business.setTimezone(validTimezone(request.timezone()));
+        business.setCurrency(request.currency().toUpperCase(Locale.ROOT));
 
-        return BusinessResponse.from(businessRepository.save(business));
+        Business saved = businessRepository.saveAndFlush(business);
+        // A replaced logo or cover is deleted, so storage does not fill up with old versions.
+        mediaService.discardIfReplaced(businessId, previousLogo, saved.getLogoMediaId());
+        mediaService.discardIfReplaced(businessId, previousCover, saved.getCoverMediaId());
+        return BusinessResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -148,7 +181,6 @@ public class BusinessService {
         settings.setSlotIntervalMinutes(request.slotIntervalMinutes());
         settings.setAllowCustomerCancellation(request.allowCustomerCancellation());
         settings.setCancellationDeadlineHours(request.cancellationDeadlineHours());
-        settings.setDefaultAppointmentDurationMinutes(request.defaultAppointmentDurationMinutes());
         settings.setEmailNotificationsEnabled(request.emailNotificationsEnabled());
         settings.setReminderNotificationsEnabled(request.reminderNotificationsEnabled());
         settings.setReminderLeadHours(request.reminderLeadHours());

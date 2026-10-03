@@ -16,11 +16,13 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     List<Customer> findByBusinessIdAndIdIn(Long businessId, Collection<Long> ids);
 
+    long countByBusinessId(Long businessId);
+
     @Query("""
            select c from Customer c
            where c.businessId = :businessId
              and (:term is null
-                  or lower(c.name) like :term
+                  or lower(concat(c.firstName, ' ', c.lastName)) like :term
                   or lower(coalesce(c.email, '')) like :term
                   or coalesce(c.phone, '') like :term)
            """)

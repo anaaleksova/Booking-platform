@@ -17,7 +17,7 @@ import java.time.Instant;
 
 /** Join between a login account and a tenant, carrying the role held there. */
 @Entity
-@Table(name = "business_users")
+@Table(name = "business_user")
 @Getter
 @Setter
 @NoArgsConstructor

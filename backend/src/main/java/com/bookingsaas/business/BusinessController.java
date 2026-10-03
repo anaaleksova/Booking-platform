@@ -4,6 +4,7 @@ import com.bookingsaas.business.dto.BusinessResponse;
 import com.bookingsaas.business.dto.BusinessSettingsResponse;
 import com.bookingsaas.business.dto.UpdateBusinessRequest;
 import com.bookingsaas.business.dto.UpdateBusinessSettingsRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -13,11 +14,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The tenant acts on <em>its own</em> business only — there is deliberately no
- * {@code /api/businesses/{id}} route, so there is no id for a client to tamper
+ * {@code /api/admin/businesses/{id}} route, so there is no id for a client to tamper
  * with.
  */
 @RestController
-@RequestMapping("/api/business")
+@RequestMapping("/api/admin/business")
+@Tag(name = "Admin · Business")
 public class BusinessController {
 
     private final BusinessService businessService;

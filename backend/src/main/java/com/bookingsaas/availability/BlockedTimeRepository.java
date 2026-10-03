@@ -20,15 +20,11 @@ public interface BlockedTimeRepository extends JpaRepository<BlockedTime, Long> 
     @Query("""
            select b from BlockedTime b
            where b.businessId = :businessId
-             and b.startDateTime < :to
-             and b.endDateTime > :from
-           order by b.startDateTime
+             and b.startTime < :to
+             and b.endTime > :from
+           order by b.startTime
            """)
     List<BlockedTime> findOverlapping(@Param("businessId") Long businessId,
                                       @Param("from") Instant from,
                                       @Param("to") Instant to);
-
-    void deleteByStaffId(Long staffId);
-
-    void deleteByResourceId(Long resourceId);
 }

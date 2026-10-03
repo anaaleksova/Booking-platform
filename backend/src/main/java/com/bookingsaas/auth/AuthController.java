@@ -5,6 +5,7 @@ import com.bookingsaas.auth.dto.CurrentUserResponse;
 import com.bookingsaas.auth.dto.LoginRequest;
 import com.bookingsaas.auth.dto.RegisterRequest;
 import com.bookingsaas.common.security.CurrentTenant;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "Auth")
 public class AuthController {
 
     private final AuthService authService;

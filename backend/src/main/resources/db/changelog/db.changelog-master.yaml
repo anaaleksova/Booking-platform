@@ -1,0 +1,45 @@
+# ---------------------------------------------------------------------------
+# Liquibase master changelog.
+#
+# Changesets are plain SQL ("formatted SQL") so the schema reads exactly as
+# PostgreSQL will run it — the exclusion constraints and partial indexes that
+# prevent double booking have no portable Liquibase equivalent anyway.
+#
+# Never edit a changeset that has been applied somewhere; add a new file.
+# ---------------------------------------------------------------------------
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-platform-and-business.sql
+  - include:
+      file: db/changelog/changes/002-catalogue-and-resources.sql
+  - include:
+      file: db/changelog/changes/003-customers-discounts-reservations.sql
+  - include:
+      file: db/changelog/changes/004-notifications.sql
+  - include:
+      file: db/changelog/changes/005-media-and-branding.sql
+  - include:
+      file: db/changelog/changes/006-gallery.sql
+  - include:
+      file: db/changelog/changes/007-floor-plans.sql
+  - include:
+      file: db/changelog/changes/008-floor-plan-decor.sql
+  - include:
+      file: db/changelog/changes/009-shared-seating.sql
+  - include:
+      file: db/changelog/changes/010-floors.sql
+  # Demo data: only runs with the "dev" context (see application-dev.yml).
+  - include:
+      file: db/changelog/seed/100-demo-data.sql
+  - include:
+      file: db/changelog/seed/101-demo-branding.sql
+  - include:
+      file: db/changelog/seed/102-demo-floor-plan.sql
+  - include:
+      file: db/changelog/seed/103-demo-floor-plan-decor.sql
+  - include:
+      file: db/changelog/seed/104-demo-floor-plan-sizes.sql
+  - include:
+      file: db/changelog/seed/105-demo-shared-seating.sql
+  - include:
+      file: db/changelog/seed/106-demo-floor-names.sql

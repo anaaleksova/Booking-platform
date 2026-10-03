@@ -10,9 +10,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** "This resource can host this service", e.g. only Reformers host Reformer Pilates. */
+/** "This resource can serve this service" — e.g. Maria performs massages but not facials. */
 @Entity
-@Table(name = "resource_services")
+@Table(name = "resource_service")
 @Getter
 @Setter
 @NoArgsConstructor

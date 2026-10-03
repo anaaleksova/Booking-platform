@@ -15,29 +15,45 @@ import java.util.Map;
  * deterministic, which is what makes the availability rules testable one at a
  * time.
  *
- * @param staffBusy    per staff member, the windows they are already taken —
- *                     bookings (buffers included) and blocked time merged,
- *                     because the engine treats them identically
- * @param staffHours   per staff member, their own weekly schedule. A member
- *                     absent from this map follows the business hours; a member
- *                     present but with no interval on a given day is off that
- *                     day
+ * @param participants   group size the reservation is for
+ * @param resources      every candidate resource referenced by the service's
+ *                       requirements, by id
+ * @param resourceHours  per resource, its own weekly schedule. A resource absent
+ *                       from this map follows the business hours
+ * @param resourceBusy   per resource, the windows it is wholly taken —
+ *                       whole-resource reservations (buffers included) and
+ *                       blocked time merged, because the engine treats them
+ *                       identically
+ * @param seatUse        per resource, seats held by bookings that share it
  */
 public record AvailabilityContext(
         ZoneId zone,
         ServiceSpec service,
-        BookingRules rules,
+        int participants,
+        ReservationRules rules,
         List<DayInterval> businessHours,
         List<TimeRange> businessBlocks,
-        List<Long> staffIds,
-        Map<Long, List<DayInterval>> staffHours,
-        Map<Long, List<TimeRange>> staffBusy,
-        List<Long> resourceIds,
+        Map<Long, ResourceSpec> resources,
+        Map<Long, List<DayInterval>> resourceHours,
         Map<Long, List<TimeRange>> resourceBusy,
+        Map<Long, List<SeatUse>> seatUse,
         Instant now
 ) {
 
-    public List<TimeRange> busyFor(Map<Long, List<TimeRange>> source, Long id) {
-        return source.getOrDefault(id, List.of());
+    /** A context without any shared-seat bookings. */
+    public AvailabilityContext(ZoneId zone, ServiceSpec service, int participants, ReservationRules rules,
+                               List<DayInterval> businessHours, List<TimeRange> businessBlocks,
+                               Map<Long, ResourceSpec> resources, Map<Long, List<DayInterval>> resourceHours,
+                               Map<Long, List<TimeRange>> resourceBusy, Instant now) {
+        this(zone, service, participants, rules, businessHours, businessBlocks, resources, resourceHours,
+                resourceBusy, Map.of(), now);
+    }
+
+    public List<TimeRange> busyOf(Long resourceId) {
+        return resourceBusy.getOrDefault(resourceId, List.of());
+    }
+
+    public List<SeatUse> seatsOf(Long resourceId) {
+        return seatUse.getOrDefault(resourceId, List.of());
     }
 }

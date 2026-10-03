@@ -1,10 +1,11 @@
 package com.bookingsaas.service;
 
+import com.bookingsaas.service.dto.ServiceDeletionResponse;
 import com.bookingsaas.service.dto.ServiceRequest;
 import com.bookingsaas.service.dto.ServiceResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -20,7 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/services")
+@RequestMapping("/api/admin/services")
+@Tag(name = "Admin · Services")
 public class ServiceController {
 
     private final ServiceCatalogService catalog;
@@ -56,9 +58,9 @@ public class ServiceController {
         return catalog.setActive(id, value);
     }
 
+    /** Deletes, or deactivates when reservations reference the service; the body says which. */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        catalog.delete(id);
-        return ResponseEntity.noContent().build();
+    public ServiceDeletionResponse delete(@PathVariable Long id) {
+        return catalog.delete(id);
     }
 }

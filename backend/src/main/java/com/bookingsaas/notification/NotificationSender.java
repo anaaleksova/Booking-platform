@@ -4,7 +4,7 @@ package com.bookingsaas.notification;
  * Delivers a queued notification over one channel.
  *
  * <p>The abstraction the spec asks for: SMS, WhatsApp or Viber support means
- * adding an implementation and a channel value — no booking or availability
+ * adding an implementation and a channel value — no reservation or availability
  * code changes.
  */
 public interface NotificationSender {

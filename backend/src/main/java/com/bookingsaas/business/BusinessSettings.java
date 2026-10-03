@@ -33,7 +33,7 @@ public class BusinessSettings extends Auditable {
 
     /** How far ahead of "now" the earliest bookable slot sits. */
     @Column(name = "minimum_booking_notice_minutes", nullable = false)
-    private int minimumBookingNoticeMinutes = 120;
+    private int minimumBookingNoticeMinutes = 60;
 
     /** How far into the future the booking window extends. */
     @Column(name = "maximum_booking_advance_days", nullable = false)
@@ -41,16 +41,13 @@ public class BusinessSettings extends Auditable {
 
     /** Granularity of generated candidate start times. */
     @Column(name = "slot_interval_minutes", nullable = false)
-    private int slotIntervalMinutes = 15;
+    private int slotIntervalMinutes = 30;
 
     @Column(name = "allow_customer_cancellation", nullable = false)
     private boolean allowCustomerCancellation = true;
 
     @Column(name = "cancellation_deadline_hours", nullable = false)
     private int cancellationDeadlineHours = 12;
-
-    @Column(name = "default_appointment_duration_minutes")
-    private Integer defaultAppointmentDurationMinutes;
 
     @Column(name = "email_notifications_enabled", nullable = false)
     private boolean emailNotificationsEnabled = true;

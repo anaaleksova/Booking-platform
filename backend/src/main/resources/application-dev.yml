@@ -1,8 +1,9 @@
 # Local development profile.
-# Adds the seed migration location so the app is usable immediately on startup.
+# Activates the "dev" Liquibase context, which adds the demo seed so the app is
+# usable immediately on startup.
 spring:
-  flyway:
-    locations: classpath:db/migration,classpath:db/seed
+  liquibase:
+    contexts: dev
 
 logging:
   level:

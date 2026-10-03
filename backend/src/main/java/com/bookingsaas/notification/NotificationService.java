@@ -44,33 +44,33 @@ public class NotificationService {
         this.clock = clock;
     }
 
-    /** Booking confirmed: one message to the customer, one to the business. */
+    /** Reservation confirmed: one message to the customer, one to the business. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void bookingConfirmed(BookingNotificationPayload payload) {
-        enqueue(NotificationType.BOOKING_CONFIRMED_CUSTOMER, payload, payload.customerEmail(), null);
-        enqueue(NotificationType.BOOKING_CONFIRMED_BUSINESS, payload, payload.businessEmail(), null);
+    public void reservationConfirmed(ReservationNotificationPayload payload) {
+        enqueue(NotificationType.RESERVATION_CONFIRMED_CUSTOMER, payload, payload.customerEmail(), null);
+        enqueue(NotificationType.RESERVATION_CONFIRMED_BUSINESS, payload, payload.businessEmail(), null);
         scheduleReminder(payload);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void bookingCancelled(BookingNotificationPayload payload) {
-        enqueue(NotificationType.BOOKING_CANCELLED_CUSTOMER, payload, payload.customerEmail(), null);
-        enqueue(NotificationType.BOOKING_CANCELLED_BUSINESS, payload, payload.businessEmail(), null);
+    public void reservationCancelled(ReservationNotificationPayload payload) {
+        enqueue(NotificationType.RESERVATION_CANCELLED_CUSTOMER, payload, payload.customerEmail(), null);
+        enqueue(NotificationType.RESERVATION_CANCELLED_BUSINESS, payload, payload.businessEmail(), null);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void bookingRescheduled(BookingNotificationPayload payload) {
-        enqueue(NotificationType.BOOKING_RESCHEDULED_CUSTOMER, payload, payload.customerEmail(), null);
+    public void reservationRescheduled(ReservationNotificationPayload payload) {
+        enqueue(NotificationType.RESERVATION_RESCHEDULED_CUSTOMER, payload, payload.customerEmail(), null);
         scheduleReminder(payload);
     }
 
     /**
-     * Queues the reminder at booking time rather than scanning for it later.
-     * The unique index on {@code (booking_id, type)} makes a repeat harmless,
+     * Queues the reminder at reservation time rather than scanning for it later.
+     * The unique index on {@code (reservation_id, type)} makes a repeat harmless,
      * so a reschedule can simply try again.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void scheduleReminder(BookingNotificationPayload payload) {
+    public void scheduleReminder(ReservationNotificationPayload payload) {
         BusinessSettings settings = businessService.settingsOf(payload.businessId());
         if (!settings.isReminderNotificationsEnabled()) {
             return;
@@ -81,22 +81,22 @@ public class NotificationService {
             // confirmation just sent is the only useful message.
             return;
         }
-        enqueue(NotificationType.BOOKING_REMINDER_CUSTOMER, payload, payload.customerEmail(), dueAt);
+        enqueue(NotificationType.RESERVATION_REMINDER_CUSTOMER, payload, payload.customerEmail(), dueAt);
     }
 
-    /** Drops any reminder still waiting for a booking that no longer stands. */
+    /** Drops any reminder still waiting for a reservation that no longer stands. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void cancelPendingReminders(Long bookingId) {
-        repository.findByBookingIdOrderByCreatedAtDesc(bookingId).stream()
+    public void cancelPendingReminders(Long reservationId) {
+        repository.findByReservationIdOrderByCreatedAtDesc(reservationId).stream()
                 .filter(notification -> notification.getType().isReminder())
                 .filter(notification -> notification.getStatus() == NotificationStatus.PENDING)
                 .forEach(notification -> {
-                    notification.markSkipped("Booking is no longer active");
+                    notification.markSkipped("Reservation is no longer active");
                     repository.save(notification);
                 });
     }
 
-    private void enqueue(NotificationType type, BookingNotificationPayload payload, String recipient, Instant dueAt) {
+    private void enqueue(NotificationType type, ReservationNotificationPayload payload, String recipient, Instant dueAt) {
         if (!properties.notifications().enabled()) {
             return;
         }
@@ -110,7 +110,7 @@ public class NotificationService {
 
         Notification notification = new Notification();
         notification.setBusinessId(payload.businessId());
-        notification.setBookingId(payload.bookingId());
+        notification.setReservationId(payload.reservationId());
         notification.setChannel(NotificationChannel.EMAIL);
         notification.setType(type);
         notification.setRecipient(recipient);
@@ -124,12 +124,12 @@ public class NotificationService {
         } catch (DataIntegrityViolationException ex) {
             // Only the reminder has a uniqueness rule; a duplicate simply means
             // one is already queued.
-            log.debug("Notification {} for booking {} already queued", type, payload.bookingId());
+            log.debug("Notification {} for reservation {} already queued", type, payload.reservationId());
         }
     }
 
     @Transactional(readOnly = true)
-    public List<Notification> forBooking(Long bookingId) {
-        return repository.findByBookingIdOrderByCreatedAtDesc(bookingId);
+    public List<Notification> forReservation(Long reservationId) {
+        return repository.findByReservationIdOrderByCreatedAtDesc(reservationId);
     }
 }

@@ -93,7 +93,7 @@ public record TimeRange(Instant start, Instant end) implements Comparable<TimeRa
     }
 
     /**
-     * Every piece present in both sets. This is how a staff member's own hours
+     * Every piece present in both sets. This is how a resource's own hours
      * are narrowed to the hours the business is actually open.
      */
     public static List<TimeRange> intersect(List<TimeRange> left, List<TimeRange> right) {
