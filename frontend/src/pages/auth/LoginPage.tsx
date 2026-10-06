@@ -14,6 +14,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useAuth } from '@/features/auth/AuthContext';
 import { errorMessage } from '@/api/client';
+import { PasswordField } from '@/components/PasswordField';
 
 const schema = z.object({
   email: z.string().min(1, 'Email is required').email('Enter a valid email address'),
@@ -23,7 +24,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export function LoginPage() {
-  const { login, isAuthenticated, initialising } = useAuth();
+  const { login, logout, isAuthenticated, initialising, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -34,14 +35,20 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: '', password: '' } });
 
-  if (!initialising && isAuthenticated) {
+  if (!initialising && isAuthenticated && user?.activeBusiness) {
     return <Navigate to="/admin" replace />;
   }
+  const customerAccount = !initialising && isAuthenticated && !user?.activeBusiness;
 
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
     try {
-      await login(values.email, values.password);
+      const signedIn = await login(values.email, values.password);
+      if (!signedIn.activeBusiness) {
+        logout();
+        setSubmitError('This is a customer account for booking. Sign in with a business account to open the dashboard.');
+        return;
+      }
       const from = (location.state as { from?: string } | null)?.from;
       navigate(from ?? '/admin', { replace: true });
     } catch (error) {
@@ -54,6 +61,14 @@ export function LoginPage() {
       <form onSubmit={onSubmit} noValidate>
         <Stack spacing={2.5}>
           {submitError ? <Alert severity="error">{submitError}</Alert> : null}
+          {customerAccount && !submitError ? (
+            <Alert severity="info">
+              You are signed in with a customer account, which can book but has no business dashboard.{' '}
+              <Link component="button" type="button" onClick={logout}>
+                Sign out
+              </Link>
+            </Alert>
+          ) : null}
           <TextField
             label="Email"
             type="email"
@@ -64,15 +79,17 @@ export function LoginPage() {
             helperText={errors.email?.message}
             {...register('email')}
           />
-          <TextField
+          <PasswordField
             label="Password"
-            type="password"
             autoComplete="current-password"
             fullWidth
             error={Boolean(errors.password)}
             helperText={errors.password?.message}
             {...register('password')}
           />
+          <Link component={RouterLink} to="/forgot-password" variant="body2" sx={{ alignSelf: 'flex-end', mt: -1 }}>
+            Forgot password?
+          </Link>
           <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
             {isSubmitting ? 'Signing in…' : 'Sign in'}
           </Button>

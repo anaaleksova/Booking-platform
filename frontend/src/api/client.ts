@@ -42,11 +42,18 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
     const code = error.response?.data?.error;
 
-    // An expired or invalid token ends the session everywhere at once. Public
-    // customer pages never carry a token, so they are unaffected.
+    // An expired or invalid token ends the session everywhere at once.
     if (status === 401 && (code === 'TOKEN_EXPIRED' || code === 'UNAUTHENTICATED')) {
+      const hadToken = Boolean(tokenStorage.get());
       tokenStorage.clear();
       onSessionExpired?.();
+      // A signed-in customer's stale token must not break browsing: public
+      // reads work without one, so retry them once anonymously.
+      const config = error.config;
+      if (hadToken && config && config.url?.startsWith('/api/public/') && config.method === 'get') {
+        delete config.headers.Authorization;
+        return apiClient.request(config);
+      }
     }
     return Promise.reject(error);
   },

@@ -42,6 +42,14 @@ public class ServiceResourceRequirement {
     @Column(nullable = false)
     private boolean required = true;
 
+    /**
+     * {@code quantity} becomes a minimum: for a group no single set of that
+     * size can seat, the booking engine combines more free resources of the
+     * type. The combinations themselves are never configured.
+     */
+    @Column(name = "combine_resources", nullable = false)
+    private boolean combineResources;
+
     /** Effective only when the service allows customer resource selection. */
     @Column(name = "customer_can_choose", nullable = false)
     private boolean customerCanChoose;

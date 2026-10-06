@@ -23,7 +23,7 @@ import java.util.List;
  * Stateless JWT security.
  *
  * <p>Open areas: authentication, the customer-facing {@code /api/public/**}
- * API, the API documentation and the health probe. Everything else requires a principal — and business-level
+ * API (except making a reservation, which needs a signed-in account), the API documentation and the health probe. Everything else requires a principal — and business-level
  * authorization then happens in the service layer through {@link CurrentTenant},
  * because URL patterns cannot express "this row belongs to your tenant".
  */
@@ -50,7 +50,11 @@ public class SecurityConfig {
                         .accessDeniedHandler(entryPoint))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
+                        .requestMatchers("/api/auth/register", "/api/auth/customer/register", "/api/auth/customer/verify",
+                                "/api/auth/password/forgot", "/api/auth/password/reset",
+                                "/api/auth/login").permitAll()
+                        // Browsing is open; booking needs an account.
+                        .requestMatchers(HttpMethod.POST, "/api/public/businesses/*/reservations").authenticated()
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()

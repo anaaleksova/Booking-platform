@@ -24,6 +24,14 @@ public enum ErrorCode {
     ACCESS_DENIED(HttpStatus.FORBIDDEN),
     EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT),
     NO_BUSINESS_CONTEXT(HttpStatus.FORBIDDEN),
+    /** The emailed sign-up code is wrong. */
+    INVALID_VERIFICATION_CODE(HttpStatus.BAD_REQUEST),
+    /** No sign-up is waiting for this email, it expired, or it ran out of attempts. */
+    VERIFICATION_EXPIRED(HttpStatus.GONE),
+    /** A new code was asked for too soon after the last one. */
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS),
+    /** The verification email could not be sent. */
+    EMAIL_DELIVERY_FAILED(HttpStatus.BAD_GATEWAY),
 
     // --- business ---------------------------------------------------------
     SLUG_ALREADY_TAKEN(HttpStatus.CONFLICT),

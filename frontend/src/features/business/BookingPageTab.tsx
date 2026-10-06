@@ -185,6 +185,10 @@ export function BookingPageTab() {
                 control={<Switch checked={form.showMap} onChange={(e) => set({ showMap: e.target.checked })} />}
                 label="Show a map of your address"
               />
+              <FormControlLabel
+                control={<Switch checked={form.darkTheme} onChange={(e) => set({ darkTheme: e.target.checked })} />}
+                label="Use a black background on your booking pages"
+              />
             </Stack>
           </Paper>
 

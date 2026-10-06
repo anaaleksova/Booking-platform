@@ -26,6 +26,7 @@ public record PublicBusinessResponse(
         String facebookUrl,
         String websiteUrl,
         boolean showMap,
+        boolean darkTheme,
         String timezone,
         String currency,
         List<DayInterval> openingHours,
@@ -42,7 +43,7 @@ public record PublicBusinessResponse(
                 business.getDescription(), business.getAccentColor(), Media.urlOf(business.getLogoMediaId()),
                 Media.urlOf(business.getCoverMediaId()), business.getPhone(), business.getEmail(),
                 business.getAddress(), business.getInstagramUrl(), business.getFacebookUrl(),
-                business.getWebsiteUrl(), business.isShowMap(), business.getTimezone(), business.getCurrency(),
+                business.getWebsiteUrl(), business.isShowMap(), business.isDarkTheme(), business.getTimezone(), business.getCurrency(),
                 openingHours, gallery.stream().map(image -> new GalleryPhoto(image.url(), image.caption())).toList());
     }
 }

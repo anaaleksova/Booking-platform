@@ -2,8 +2,12 @@ package com.bookingsaas.auth;
 
 import com.bookingsaas.auth.dto.AuthResponse;
 import com.bookingsaas.auth.dto.CurrentUserResponse;
+import com.bookingsaas.auth.dto.CustomerRegisterRequest;
+import com.bookingsaas.auth.dto.ForgotPasswordRequest;
+import com.bookingsaas.auth.dto.ResetPasswordRequest;
 import com.bookingsaas.auth.dto.LoginRequest;
 import com.bookingsaas.auth.dto.RegisterRequest;
+import com.bookingsaas.auth.dto.VerifySignupRequest;
 import com.bookingsaas.common.security.CurrentTenant;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -37,6 +41,33 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
         return authService.register(request);
+    }
+
+    /** Emails a 6-digit code; calling again sends a new one. No account is created yet. */
+    @PostMapping("/customer/register")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void startCustomerSignup(@Valid @RequestBody CustomerRegisterRequest request) {
+        authService.startCustomerSignup(request);
+    }
+
+    /** The emailed code creates the account and signs the customer in. */
+    @PostMapping("/customer/verify")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AuthResponse verifyCustomerSignup(@Valid @RequestBody VerifySignupRequest request) {
+        return authService.verifyCustomerSignup(request);
+    }
+
+    /** Emails a reset code if the account exists. Always 202, so it reveals nothing. */
+    @PostMapping("/password/forgot")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+    }
+
+    /** The emailed code sets a new password and signs the user in. */
+    @PostMapping("/password/reset")
+    public AuthResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return authService.resetPassword(request);
     }
 
     @PostMapping("/login")

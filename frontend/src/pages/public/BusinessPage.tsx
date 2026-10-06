@@ -7,7 +7,9 @@ import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { alpha, keyframes } from '@mui/material/styles';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
 import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
 import MapRoundedIcon from '@mui/icons-material/MapRounded';
@@ -18,6 +20,7 @@ import { mediaUrl } from '@/features/media/api';
 import { usePublicBusiness, usePublicServices } from '@/features/public/api';
 import { BusinessShell } from '@/features/public/BusinessShell';
 import { GallerySection } from '@/features/public/GallerySection';
+import { Reveal } from '@/features/public/Reveal';
 import type { DayInterval, PublicBusiness, PublicService } from '@/types/api';
 import { DAY_NAMES, formatDuration, formatInterval, formatMoney } from '@/utils/format';
 
@@ -47,7 +50,7 @@ export function BusinessPage() {
   return (
     <BusinessShell business={info} transparentHeader>
       <Hero business={info} />
-      <Box id="services" sx={{ py: { xs: 6, md: 10 }, bgcolor: '#fff' }}>
+      <Box id="services" sx={{ py: { xs: 6, md: 10 }, bgcolor: 'background.paper' }}>
         <Container maxWidth="lg">
           <SectionTitle eyebrow="Price list" title="Services & prices" />
           {services.isLoading ? <LoadingState /> : null}
@@ -55,7 +58,7 @@ export function BusinessPage() {
           {services.data?.length === 0 ? <EmptyState title="No services are open for booking right now" /> : null}
           <ServiceGroups slug={slug} services={services.data ?? []} />
           <Stack alignItems="center" sx={{ mt: 5 }}>
-            <Button component={RouterLink} to={`/b/${slug}/book`} variant="contained" size="large" sx={{ borderRadius: 999, px: 4, bgcolor: '#111214', '&:hover': { bgcolor: '#000' } }}>
+            <Button component={RouterLink} to={`/b/${slug}/book`} variant="contained" size="large" sx={{ borderRadius: 999, px: 4, bgcolor: 'text.primary', color: 'background.default', '&:hover': { bgcolor: 'text.secondary' } }}>
               Book an appointment
             </Button>
           </Stack>
@@ -66,12 +69,14 @@ export function BusinessPage() {
         title={(eyebrow, heading) => <SectionTitle eyebrow={eyebrow} title={heading} />}
       />
       {info.description ? (
-        <Box sx={{ py: { xs: 6, md: 8 }, bgcolor: (info.gallery ?? []).length ? '#fff' : undefined }}>
+        <Box sx={{ py: { xs: 6, md: 8 }, bgcolor: (info.gallery ?? []).length ? 'background.paper' : undefined }}>
           <Container maxWidth="md" sx={{ textAlign: 'center' }}>
             <SectionTitle eyebrow="About us" title={`Welcome to ${info.name}`} />
-            <Typography color="text.secondary" sx={{ fontSize: 18, lineHeight: 1.7, whiteSpace: 'pre-line' }}>
-              {info.description}
-            </Typography>
+            <Reveal delay={120}>
+              <Typography color="text.secondary" sx={{ fontSize: 18, lineHeight: 1.7, whiteSpace: 'pre-line' }}>
+                {info.description}
+              </Typography>
+            </Reveal>
           </Container>
         </Box>
       ) : null}
@@ -80,6 +85,33 @@ export function BusinessPage() {
   );
 }
 
+const riseIn = keyframes`
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+`;
+
+const slowZoom = keyframes`
+  from { transform: scale(1.12); }
+  to { transform: scale(1); }
+`;
+
+const gradientDrift = keyframes`
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 60%; }
+`;
+
+const softPulse = keyframes`
+  0%, 100% { box-shadow: 0 10px 30px rgba(0,0,0,0.25), 0 0 0 0 rgba(255,255,255,0.35); }
+  50% { box-shadow: 0 10px 30px rgba(0,0,0,0.25), 0 0 0 10px rgba(255,255,255,0); }
+`;
+
+/** Staggered entrance for the hero's lines; `step` is the order. */
+const heroLine = (step: number) => ({
+  opacity: 0,
+  animation: `${riseIn} 800ms cubic-bezier(0.22, 1, 0.36, 1) ${150 + step * 140}ms forwards`,
+  '@media (prefers-reduced-motion: reduce)': { opacity: 1, animation: 'none' },
+});
+
 function Hero({ business }: { business: PublicBusiness }) {
   const cover = mediaUrl(business.coverUrl);
 
@@ -87,6 +119,7 @@ function Hero({ business }: { business: PublicBusiness }) {
     <Box
       sx={{
         position: 'relative',
+        overflow: 'hidden',
         minHeight: { xs: 560, md: 640 },
         display: 'grid',
         placeItems: 'center',
@@ -96,22 +129,31 @@ function Hero({ business }: { business: PublicBusiness }) {
         pt: 10,
         pb: 6,
         backgroundColor: 'primary.main',
-        backgroundImage: cover
-          ? `linear-gradient(180deg, rgba(10,12,20,0.55) 0%, rgba(10,12,20,0.45) 50%, rgba(10,12,20,0.75) 100%), url("${cover}")`
-          : (theme) => `radial-gradient(circle at 30% 20%, ${theme.palette.primary.light} 0%, ${theme.palette.primary.dark} 55%, #111214 100%)`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: cover
+            ? `linear-gradient(180deg, rgba(10,12,20,0.55) 0%, rgba(10,12,20,0.45) 50%, rgba(10,12,20,0.75) 100%), url("${cover}")`
+            : (theme) => `radial-gradient(circle at 30% 20%, ${theme.palette.primary.light} 0%, ${theme.palette.primary.dark} 55%, #111214 100%)`,
+          backgroundSize: cover ? 'cover' : '160% 160%',
+          backgroundPosition: 'center',
+          animation: cover ? `${slowZoom} 14s ease-out forwards` : `${gradientDrift} 18s ease-in-out infinite`,
+          '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+        },
       }}
     >
-      <Stack alignItems="center" spacing={2} sx={{ maxWidth: 760 }}>
-        <Typography variant="overline" sx={{ letterSpacing: '0.35em', opacity: 0.85 }}>
+      <Stack alignItems="center" spacing={2} sx={{ maxWidth: 760, position: 'relative' }}>
+        <Typography variant="overline" sx={{ letterSpacing: '0.35em', color: 'rgba(255,255,255,0.85)', ...heroLine(0) }}>
           Welcome
         </Typography>
-        <Typography component="h1" sx={{ fontSize: { xs: 44, sm: 64, md: 84 }, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em' }}>
+        <Typography component="h1" sx={{ fontSize: { xs: 44, sm: 64, md: 84 }, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em', ...heroLine(1) }}>
           {business.name}
         </Typography>
         {business.tagline ? (
-          <Typography sx={{ fontSize: { xs: 17, md: 20 }, opacity: 0.92, maxWidth: 620 }}>{business.tagline}</Typography>
+          <Typography sx={{ fontSize: { xs: 17, md: 20 }, maxWidth: 620, ...heroLine(2) }}>
+            <Box component="span" sx={{ opacity: 0.92 }}>{business.tagline}</Box>
+          </Typography>
         ) : null}
         <Button
           component={RouterLink}
@@ -119,7 +161,18 @@ function Hero({ business }: { business: PublicBusiness }) {
           variant="contained"
           size="large"
           startIcon={<CalendarMonthRoundedIcon />}
-          sx={{ mt: 2, borderRadius: 999, px: 4, py: 1.5, fontSize: 17, boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }}
+          sx={{
+            mt: 2,
+            borderRadius: 999,
+            px: 4,
+            py: 1.5,
+            fontSize: 17,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+            ...heroLine(3),
+            animation: `${riseIn} 800ms cubic-bezier(0.22, 1, 0.36, 1) 570ms forwards, ${softPulse} 2.8s ease-in-out 1.6s infinite`,
+            transition: 'transform 200ms ease',
+            '&:hover': { transform: 'translateY(-2px)' },
+          }}
         >
           See free times & prices
         </Button>
@@ -140,16 +193,17 @@ function ServiceGroups({ slug, services }: { slug: string; services: PublicServi
 
   return (
     <Grid container spacing={3}>
-      {groups.map(([category, items]) => (
+      {groups.map(([category, items], groupIndex) => (
         <Grid item xs={12} md={groups.length > 1 ? 6 : 12} key={category}>
-          <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3 }, height: '100%', borderRadius: 4 }}>
+          <Reveal delay={groupIndex * 120} sx={{ height: '100%' }}>
+          <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3.5 }, height: '100%', borderRadius: 4 }}>
             <Typography variant="h6" fontWeight={800} sx={{ mb: 2 }}>
               {category}
             </Typography>
-            <Stack spacing={2}>
-              {items.map((service) => (
+            <Stack spacing={1}>
+              {items.map((service, index) => (
+                <Reveal key={service.id} delay={120 + index * 90}>
                 <Stack
-                  key={service.id}
                   component={RouterLink}
                   to={`/b/${slug}/book?service=${service.id}`}
                   direction="row"
@@ -158,19 +212,36 @@ function ServiceGroups({ slug, services }: { slug: string; services: PublicServi
                   sx={{
                     color: 'inherit',
                     textDecoration: 'none',
-                    p: 1,
-                    mx: -1,
+                    px: { xs: 2, md: 2.5 },
+                    py: { xs: 1.75, md: 2 },
+                    mx: { xs: -1, md: -1.5 },
                     borderRadius: 3,
-                    '&:hover': { bgcolor: 'action.hover' },
+                    border: 1,
+                    borderColor: 'transparent',
+                    transition: 'background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease',
+                    '& .service-arrow': { opacity: 0, transform: 'translateX(-6px)', transition: 'opacity 200ms ease, transform 200ms ease' },
+                    '& .service-img': { transition: 'transform 300ms ease' },
+                    '&:hover, &:focus-visible': {
+                      bgcolor: (theme) => alpha(theme.palette.primary.main, 0.05),
+                      borderColor: (theme) => alpha(theme.palette.primary.main, 0.18),
+                      boxShadow: '0 8px 24px rgba(17,18,20,0.06)',
+                      transform: 'translateY(-2px)',
+                      '& .service-arrow': { opacity: 1, transform: 'none' },
+                      '& .service-img': { transform: 'scale(1.05)' },
+                    },
+                    '@media (prefers-reduced-motion: reduce)': { '&:hover, &:focus-visible': { transform: 'none' } },
                   }}
                 >
                   {service.imageUrl ? (
-                    <Box
-                      component="img"
-                      src={mediaUrl(service.imageUrl)}
-                      alt=""
-                      sx={{ width: 72, height: 72, borderRadius: 2.5, objectFit: 'cover', flexShrink: 0 }}
-                    />
+                    <Box sx={{ width: 72, height: 72, borderRadius: 2.5, overflow: 'hidden', flexShrink: 0 }}>
+                      <Box
+                        component="img"
+                        className="service-img"
+                        src={mediaUrl(service.imageUrl)}
+                        alt=""
+                        sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                    </Box>
                   ) : null}
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Stack direction="row" alignItems="baseline" spacing={1}>
@@ -200,10 +271,13 @@ function ServiceGroups({ slug, services }: { slug: string; services: PublicServi
                       ) : null}
                     </Stack>
                   </Box>
+                  <ArrowForwardRoundedIcon className="service-arrow" color="primary" sx={{ fontSize: 20, flexShrink: 0 }} />
                 </Stack>
+                </Reveal>
               ))}
             </Stack>
           </Paper>
+          </Reveal>
         </Grid>
       ))}
     </Grid>
@@ -215,12 +289,13 @@ function FindUs({ business }: { business: PublicBusiness }) {
   const showMap = business.showMap && Boolean(business.address);
 
   return (
-    <Box id="find-us" sx={{ py: { xs: 6, md: 10 }, bgcolor: '#fff', borderTop: 1, borderColor: 'divider' }}>
+    <Box id="find-us" sx={{ py: { xs: 6, md: 10 }, bgcolor: 'background.paper', borderTop: 1, borderColor: 'divider' }}>
       <Container maxWidth="lg">
         <SectionTitle eyebrow="Where we are" title="How to find us" />
         <Grid container spacing={3}>
           {showMap ? (
             <Grid item xs={12} md={6}>
+              <Reveal sx={{ height: '100%' }}>
               <Paper variant="outlined" sx={{ overflow: 'hidden', borderRadius: 4, height: { xs: 280, md: '100%' }, minHeight: 280 }}>
                 <Box
                   component="iframe"
@@ -231,9 +306,11 @@ function FindUs({ business }: { business: PublicBusiness }) {
                   sx={{ border: 0, width: '100%', height: '100%', display: 'block' }}
                 />
               </Paper>
+              </Reveal>
             </Grid>
           ) : null}
           <Grid item xs={12} md={showMap ? 6 : 12}>
+            <Reveal delay={showMap ? 120 : 0} sx={{ height: '100%' }}>
             <Paper variant="outlined" sx={{ p: { xs: 3, md: 4 }, borderRadius: 4, height: '100%' }}>
               <Typography variant="h5" fontWeight={800}>
                 {business.name}
@@ -264,6 +341,7 @@ function FindUs({ business }: { business: PublicBusiness }) {
                 </Button>
               </Stack>
             </Paper>
+            </Reveal>
           </Grid>
         </Grid>
       </Container>
@@ -273,14 +351,16 @@ function FindUs({ business }: { business: PublicBusiness }) {
 
 function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
-    <Stack alignItems="center" spacing={1} sx={{ mb: { xs: 4, md: 5 }, textAlign: 'center' }}>
-      <Typography variant="overline" color="primary" sx={{ letterSpacing: '0.3em', fontWeight: 700 }}>
-        {eyebrow}
-      </Typography>
-      <Typography component="h2" sx={{ fontSize: { xs: 30, md: 42 }, fontWeight: 800, letterSpacing: '-0.02em' }}>
-        {title}
-      </Typography>
-    </Stack>
+    <Reveal>
+      <Stack alignItems="center" spacing={1} sx={{ mb: { xs: 4, md: 5 }, textAlign: 'center' }}>
+        <Typography variant="overline" color="primary" sx={{ letterSpacing: '0.3em', fontWeight: 700 }}>
+          {eyebrow}
+        </Typography>
+        <Typography component="h2" sx={{ fontSize: { xs: 30, md: 42 }, fontWeight: 800, letterSpacing: '-0.02em' }}>
+          {title}
+        </Typography>
+      </Stack>
+    </Reveal>
   );
 }
 

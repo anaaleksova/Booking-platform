@@ -57,6 +57,29 @@ public class FloorPlanService {
         return byType;
     }
 
+    /** Where a resource stands: the plan it is drawn on. */
+    public record Area(Long id, String name) {
+    }
+
+    /**
+     * Resource id → the floor plan it stands on, for the given types.
+     * Resources on no plan are absent. The booking engine keeps combined
+     * resources within one area.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Area> areasOf(Long businessId, Collection<Long> resourceTypeIds) {
+        if (resourceTypeIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Area> areas = new HashMap<>();
+        for (FloorPlan plan : repository.findByBusinessIdAndResourceTypeIdInOrderByPositionAscIdAsc(businessId,
+                resourceTypeIds)) {
+            Area area = new Area(plan.getId(), plan.getName());
+            plan.getItems().forEach(item -> areas.put(item.getResourceId(), area));
+        }
+        return areas;
+    }
+
     @Transactional(readOnly = true)
     public List<FloorPlanResponse> list(Long resourceTypeId) {
         Long businessId = currentTenant.businessId();

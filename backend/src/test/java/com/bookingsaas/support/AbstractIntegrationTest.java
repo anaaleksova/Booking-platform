@@ -1,5 +1,7 @@
 package com.bookingsaas.support;
 
+import com.bookingsaas.auth.PasswordResetCodeSender;
+import com.bookingsaas.auth.SignupCodeSender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,6 +21,11 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -59,6 +67,22 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected MockMvc mockMvc;
 
+    /** Customer accounts created in the current test, by email. */
+    private final Map<String, String> customerTokens = new ConcurrentHashMap<>();
+
+    /** Sign-up codes are captured here instead of being emailed. */
+    @MockBean
+    protected SignupCodeSender signupCodeSender;
+
+    /** The last sign-up code "sent" to each email in the current test. */
+    protected final Map<String, String> sentCodes = new ConcurrentHashMap<>();
+
+    @MockBean
+    protected PasswordResetCodeSender passwordResetCodeSender;
+
+    /** The last password-reset code "sent" to each email in the current test. */
+    protected final Map<String, String> resetCodes = new ConcurrentHashMap<>();
+
     @Autowired
     protected ObjectMapper objectMapper;
 
@@ -79,8 +103,15 @@ public abstract class AbstractIntegrationTest {
      */
     @BeforeEach
     void resetDatabase() {
+        customerTokens.clear();
+        sentCodes.clear();
+        doAnswer(invocation -> sentCodes.put(invocation.getArgument(0), invocation.getArgument(2)))
+                .when(signupCodeSender).send(anyString(), anyString(), anyString());
+        resetCodes.clear();
+        doAnswer(invocation -> resetCodes.put(invocation.getArgument(0), invocation.getArgument(2)))
+                .when(passwordResetCodeSender).send(anyString(), anyString(), anyString());
         jdbcTemplate.execute("""
-                TRUNCATE notification, floor_plan_decor, floor_plan_item, floor_plan, gallery_image, media, reservation_resource, reservation, discount_service, discount,
+                TRUNCATE password_reset, pending_signup, notification, floor_plan_decor, floor_plan_item, floor_plan, gallery_image, media, reservation_resource, reservation, discount_service, discount,
                          blocked_time, resource_service, service_resource_requirement, service,
                          employee, resource_hours, resource, resource_type, customer, business_hours,
                          business_settings, business_user, business, app_user
@@ -95,6 +126,28 @@ public abstract class AbstractIntegrationTest {
                  "businessName":"%s","timezone":"Europe/Skopje"}
                 """.formatted(email, businessName), 201);
         return response.get("accessToken").asText();
+    }
+
+    /**
+     * The token of a booking (customer) account with this email, signing it up
+     * (and confirming the emailed code) on first use. Booking requires an account, and the booking takes the
+     * account's email, so each distinct email is its own account.
+     */
+    protected String customerToken(String email) throws Exception {
+        email = email.toLowerCase(java.util.Locale.ROOT);   // accounts are case-insensitive
+        String existing = customerTokens.get(email);
+        if (existing != null) {
+            return existing;
+        }
+        send(post("/api/auth/customer/register"), null, """
+                {"fullName":"Test Customer","email":"%s","password":"password123"}
+                """.formatted(email), 202);
+        JsonNode response = send(post("/api/auth/customer/verify"), null, """
+                {"email":"%s","code":"%s"}
+                """.formatted(email, sentCodes.get(email)), 201);
+        String token = response.get("accessToken").asText();
+        customerTokens.put(email, token);
+        return token;
     }
 
     /** Opens the business every day 08:00-20:00 and lets customers book with no notice. */

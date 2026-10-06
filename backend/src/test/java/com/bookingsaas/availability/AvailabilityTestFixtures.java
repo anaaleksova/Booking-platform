@@ -61,6 +61,7 @@ final class AvailabilityTestFixtures {
         private final Map<Long, List<TimeRange>> busy = new HashMap<>();
         private final Map<Long, List<SeatUse>> seatUse = new HashMap<>();
         private final List<Object[]> requirements = new ArrayList<>();
+        private final java.util.Set<Long> combinable = new java.util.HashSet<>();
 
         private Duration duration = Duration.ofMinutes(60);
         private Duration bufferBefore = Duration.ZERO;
@@ -93,6 +94,18 @@ final class AvailabilityTestFixtures {
         Builder seats(long resourceId, String from, String to, int seats) {
             seatUse.computeIfAbsent(resourceId, key -> new ArrayList<>()).add(new SeatUse(range(from, to), seats));
             return this;
+        }
+
+        /** A table standing in an area (a floor plan). */
+        Builder tableInArea(long id, int capacity, long areaId) {
+            resources.put(id, new ResourceSpec(id, TABLE, "Table " + id, capacity, false, null, areaId));
+            return this;
+        }
+
+        /** A requirement whose resources are combined for groups one cannot seat. */
+        Builder requiresCombined(long requirementId, long typeId, int minQuantity, boolean choosable) {
+            combinable.add(requirementId);
+            return requires(requirementId, typeId, minQuantity, true, choosable);
         }
 
         Builder room(long id, Integer capacity) {
@@ -168,7 +181,7 @@ final class AvailabilityTestFixtures {
                     .map(row -> {
                         long typeId = (long) row[1];
                         return new RequirementSpec((long) row[0], typeId, typeName(typeId), (int) row[2],
-                                (boolean) row[3], (boolean) row[4],
+                                (boolean) row[3], (boolean) row[4], combinable.contains((long) row[0]),
                                 resources.values().stream()
                                         .filter(resource -> resource.resourceTypeId() == typeId)
                                         .map(ResourceSpec::id)

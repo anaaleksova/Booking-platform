@@ -1,5 +1,7 @@
 import Grid from '@mui/material/Grid';
 import TextField from '@mui/material/TextField';
+import type { CountryCode } from 'libphonenumber-js/max';
+import { PhoneField, isValidPhone } from '@/components/PhoneField';
 
 export interface CustomerForm {
   firstName: string;
@@ -11,30 +13,33 @@ export interface CustomerForm {
 
 export const EMPTY_CUSTOMER: CustomerForm = { firstName: '', lastName: '', email: '', phone: '', notes: '' };
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export function customerErrors(form: CustomerForm): Partial<Record<keyof CustomerForm, string>> {
   return {
     firstName: form.firstName.trim() ? undefined : 'Enter your first name',
     lastName: form.lastName.trim() ? undefined : 'Enter your last name',
-    email: EMAIL.test(form.email.trim()) ? undefined : 'Enter a valid email address',
     phone: !form.phone.trim()
       ? 'Enter your phone number'
-      : /^\+?[0-9 ()./-]{6,40}$/.test(form.phone.trim())
+      : isValidPhone(form.phone)
         ? undefined
-        : 'Enter a valid phone number',
+        : 'This is not a valid number for the selected country',
   };
 }
 
-/** Step 4: who the reservation is for. No account needed; email and phone are required. */
+/**
+ * Step 4: who the reservation is for. Needs a signed-in account; the email is
+ * the account's and cannot be changed here, the phone is required.
+ */
 export function DetailsStep({
   value,
   onChange,
   showErrors,
+  defaultCountry,
 }: {
   value: CustomerForm;
   onChange: (value: CustomerForm) => void;
   showErrors: boolean;
+  /** Preselected phone country, e.g. the business's own. */
+  defaultCountry: CountryCode;
 }) {
   const errors = customerErrors(value);
   const field = (key: keyof CustomerForm, label: string, autoComplete: string, type = 'text') => (
@@ -53,8 +58,24 @@ export function DetailsStep({
     <Grid container spacing={2}>
       <Grid item xs={12} sm={6}>{field('firstName', 'First name', 'given-name')}</Grid>
       <Grid item xs={12} sm={6}>{field('lastName', 'Last name', 'family-name')}</Grid>
-      <Grid item xs={12} sm={6}>{field('email', 'Email', 'email', 'email')}</Grid>
-      <Grid item xs={12} sm={6}>{field('phone', 'Phone', 'tel', 'tel')}</Grid>
+      <Grid item xs={12}>
+        <PhoneField
+          value={value.phone}
+          onChange={(phone) => onChange({ ...value, phone })}
+          defaultCountry={defaultCountry}
+          error={showErrors && Boolean(errors.phone)}
+          helperText={showErrors ? errors.phone : undefined}
+        />
+      </Grid>
+      <Grid item xs={12}>
+        <TextField
+          fullWidth
+          label="Email address"
+          value={value.email}
+          InputProps={{ readOnly: true }}
+          helperText="From your account. Confirmations go here."
+        />
+      </Grid>
       <Grid item xs={12}>
         <TextField
           fullWidth

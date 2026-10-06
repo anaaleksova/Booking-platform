@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import Button from '@mui/material/Button';
@@ -12,6 +12,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
+import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
@@ -38,6 +39,8 @@ dayjs.extend(isoWeek);
 
 type View = 'list' | 'calendar';
 
+const PAGE_SIZES = [10, 25, 50];
+
 export function ReservationsPage() {
   const [view, setView] = useState<View>('list');
   const [from, setFrom] = useState(dayjs().format('YYYY-MM-DD'));
@@ -48,6 +51,8 @@ export function ReservationsPage() {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
 
   const { data: services } = useServices();
   const filters =
@@ -72,6 +77,15 @@ export function ReservationsPage() {
         .some((value) => value!.toLowerCase().includes(term)),
     );
   }, [data, search]);
+
+  // A different filter means a different list, so start again from the first page.
+  useEffect(() => {
+    setPage(0);
+  }, [from, to, status, serviceId, search]);
+
+  const lastPage = Math.max(0, Math.ceil(visible.length / pageSize) - 1);
+  const currentPage = Math.min(page, lastPage);
+  const pageRows = visible.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
   return (
     <>
@@ -176,7 +190,7 @@ export function ReservationsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {visible.map((reservation) => (
+              {pageRows.map((reservation) => (
                 <TableRow key={reservation.id} hover sx={{ cursor: 'pointer' }} onClick={() => setSelectedId(reservation.id)}>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     <Typography variant="body2" fontWeight={600}>
@@ -218,6 +232,18 @@ export function ReservationsPage() {
               ))}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={visible.length}
+            page={currentPage}
+            rowsPerPage={pageSize}
+            rowsPerPageOptions={PAGE_SIZES}
+            onPageChange={(_, next) => setPage(next)}
+            onRowsPerPageChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(0);
+            }}
+          />
         </TableContainer>
       )}
 

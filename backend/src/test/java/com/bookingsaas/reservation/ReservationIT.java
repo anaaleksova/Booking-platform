@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -116,9 +117,11 @@ class ReservationIT extends AbstractIntegrationTest {
         List<Future<Integer>> results = new ArrayList<>();
         for (int i = 0; i < attempts; i++) {
             String email = "racer" + i + "@example.com";
+            String racerToken = customerToken("racer" + i + "@example.com");
             Callable<Integer> attempt = () -> {
                 start.await();
                 return mockMvc.perform(post("/api/public/businesses/" + slug + "/reservations")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(racerToken))
                                 .contentType("application/json")
                                 .content(body("14:00", 1, null, email)))
                         .andReturn().getResponse().getStatus();
@@ -199,18 +202,46 @@ class ReservationIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void email_and_phone_are_both_required() throws Exception {
-        JsonNode missingPhone = send(post("/api/public/businesses/" + slug + "/reservations"), null, """
+    void booking_requires_a_signed_in_account() throws Exception {
+        JsonNode anonymous = send(post("/api/public/businesses/" + slug + "/reservations"), null,
+                body("10:00", 1, null, "anon@example.com"), 401);
+        assertThat(anonymous.get("error").asText()).isEqualTo("UNAUTHENTICATED");
+
+        // Browsing stays open.
+        send(get("/api/public/businesses/" + slug + "/services/" + serviceId + "/availability?from=" + day),
+                null, null, 200);
+    }
+
+    @Test
+    void a_customer_account_cannot_reach_the_admin_api() throws Exception {
+        JsonNode denied = send(get("/api/admin/customers"), customerToken("shopper@example.com"), null, 403);
+        assertThat(denied.get("error").asText()).isEqualTo("NO_BUSINESS_CONTEXT");
+    }
+
+    @Test
+    void the_reservation_takes_the_accounts_email_and_needs_a_phone() throws Exception {
+        String token = customerToken("owner.of.account@example.com");
+
+        JsonNode missingPhone = send(post("/api/public/businesses/" + slug + "/reservations"), token, """
                 {"serviceId":%d,"participants":1,"startTime":"%sT10:00:00",
-                 "customer":{"firstName":"No","lastName":"Phone","email":"nophone@example.com"}}
+                 "customer":{"firstName":"No","lastName":"Phone"}}
                 """.formatted(serviceId, day), 400);
         assertThat(missingPhone.get("fieldErrors").has("customer.phone")).isTrue();
 
-        JsonNode missingEmail = send(post("/api/public/businesses/" + slug + "/reservations"), null, """
+        JsonNode badPhone = send(post("/api/public/businesses/" + slug + "/reservations"), token, """
                 {"serviceId":%d,"participants":1,"startTime":"%sT10:00:00",
-                 "customer":{"firstName":"No","lastName":"Email","phone":"+389 70 111 222"}}
+                 "customer":{"firstName":"Bad","lastName":"Phone","phone":"+389 12"}}
                 """.formatted(serviceId, day), 400);
-        assertThat(missingEmail.get("fieldErrors").has("customer.email")).isTrue();
+        assertThat(badPhone.get("fieldErrors").has("customer.phone")).isTrue();
+
+        // An email in the request is ignored: nobody can book in someone else's name.
+        send(post("/api/public/businesses/" + slug + "/reservations"), token, """
+                {"serviceId":%d,"participants":1,"startTime":"%sT10:00:00",
+                 "customer":{"firstName":"Some","lastName":"One","email":"victim@example.com","phone":"+389 70 111 222"}}
+                """.formatted(serviceId, day), 201);
+        JsonNode customers = send(get("/api/admin/customers"), this.token, null, 200).get("content");
+        assertThat(customers).hasSize(1);
+        assertThat(customers.get(0).get("email").asText()).isEqualTo("owner.of.account@example.com");
     }
 
     @Test
@@ -225,7 +256,7 @@ class ReservationIT extends AbstractIntegrationTest {
 
     private JsonNode reserve(String time, int participants, String code, String email, int expectedStatus)
             throws Exception {
-        return send(post("/api/public/businesses/" + slug + "/reservations"), null,
+        return send(post("/api/public/businesses/" + slug + "/reservations"), customerToken(email),
                 body(time, participants, code, email), expectedStatus);
     }
 

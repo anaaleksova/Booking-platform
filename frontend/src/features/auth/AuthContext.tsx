@@ -8,8 +8,17 @@ interface AuthContextValue {
   initialising: boolean;
   isAuthenticated: boolean;
   isOwner: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /** Resolves to the signed-in user, so callers can tell a customer account from a business one. */
+  login: (email: string, password: string) => Promise<CurrentUser>;
   register: (input: RegisterInput) => Promise<void>;
+  /** Booking-only sign-up, step 1: emails a 6-digit code. No account yet. */
+  startCustomerSignup: (input: CustomerRegisterInput) => Promise<void>;
+  /** Step 2: the code creates the account (no business) and signs in. */
+  verifyCustomerSignup: (email: string, code: string) => Promise<void>;
+  /** Forgotten password, step 1: emails a code if the account exists. */
+  requestPasswordReset: (email: string) => Promise<void>;
+  /** Step 2: the code sets the new password and signs in. */
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<CurrentUser>;
   logout: () => void;
 }
 
@@ -19,6 +28,12 @@ export interface RegisterInput {
   password: string;
   businessName: string;
   timezone: string;
+}
+
+export interface CustomerRegisterInput {
+  fullName: string;
+  email: string;
+  password: string;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -65,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string) => {
       const { data } = await apiClient.post<AuthResponse>('/api/auth/login', { email, password });
       applySession(data);
+      return data.user;
     },
     [applySession],
   );
@@ -77,6 +93,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applySession],
   );
 
+  const startCustomerSignup = useCallback(async (input: CustomerRegisterInput) => {
+    await apiClient.post('/api/auth/customer/register', input);
+  }, []);
+
+  const verifyCustomerSignup = useCallback(
+    async (email: string, code: string) => {
+      const { data } = await apiClient.post<AuthResponse>('/api/auth/customer/verify', { email, code });
+      applySession(data);
+    },
+    [applySession],
+  );
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    await apiClient.post('/api/auth/password/forgot', { email });
+  }, []);
+
+  const resetPassword = useCallback(
+    async (email: string, code: string, newPassword: string) => {
+      const { data } = await apiClient.post<AuthResponse>('/api/auth/password/reset', { email, code, newPassword });
+      applySession(data);
+      return data.user;
+    },
+    [applySession],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -85,9 +126,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isOwner: user?.activeBusiness?.role === 'BUSINESS_OWNER',
       login,
       register,
+      startCustomerSignup,
+      verifyCustomerSignup,
+      requestPasswordReset,
+      resetPassword,
       logout,
     }),
-    [user, initialising, login, register, logout],
+    [user, initialising, login, register, startCustomerSignup, verifyCustomerSignup, requestPasswordReset, resetPassword, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -88,7 +88,16 @@ export function FloorPlanEditor({ type, onClose }: { type: ResourceType | null; 
   const resources = useResources();
 
   return (
-    <Dialog open={type !== null} onClose={onClose} maxWidth="xl" fullWidth fullScreen={fullScreen}>
+    <Dialog
+      open={type !== null}
+      onClose={onClose}
+      maxWidth="xl"
+      fullWidth
+      fullScreen={fullScreen}
+      // Wide screens: the dialog takes the window's height and the map scales into it,
+      // so nothing but the side panel ever scrolls.
+      PaperProps={{ sx: { height: { md: 'calc(100% - 64px)' } } }}
+    >
       <DialogTitle>Floor plans · {type?.name}</DialogTitle>
       {type && plans.isSuccess && resources.isSuccess ? (
         <EditorBody
@@ -120,6 +129,9 @@ function EditorBody({
 }) {
   const toast = useToast();
   const save = useSaveFloorPlans();
+  const theme = useTheme();
+  /** Map and panel side by side, fitted to the window; below this they stack and scroll. */
+  const wide = useMediaQuery(theme.breakpoints.up('md'));
   const nextKey = useRef(0);
   const [floors, setFloors] = useState<FloorDraft[]>(() =>
     plans.length
@@ -405,7 +417,7 @@ function EditorBody({
 
   return (
     <>
-      <DialogContent dividers>
+      <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', overflow: wide ? 'hidden' : 'auto' }}>
         <FloorTabs
           floors={floors}
           activeKey={floor?.key}
@@ -415,8 +427,21 @@ function EditorBody({
         />
 
         {floor ? (
-          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3} alignItems="flex-start" sx={{ mt: 2 }}>
-            <Box sx={{ flex: 1, minWidth: 0, width: '100%', position: 'relative' }}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={3}
+            alignItems={wide ? 'stretch' : 'flex-start'}
+            sx={{ mt: 2, ...(wide ? { flex: 1, minHeight: 0 } : {}) }}
+          >
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                width: '100%',
+                position: 'relative',
+                ...(wide ? { display: 'flex', flexDirection: 'column', minHeight: 0 } : {}),
+              }}
+            >
               {items.length === 0 && decor.length === 0 ? (
                 <Stack
                   alignItems="center"
@@ -437,7 +462,15 @@ function EditorBody({
                   </Box>
                 </Stack>
               ) : null}
-              <FloorPlanScene ref={svgRef} aspectRatio={aspectRatio} minWidth={560} label={`Floor plan of ${floor.name}`} onBackgroundPointerDown={() => setSelection(null)}>
+              <Box sx={wide ? { flex: 1, minHeight: 0 } : undefined}>
+              <FloorPlanScene
+                ref={svgRef}
+                aspectRatio={aspectRatio}
+                minWidth={560}
+                fill={wide}
+                label={`Floor plan of ${floor.name}`}
+                onBackgroundPointerDown={() => setSelection(null)}
+              >
                 {decorDrawOrder(decor).map((piece) => (
                   <DecorShape
                     key={piece.key}
@@ -464,12 +497,16 @@ function EditorBody({
                   );
                 })}
               </FloorPlanScene>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, flexShrink: 0 }}>
                 Drag anything to move it. Select it to change its shape, size or name; arrow keys nudge (Shift for bigger steps), Delete removes.
               </Typography>
             </Box>
 
-            <Stack spacing={2.5} sx={{ width: { xs: '100%', lg: 320 }, flexShrink: 0 }}>
+            <Stack
+              spacing={2.5}
+              sx={{ width: { xs: '100%', md: 280, lg: 320 }, flexShrink: 0, ...(wide ? { overflowY: 'auto', minHeight: 0, pr: 0.5, pb: 1 } : {}) }}
+            >
               {selectedTable ? (
                 <TableControls
                   item={selectedTable}
@@ -635,7 +672,7 @@ function EditorBody({
         )}
 
         {floors.length > 0 && floors.every((draft) => draft.items.length === 0) && plans.length > 0 ? (
-          <Alert severity="info" sx={{ mt: 2 }}>
+          <Alert severity="info" sx={{ mt: 2, flexShrink: 0 }}>
             With nothing placed on any floor, customers choose from the list as before.
           </Alert>
         ) : null}

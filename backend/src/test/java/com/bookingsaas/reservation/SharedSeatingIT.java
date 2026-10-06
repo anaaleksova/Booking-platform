@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -97,9 +98,11 @@ class SharedSeatingIT extends AbstractIntegrationTest {
         List<Future<Integer>> results = new ArrayList<>();
         for (int i = 0; i < attempts; i++) {
             String email = "racer" + i + "@example.com";
+            String racerToken = customerToken("racer" + i + "@example.com");
             Callable<Integer> attempt = () -> {
                 start.await();
                 return mockMvc.perform(post("/api/public/businesses/" + slug + "/reservations")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(racerToken))
                                 .contentType("application/json")
                                 .content(body(5, longTable, email)))
                         .andReturn().getResponse().getStatus();
@@ -137,7 +140,7 @@ class SharedSeatingIT extends AbstractIntegrationTest {
     // --- helpers -----------------------------------------------------------
 
     private JsonNode reserve(int participants, long tableId, String email, int expectedStatus) throws Exception {
-        return send(post("/api/public/businesses/" + slug + "/reservations"), null, body(participants, tableId, email),
+        return send(post("/api/public/businesses/" + slug + "/reservations"), customerToken(email), body(participants, tableId, email),
                 expectedStatus);
     }
 

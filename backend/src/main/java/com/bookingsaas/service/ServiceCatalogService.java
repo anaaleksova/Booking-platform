@@ -206,6 +206,7 @@ public class ServiceCatalogService {
             requirement.setQuantity(line.quantity());
             requirement.setRequired(line.required());
             requirement.setCustomerCanChoose(line.customerCanChoose());
+            requirement.setCombineResources(line.combines());
             requirement.setPosition(position++);
             requirementRepository.save(requirement);
         }
@@ -221,7 +222,7 @@ public class ServiceCatalogService {
         ResourceType type = types.get(requirement.getResourceTypeId());
         return new RequirementResponse(requirement.getId(), requirement.getResourceTypeId(),
                 type == null ? null : type.getName(), requirement.getQuantity(), requirement.isRequired(),
-                requirement.isCustomerCanChoose());
+                requirement.isCustomerCanChoose(), requirement.isCombineResources());
     }
 
     private static void apply(BookableService service, ServiceRequest request) {

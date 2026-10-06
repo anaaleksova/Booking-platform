@@ -58,6 +58,17 @@ public class Notification extends Auditable {
     @Column(nullable = false, columnDefinition = "text")
     private String body;
 
+    /** Branded HTML alternative to {@link #body}; null for plain-text-only messages. */
+    @Column(name = "html_body", columnDefinition = "text")
+    private String htmlBody;
+
+    /** Display name the email appears to come from (the business). */
+    @Column(name = "sender_name", length = 160)
+    private String senderName;
+
+    @Column(name = "reply_to", length = 320)
+    private String replyTo;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private NotificationStatus status = NotificationStatus.PENDING;

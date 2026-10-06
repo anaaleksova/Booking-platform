@@ -10,13 +10,21 @@ package com.bookingsaas.availability;
  *                     six seats for others
  * @param minPartySize the smallest group a private resource is given to;
  *                     {@code null} for any group
+ * @param areaId       where it stands — a floor plan — so combined resources
+ *                     stay together; {@code null} when it is on no plan
  */
 public record ResourceSpec(Long id, Long resourceTypeId, String name, Integer capacity, boolean shared,
-                           Integer minPartySize) {
+                           Integer minPartySize, Long areaId) {
 
     /** A private resource with no minimum group size. */
     public ResourceSpec(Long id, Long resourceTypeId, String name, Integer capacity) {
-        this(id, resourceTypeId, name, capacity, false, null);
+        this(id, resourceTypeId, name, capacity, false, null, null);
+    }
+
+    /** A resource on no floor plan. */
+    public ResourceSpec(Long id, Long resourceTypeId, String name, Integer capacity, boolean shared,
+                        Integer minPartySize) {
+        this(id, resourceTypeId, name, capacity, shared, minPartySize, null);
     }
 
     /** Capacity for arithmetic: an unlimited resource covers any group. */
@@ -26,6 +34,6 @@ public record ResourceSpec(Long id, Long resourceTypeId, String name, Integer ca
 
     /** The same resource with only {@code seats} left, as seen at one time. */
     ResourceSpec withCapacity(int seats) {
-        return new ResourceSpec(id, resourceTypeId, name, seats, shared, minPartySize);
+        return new ResourceSpec(id, resourceTypeId, name, seats, shared, minPartySize, areaId);
     }
 }

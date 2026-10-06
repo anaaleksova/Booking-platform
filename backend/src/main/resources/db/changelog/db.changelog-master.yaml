@@ -28,6 +28,16 @@ databaseChangeLog:
       file: db/changelog/changes/009-shared-seating.sql
   - include:
       file: db/changelog/changes/010-floors.sql
+  - include:
+      file: db/changelog/changes/011-combined-resources.sql
+  - include:
+      file: db/changelog/changes/012-dark-booking-page.sql
+  - include:
+      file: db/changelog/changes/013-notification-html.sql
+  - include:
+      file: db/changelog/changes/014-pending-signup.sql
+  - include:
+      file: db/changelog/changes/015-password-reset.sql
   # Demo data: only runs with the "dev" context (see application-dev.yml).
   - include:
       file: db/changelog/seed/100-demo-data.sql
@@ -43,3 +53,5 @@ databaseChangeLog:
       file: db/changelog/seed/105-demo-shared-seating.sql
   - include:
       file: db/changelog/seed/106-demo-floor-names.sql
+  - include:
+      file: db/changelog/seed/107-demo-combined-tables.sql

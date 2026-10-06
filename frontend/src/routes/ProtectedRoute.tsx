@@ -11,7 +11,7 @@ import { LoadingState } from '@/components/states';
  * request.
  */
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated, initialising } = useAuth();
+  const { isAuthenticated, initialising, user } = useAuth();
   const location = useLocation();
 
   if (initialising) {
@@ -21,6 +21,11 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   if (!isAuthenticated) {
     // Remember where they were headed so login can return them there.
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  // A customer (booking-only) account has no business to manage.
+  if (!user?.activeBusiness) {
+    return <Navigate to="/login" replace state={{ from: location.pathname, customerAccount: true }} />;
   }
 
   return <>{children}</>;

@@ -19,6 +19,7 @@ function page<T, K extends keyof T>(loader: () => Promise<T>, name: K) {
 }
 
 const LoginPage = page(() => import('@/pages/auth/LoginPage'), 'LoginPage');
+const ForgotPasswordPage = page(() => import('@/pages/auth/ForgotPasswordPage'), 'ForgotPasswordPage');
 const RegisterPage = page(() => import('@/pages/auth/RegisterPage'), 'RegisterPage');
 const NotFoundPage = page(() => import('@/pages/NotFoundPage'), 'NotFoundPage');
 
@@ -52,6 +53,7 @@ export function App() {
     <Suspense fallback={<LoadingState />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
         <Route path="/" element={<HomePage />} />

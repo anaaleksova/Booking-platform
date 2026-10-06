@@ -1,5 +1,6 @@
 package com.bookingsaas.notification;
 
+import com.bookingsaas.business.Business;
 import com.bookingsaas.business.BusinessService;
 import com.bookingsaas.business.BusinessSettings;
 import com.bookingsaas.common.config.AppProperties;
@@ -116,6 +117,11 @@ public class NotificationService {
         notification.setRecipient(recipient);
         notification.setSubject(composer.subject(type, payload));
         notification.setBody(composer.body(type, payload));
+        Business business = businessService.requireById(payload.businessId());
+        notification.setHtmlBody(composer.html(type, payload,
+                new NotificationComposer.Branding(business.getAccentColor(), business.isDarkTheme())));
+        notification.setSenderName(payload.businessName());
+        notification.setReplyTo(payload.businessEmail());
         notification.setScheduledAt(dueAt == null ? clock.instant() : dueAt);
 
         try {

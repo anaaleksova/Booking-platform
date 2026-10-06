@@ -30,12 +30,19 @@ public record SlotEvaluation(
      *                     busy)
      * @param satisfiable  whether {@code quantity} of them can cover the group
      * @param seatsLeft    for shared candidates, the seats still free at that time
+     * @param allocations  for a combinable requirement, the best ways to seat
+     *                     the group at that time, best first; empty otherwise
      */
     public record RequirementOption(RequirementSpec requirement, List<Long> candidateIds, boolean satisfiable,
-                                    Map<Long, Integer> seatsLeft) {
+                                    Map<Long, Integer> seatsLeft, List<AllocationFinder.Allocation> allocations) {
+
+        public RequirementOption(RequirementSpec requirement, List<Long> candidateIds, boolean satisfiable,
+                                 Map<Long, Integer> seatsLeft) {
+            this(requirement, candidateIds, satisfiable, seatsLeft, List.of());
+        }
 
         public RequirementOption(RequirementSpec requirement, List<Long> candidateIds, boolean satisfiable) {
-            this(requirement, candidateIds, satisfiable, Map.of());
+            this(requirement, candidateIds, satisfiable, Map.of(), List.of());
         }
     }
 

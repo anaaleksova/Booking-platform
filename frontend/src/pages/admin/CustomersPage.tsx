@@ -28,7 +28,7 @@ import { useBusiness } from '@/features/business/api';
 import { useCustomers, useSaveCustomer, type CustomerInput } from '@/features/customers/api';
 import { formatDaysAgo, formatLocalDate, formatMoney } from '@/utils/format';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZES = [10, 25, 50];
 
 export function CustomersPage() {
   const navigate = useNavigate();
@@ -37,8 +37,9 @@ export function CustomersPage() {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [draft, setDraft] = useState<CustomerInput | null>(null);
-  const { data, isLoading, isError, error, refetch } = useCustomers(query, page, PAGE_SIZE);
+  const { data, isLoading, isError, error, refetch } = useCustomers(query, page, pageSize);
   const save = useSaveCustomer();
 
   // Debounce the search box so typing does not fire a request per keystroke.
@@ -131,9 +132,13 @@ export function CustomersPage() {
             component="div"
             count={data?.totalElements ?? 0}
             page={page}
-            rowsPerPage={PAGE_SIZE}
-            rowsPerPageOptions={[PAGE_SIZE]}
+            rowsPerPage={pageSize}
+            rowsPerPageOptions={PAGE_SIZES}
             onPageChange={(_, next) => setPage(next)}
+            onRowsPerPageChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(0);
+            }}
           />
         </TableContainer>
       )}

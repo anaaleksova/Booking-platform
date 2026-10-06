@@ -151,6 +151,9 @@ public class BusinessService {
         if (request.showGallery() != null) {
             business.setShowGallery(request.showGallery());
         }
+        if (request.darkTheme() != null) {
+            business.setDarkTheme(request.darkTheme());
+        }
         business.setPhone(trimToNull(request.phone()));
         business.setEmail(trimToNull(request.email()));
         business.setAddress(trimToNull(request.address()));

@@ -1,28 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
-import ButtonBase from '@mui/material/ButtonBase';
 import Container from '@mui/material/Container';
-import Dialog from '@mui/material/Dialog';
 import IconButton from '@mui/material/IconButton';
-import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
-import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { mediaUrl } from '@/features/media/api';
 import type { PublicBusiness } from '@/types/api';
 
 type Photo = PublicBusiness['gallery'][number];
 
+/** Up to this many photos sit in a plain grid; more become a carousel. */
+const MAX_GRID = 3;
+
 /**
- * The booking page's photo gallery: a grid on wide screens, a swipeable row on
- * phones, and a full-screen viewer with on-screen and keyboard arrows
- * and captions. Renders nothing when there are no photos.
+ * The booking page's photo gallery: a grid for up to three photos, a
+ * horizontally scrolling carousel for more. The photos are decoration — they
+ * are not clickable. Renders nothing when there are no photos.
  */
 export function GallerySection({ photos, title }: { photos: Photo[]; title: (eyebrow: string, heading: string) => React.ReactNode }) {
-  const [open, setOpen] = useState<number | null>(null);
-  const layout = gridLayout(photos.length);
-
   if (photos.length === 0) {
     return null;
   }
@@ -31,82 +27,144 @@ export function GallerySection({ photos, title }: { photos: Photo[]; title: (eye
       <Container maxWidth="lg">
         {title('Gallery', 'Take a look inside')}
 
-        {/* Wide screens: a grid sized to the number of photos, so rows end even. */}
-        <Box
-          sx={{
-            display: { xs: 'none', md: 'grid' },
-            gridTemplateColumns: `repeat(${layout.columns}, 1fr)`,
-            gridAutoRows: layout.rowHeight,
-            gap: 1.5,
-          }}
-        >
-          {photos.map((photo, index) => (
-            <Thumb
-              key={photo.url}
-              photo={photo}
-              onClick={() => setOpen(index)}
-              sx={index === 0 && layout.leadPhoto ? { gridColumn: 'span 2', gridRow: 'span 2' } : undefined}
-            />
-          ))}
-        </Box>
+        {photos.length > MAX_GRID ? (
+          <Carousel photos={photos} />
+        ) : (
+          // Up to three photos: a single row that fills the width.
+          <Box
+            sx={{
+              display: { xs: 'none', md: 'grid' },
+              gridTemplateColumns: `repeat(${photos.length}, 1fr)`,
+              gridAutoRows: photos.length <= 2 ? 360 : 260,
+              gap: 1.5,
+            }}
+          >
+            {photos.map((photo) => (
+              <Thumb key={photo.url} photo={photo} />
+            ))}
+          </Box>
+        )}
 
         {/* Phones: one swipeable row that snaps photo by photo. */}
-        <Box
-          sx={{
-            display: { xs: 'flex', md: 'none' },
-            gap: 1.5,
-            overflowX: 'auto',
-            scrollSnapType: 'x mandatory',
-            mx: -2,
-            px: 2,
-            pb: 1,
-            scrollbarWidth: 'none',
-          }}
-        >
-          {photos.map((photo, index) => (
-            <Thumb
-              key={photo.url}
-              photo={photo}
-              onClick={() => setOpen(index)}
-              sx={{ flex: '0 0 78%', height: 260, scrollSnapAlign: 'center' }}
-            />
-          ))}
-        </Box>
+        {photos.length <= MAX_GRID ? (
+          <Box
+            sx={{
+              display: { xs: 'flex', md: 'none' },
+              gap: 1.5,
+              overflowX: 'auto',
+              scrollSnapType: 'x mandatory',
+              mx: -2,
+              px: 2,
+              pb: 1,
+              scrollbarWidth: 'none',
+            }}
+          >
+            {photos.map((photo) => (
+              <Thumb
+                key={photo.url}
+                photo={photo}
+                sx={{ flex: '0 0 78%', height: 260, scrollSnapAlign: 'center' }}
+              />
+            ))}
+          </Box>
+        ) : null}
       </Container>
-
-      <Viewer photos={photos} index={open} onChange={setOpen} />
     </Box>
   );
 }
 
 /**
- * Columns for the desktop grid. A large lead photo (2×2) is used only when the
- * remaining photos still fill the rows exactly — 5 or 9 photos in 4 columns;
- * otherwise the column count is picked to divide the photos evenly.
+ * More than three photos: a horizontally scrollable row (three visible on wide
+ * screens, one and a bit on phones) that snaps photo by photo, with arrows
+ * that appear when there is more to see in that direction.
  */
-function gridLayout(count: number): { columns: number; leadPhoto: boolean; rowHeight: number } {
-  if (count === 5 || count === 9) {
-    return { columns: 4, leadPhoto: true, rowHeight: 200 };
-  }
-  if (count <= 4) {
-    return { columns: Math.max(1, count), leadPhoto: false, rowHeight: count <= 2 ? 360 : 260 };
-  }
-  const columns = count % 4 === 0 ? 4 : count % 3 === 0 ? 3 : count % 5 === 0 ? 5 : 4;
-  return { columns, leadPhoto: false, rowHeight: columns === 3 ? 260 : 220 };
+function Carousel({ photos }: { photos: Photo[] }) {
+  const track = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: true, end: false });
+
+  const update = useCallback(() => {
+    const node = track.current;
+    if (node) {
+      setEdges({ start: node.scrollLeft < 4, end: node.scrollLeft + node.clientWidth >= node.scrollWidth - 4 });
+    }
+  }, []);
+
+  useEffect(() => {
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [update, photos.length]);
+
+  const scrollBy = (direction: number) => {
+    const node = track.current;
+    const first = node?.firstElementChild;
+    if (node && first) {
+      // One photo plus the 12px gap between photos.
+      node.scrollBy({ left: direction * (first.getBoundingClientRect().width + 12), behavior: 'smooth' });
+    }
+  };
+
+  return (
+    <Box sx={{ position: 'relative' }}>
+      <Box
+        ref={track}
+        onScroll={update}
+        sx={{
+          display: 'flex',
+          gap: 1.5,
+          overflowX: 'auto',
+          scrollSnapType: 'x mandatory',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
+          mx: { xs: -2, md: 0 },
+          px: { xs: 2, md: 0 },
+          pb: 1,
+        }}
+      >
+        {photos.map((photo) => (
+          <Thumb
+            key={photo.url}
+            photo={photo}
+            sx={{ flex: { xs: '0 0 78%', md: '0 0 calc((100% - 24px) / 3)' }, height: { xs: 260, md: 280 }, scrollSnapAlign: 'start' }}
+          />
+        ))}
+      </Box>
+      {[
+        { direction: -1, hidden: edges.start, label: 'Previous photos', side: { left: -20 }, icon: <ChevronLeftRoundedIcon /> },
+        { direction: 1, hidden: edges.end, label: 'Next photos', side: { right: -20 }, icon: <ChevronRightRoundedIcon /> },
+      ].map(({ direction, hidden, label, side, icon }) => (
+        <IconButton
+          key={direction}
+          onClick={() => scrollBy(direction)}
+          aria-label={label}
+          sx={{
+            display: { xs: 'none', md: 'inline-flex' },
+            position: 'absolute',
+            top: 'calc(50% - 28px)',
+            ...side,
+            bgcolor: '#fff',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+            opacity: hidden ? 0 : 1,
+            pointerEvents: hidden ? 'none' : 'auto',
+            transition: 'opacity 200ms ease',
+            '&:hover': { bgcolor: '#fff' },
+          }}
+        >
+          {icon}
+        </IconButton>
+      ))}
+    </Box>
+  );
 }
 
-function Thumb({ photo, onClick, sx }: { photo: Photo; onClick: () => void; sx?: object }) {
+function Thumb({ photo, sx }: { photo: Photo; sx?: object }) {
   return (
-    <ButtonBase
-      onClick={onClick}
-      aria-label={photo.caption ? `Open photo: ${photo.caption}` : 'Open photo'}
+    <Box
       sx={{
         position: 'relative',
         borderRadius: 3,
         overflow: 'hidden',
         bgcolor: 'action.hover',
-        '& img': { transition: 'transform 300ms ease' },
-        '&:hover img': { transform: 'scale(1.04)' },
         ...sx,
       }}
     >
@@ -137,62 +195,6 @@ function Thumb({ photo, onClick, sx }: { photo: Photo; onClick: () => void; sx?:
           {photo.caption}
         </Typography>
       ) : null}
-    </ButtonBase>
-  );
-}
-
-function Viewer({ photos, index, onChange }: { photos: Photo[]; index: number | null; onChange: (index: number | null) => void }) {
-  const step = useCallback(
-    (direction: number) => index !== null && onChange((index + direction + photos.length) % photos.length),
-    [index, onChange, photos.length],
-  );
-
-  useEffect(() => {
-    if (index === null) {
-      return;
-    }
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowRight') step(1);
-      if (event.key === 'ArrowLeft') step(-1);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [index, step]);
-
-  const photo = index === null ? null : photos[index];
-  return (
-    <Dialog
-      open={photo !== null}
-      onClose={() => onChange(null)}
-      fullScreen
-      PaperProps={{ sx: { bgcolor: 'rgba(8,9,12,0.96)', color: '#fff' } }}
-    >
-      {photo ? (
-        <Stack sx={{ height: '100%' }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 1.5 }}>
-            <Typography variant="body2" sx={{ opacity: 0.7, pl: 1 }}>
-              {(index ?? 0) + 1} / {photos.length}
-            </Typography>
-            <IconButton onClick={() => onChange(null)} aria-label="Close" sx={{ color: '#fff' }}>
-              <CloseRoundedIcon />
-            </IconButton>
-          </Stack>
-          <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', px: { xs: 0, md: 9 } }}>
-            {photos.length > 1 ? (
-              <IconButton onClick={() => step(-1)} aria-label="Previous photo" sx={{ position: 'absolute', left: 8, color: '#fff', bgcolor: 'rgba(255,255,255,0.12)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}>
-                <ChevronLeftRoundedIcon fontSize="large" />
-              </IconButton>
-            ) : null}
-            <Box component="img" src={mediaUrl(photo.url)} alt={photo.caption ?? ''} sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-            {photos.length > 1 ? (
-              <IconButton onClick={() => step(1)} aria-label="Next photo" sx={{ position: 'absolute', right: 8, color: '#fff', bgcolor: 'rgba(255,255,255,0.12)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}>
-                <ChevronRightRoundedIcon fontSize="large" />
-              </IconButton>
-            ) : null}
-          </Box>
-          <Typography sx={{ textAlign: 'center', p: 2, minHeight: 56, opacity: 0.9 }}>{photo.caption}</Typography>
-        </Stack>
-      ) : null}
-    </Dialog>
+    </Box>
   );
 }

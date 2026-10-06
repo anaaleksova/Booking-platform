@@ -23,6 +23,7 @@ public record BusinessResponse(
         String websiteUrl,
         boolean showMap,
         boolean showGallery,
+        boolean darkTheme,
         String phone,
         String email,
         String address,
@@ -38,7 +39,7 @@ public record BusinessResponse(
                 business.getLogoMediaId(), Media.urlOf(business.getLogoMediaId()),
                 business.getCoverMediaId(), Media.urlOf(business.getCoverMediaId()),
                 business.getInstagramUrl(), business.getFacebookUrl(), business.getWebsiteUrl(),
-                business.isShowMap(), business.isShowGallery(), business.getPhone(), business.getEmail(),
+                business.isShowMap(), business.isShowGallery(), business.isDarkTheme(), business.getPhone(), business.getEmail(),
                 business.getAddress(), business.getCurrency(), business.getTimezone(), business.isActive(), business.getCreatedAt());
     }
 }

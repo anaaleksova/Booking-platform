@@ -155,8 +155,9 @@ A replaced image is deleted automatically.
 **Gallery.** Optional and up to 12 photos, with captions and an order you
 set. It is managed in Settings → Booking page; changes save immediately,
 and a switch hides the section. The section only appears when it has
-photos. Desktop shows a grid sized to the photo count, phones a swipeable
-row, and tapping opens a full-screen viewer.
+photos. Up to three photos sit in a grid (a swipeable row on phones); more
+become a carousel that scrolls one photo at a time. The photos are
+decoration and are not clickable.
 
 **Floor plans.** Optional, with one plan per floor or area of a resource type. A co-working space can draw each of its floors, and a restaurant its dining room and rooftop. Restaurants, bars and
 coworking spaces can use them to show where each table or desk is. Open
@@ -235,6 +236,41 @@ reservation inside its transaction. Customers can pick resources only for
 requirements the business marked as customer-choosable. Everything else is
 assigned by the server.
 
+### Combining resources for larger groups
+
+A requirement can have **Combine for larger groups** switched on. Its quantity
+then becomes a minimum. When no single resource seats the group, the engine
+puts free ones of that type together: Table 3 + Table 4 for eight, four desks
+for a team of four. The admin only manages individual resources. Combinations
+are never configured or stored as such. A reservation simply holds one
+`reservation_resource` row per resource it was given, so history keeps exactly
+what was allocated.
+
+`availability/AllocationFinder` does the search, and it is pure and
+unit-tested:
+
+- It only uses resources that are eligible for the service and free at that
+  time.
+- A combination stays within one floor plan, so a group is never split between
+  the dining room and the terrace. Resources on no plan form one area.
+- Ranking (`AllocationFinder.RANKING`, one comparator) prefers, in order:
+  1. fewer resources
+  2. fewer spare seats
+  3. the engine's usual preference (smallest, least busy)
+- No set ever includes a resource the group could do without.
+- It never tries all 2^N subsets:
+  - Resources of equal capacity in an area are counted rather than enumerated.
+  - Branches are pruned as soon as they cannot reach the group, already seat
+    it, or cannot beat the options already kept.
+  - Hard caps of 20 resources per allocation and 20,000 search steps.
+
+  Five hundred identical desks are searched in milliseconds.
+
+The availability response carries the best options per slot
+(`requirements[].allocations`). Customers choose one of these, or "No
+preference". Admins can also pick resources by hand, and the server validates
+the set with the same rules.
+
 ## Double booking
 
 Double booking is prevented in three layers:
@@ -247,7 +283,10 @@ Double booking is prevented in three layers:
    `409 RESOURCE_NOT_AVAILABLE`.
 
 Layer 3 is the guarantee. `ReservationIT` fires six concurrent requests at
-one resource: exactly one succeeds.
+one resource: exactly one succeeds. It holds for combinations too, because
+every resource of a combination is its own row under the same constraint.
+`CombinedResourcesIT` races two groups for Table 1 + Table 3 and Table 2 +
+Table 3: exactly one gets in, and nothing is half-written.
 
 ## Pricing, discounts and revenue
 

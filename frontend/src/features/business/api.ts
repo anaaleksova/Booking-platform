@@ -18,6 +18,7 @@ export type BusinessInput = Pick<
   | 'websiteUrl'
   | 'showMap'
   | 'showGallery'
+  | 'darkTheme'
   | 'phone'
   | 'email'
   | 'address'
@@ -40,6 +41,7 @@ export function toBusinessInput(business: Business, patch: Partial<BusinessInput
     websiteUrl: business.websiteUrl ?? '',
     showMap: business.showMap,
     showGallery: business.showGallery,
+    darkTheme: business.darkTheme,
     phone: business.phone ?? '',
     email: business.email ?? '',
     address: business.address ?? '',

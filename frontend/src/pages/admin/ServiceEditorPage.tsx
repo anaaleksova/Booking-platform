@@ -78,11 +78,12 @@ export function ServiceEditorPage() {
         bufferAfterMinutes: existing.bufferAfterMinutes,
         allowCustomerResourceSelection: existing.allowCustomerResourceSelection,
         active: existing.active,
-        requirements: existing.requirements.map(({ resourceTypeId, quantity, required, customerCanChoose }) => ({
+        requirements: existing.requirements.map(({ resourceTypeId, quantity, required, customerCanChoose, combineResources }) => ({
           resourceTypeId,
           quantity,
           required,
           customerCanChoose,
+          combineResources,
         })),
       });
     }
@@ -266,7 +267,7 @@ export function ServiceEditorPage() {
                   if (next) {
                     set('requirements', [
                       ...form.requirements,
-                      { resourceTypeId: next.id, quantity: 1, required: true, customerCanChoose: false },
+                      { resourceTypeId: next.id, quantity: 1, required: true, customerCanChoose: false, combineResources: false },
                     ]);
                   }
                 }}
@@ -341,7 +342,23 @@ export function ServiceEditorPage() {
                       }
                       label={<Typography variant="body2">Customer chooses</Typography>}
                     />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={row.combineResources}
+                          onChange={(e) => setRequirement(index, { combineResources: e.target.checked })}
+                        />
+                      }
+                      label={<Typography variant="body2">Combine for larger groups</Typography>}
+                    />
                   </Stack>
+                  {row.combineResources ? (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      When no single one seats the group, free ones in the same area are put together automatically —
+                      {row.quantity > 1 ? ` at least ${row.quantity}, ` : ' '}as few as possible, with the fewest spare seats.
+                    </Typography>
+                  ) : null}
                 </Paper>
               ))}
             </Stack>

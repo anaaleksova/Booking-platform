@@ -1,5 +1,6 @@
 package com.bookingsaas.availability;
 
+import com.bookingsaas.availability.AllocationFinder.Allocation;
 import com.bookingsaas.availability.ResourceAllocation.AllocatedResource;
 import com.bookingsaas.availability.SlotEvaluation.RequirementOption;
 import com.bookingsaas.availability.dto.AvailableSlot;
@@ -40,6 +41,12 @@ import java.util.Set;
  *       {@code quantity} of them must together have the capacity for the
  *       group</li>
  * </ol>
+ *
+ * <p>A <em>combinable</em> requirement treats {@code quantity} as a minimum:
+ * when no single resource seats the group, the {@link AllocationFinder} puts
+ * free ones together (Table 3 + Table 4 for eight). Those combinations are
+ * worked out per request and never stored as such — the reservation simply
+ * holds every resource it was given.
  *
  * <p>A <em>shared</em> resource is free while it has seats left: other
  * bookings use up seats rather than the whole resource, and only the seats
@@ -162,14 +169,20 @@ public class AvailabilityEngine {
                 }
             }
             List<ResourceSpec> ordered = byPreference(ctx, free);
-            boolean satisfiable = bestFit(ordered, requirement.quantity(), ctx.participants()) != null;
+            List<Allocation> allocations = requirement.combinable()
+                    ? AllocationFinder.find(ordered, requirement.quantity(), ctx.participants(),
+                            AllocationFinder.DEFAULT_LIMIT)
+                    : List.of();
+            boolean satisfiable = requirement.combinable()
+                    ? !allocations.isEmpty()
+                    : bestFit(ordered, requirement.quantity(), ctx.participants()) != null;
 
             if (requirement.required() && !satisfiable) {
                 return SlotEvaluation.rejected(ErrorCode.RESOURCE_NOT_AVAILABLE,
                         unavailableMessage(requirement, free.size(), ctx.participants()));
             }
             options.add(new RequirementOption(requirement, ordered.stream().map(ResourceSpec::id).toList(),
-                    satisfiable, Map.copyOf(seatsLeft)));
+                    satisfiable, Map.copyOf(seatsLeft), allocations));
         }
         return SlotEvaluation.available(List.copyOf(options));
     }
@@ -218,6 +231,10 @@ public class AvailabilityEngine {
     }
 
     private List<ResourceSpec> autoAssign(AvailabilityContext ctx, RequirementOption option) {
+        if (option.requirement().combinable()) {
+            // The best-ranked combination; none only for an unsatisfied optional requirement.
+            return option.allocations().isEmpty() ? List.of() : option.allocations().get(0).resources();
+        }
         List<ResourceSpec> ordered = option.candidateIds().stream().map(id -> asSeen(ctx, option, id)).toList();
         List<ResourceSpec> fit = bestFit(ordered, option.requirement().quantity(), ctx.participants());
         // Only an optional requirement reaches here unsatisfied: skip it.
@@ -284,7 +301,10 @@ public class AvailabilityEngine {
         RequirementSpec requirement = option.requirement();
         String type = requirement.resourceTypeName();
         Set<Long> distinct = new HashSet<>(picked);
-        if (distinct.size() != picked.size() || picked.size() != requirement.quantity()) {
+        if (distinct.size() != picked.size()) {
+            throw ApiException.of(ErrorCode.INVALID_RESOURCE_SELECTION, "Select each " + type + " only once.");
+        }
+        if (!requirement.combinable() && picked.size() != requirement.quantity()) {
             throw ApiException.of(ErrorCode.INVALID_RESOURCE_SELECTION,
                     "Select exactly " + requirement.quantity() + " × " + type + ".");
         }
@@ -304,6 +324,14 @@ public class AvailabilityEngine {
             }
         }
         List<ResourceSpec> seen = picked.stream().map(id -> asSeen(ctx, option, id)).toList();
+        if (requirement.combinable()) {
+            String rejection = AllocationFinder.rejectionOf(seen, requirement.quantity(), ctx.participants());
+            if (rejection != null) {
+                throw ApiException.of(ErrorCode.INVALID_RESOURCE_SELECTION,
+                        "That combination of " + type + " resources does not work: " + rejection);
+            }
+            return seen;
+        }
         long capacity = seen.stream().mapToLong(ResourceSpec::effectiveCapacity).sum();
         if (capacity < ctx.participants()) {
             throw ApiException.of(ErrorCode.INVALID_RESOURCE_SELECTION,
@@ -345,6 +373,10 @@ public class AvailabilityEngine {
 
     private static String unavailableMessage(RequirementSpec requirement, int freeCount, int participants) {
         String type = requirement.resourceTypeName();
+        if (requirement.combinable() && freeCount >= requirement.quantity()) {
+            return "No available " + type + ", alone or combined, can accommodate " + participants
+                    + " participants at that time.";
+        }
         if (freeCount < requirement.quantity()) {
             return requirement.quantity() == 1
                     ? "No " + type + " is available at that time."

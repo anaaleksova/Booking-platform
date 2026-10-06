@@ -44,7 +44,8 @@ export type TableState = 'edit' | 'editSelected' | 'free' | 'selected' | 'taken'
 export const TABLE_COLORS = {
   edit: { top: '#efe3cf', line: '#b08d5b', chair: '#a9b1ba', back: '#7e8792', text: '#3f3a33' },
   free: { top: '#e3f4e8', line: '#2f9e5c', chair: '#acdcbd', back: '#2f9e5c', text: '#1d5233' },
-  taken: { top: '#f8e2e2', line: '#d46b6b', chair: '#ecc1c1', back: '#c95b5b', text: '#8a3c3c' },
+  // Neutral grey: booked must never be mistaken for the customer's own (brand-coloured) choice.
+  taken: { top: '#e6e8eb', line: '#9aa1ab', chair: '#d3d7dc', back: '#9aa1ab', text: '#6b7280' },
   small: { top: '#efede9', line: '#b9b3a9', chair: '#e0dcd5', back: '#c6c0b6', text: '#857f75' },
 };
 
@@ -79,13 +80,21 @@ export const FloorPlanScene = forwardRef<
     zoom?: number;
     /** Below this width the plan scrolls sideways instead of shrinking further. */
     minWidth?: number;
+    /**
+     * Fill the parent's height as well as its width: the drawing is as large
+     * as fits both, centred, and never scrolls. The parent needs a definite
+     * height (e.g. a flex item in a fixed-height dialog).
+     */
+    fill?: boolean;
     onBackgroundPointerDown?: () => void;
   }
->(function FloorPlanScene({ aspectRatio, children, label, zoom = 1, minWidth = 0, onBackgroundPointerDown }, ref) {
+>(function FloorPlanScene({ aspectRatio, children, label, zoom = 1, minWidth = 0, fill = false, onBackgroundPointerDown }, ref) {
   const theme = useTheme();
   const id = useId().replace(/:/g, '');
   const height = viewHeight(aspectRatio);
   const windows = Math.max(2, Math.floor(VIEW_WIDTH / 190));
+  /** Width over height of the whole drawing, walls included. */
+  const drawnRatio = (VIEW_WIDTH + 2 * WALL + 8) / (height + 2 * WALL + 8);
 
   return (
     <Box
@@ -94,9 +103,18 @@ export const FloorPlanScene = forwardRef<
         borderRadius: 3,
         bgcolor: theme.palette.mode === 'dark' ? 'grey.900' : '#f3f4f6',
         p: { xs: 1.5, sm: 3 },
+        ...(fill ? { height: '100%', containerType: 'size', display: 'flex', alignItems: 'center' } : {}),
       }}
     >
-      <Box sx={{ width: `${zoom * 100}%`, minWidth: minWidth * zoom, mx: 'auto', transition: 'width 200ms ease' }}>
+      <Box
+        sx={{
+          // In fill mode 100cqh is the frame's inner height: as wide as that height allows, at most the full width.
+          width: fill ? `min(100%, calc(100cqh * ${drawnRatio.toFixed(4)}))` : `${zoom * 100}%`,
+          minWidth: fill ? 0 : minWidth * zoom,
+          mx: 'auto',
+          transition: 'width 200ms ease',
+        }}
+      >
         <Box
           component="svg"
           ref={ref}

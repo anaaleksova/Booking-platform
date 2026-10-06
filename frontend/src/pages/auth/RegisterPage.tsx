@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import { useAuth } from '@/features/auth/AuthContext';
 import { errorMessage } from '@/api/client';
 import { AuthShell } from '@/pages/auth/LoginPage';
+import { PasswordField } from '@/components/PasswordField';
 
 /** A short list plus the browser's own zone, which covers most sign-ups. */
 const COMMON_TIMEZONES = [
@@ -101,9 +102,8 @@ export function RegisterPage() {
             helperText={errors.email?.message}
             {...register('email')}
           />
-          <TextField
+          <PasswordField
             label="Password"
-            type="password"
             autoComplete="new-password"
             fullWidth
             error={Boolean(errors.password)}

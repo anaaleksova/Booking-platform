@@ -31,7 +31,8 @@ public record ServiceResponse(
             String resourceTypeName,
             int quantity,
             boolean required,
-            boolean customerCanChoose
+            boolean customerCanChoose,
+            boolean combineResources
     ) {
     }
 

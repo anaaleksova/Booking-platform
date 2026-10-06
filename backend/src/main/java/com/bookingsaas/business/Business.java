@@ -70,6 +70,10 @@ public class Business extends Auditable {
     @Column(name = "show_gallery", nullable = false)
     private boolean showGallery = true;
 
+    /** Whether the customer-facing pages use a black background instead of a light one. */
+    @Column(name = "dark_theme", nullable = false)
+    private boolean darkTheme = false;
+
     @Column(length = 40)
     private String phone;
 

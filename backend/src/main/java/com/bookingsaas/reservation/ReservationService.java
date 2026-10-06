@@ -123,8 +123,11 @@ public class ReservationService {
                 toInstant(request.startTime(), business.zoneId()), participants,
                 selections(request.resourceSelections()), null, true);
 
+        // The account's email, never the one in the request: it is what ties
+        // the booking to the person who is signed in.
+        String email = currentTenant.user().email();
         Customer customer = customerService.findOrCreate(businessId, request.customer().firstName(),
-                request.customer().lastName(), request.customer().email(), request.customer().phone());
+                request.customer().lastName(), email, request.customer().phone());
 
         Reservation reservation = build(business, service, customer, participants, allocation, quote,
                 ReservationSource.PUBLIC, request.notes(), null, null);

@@ -5,6 +5,7 @@ import com.bookingsaas.availability.dto.AvailableSlot;
 import com.bookingsaas.availability.dto.DayAvailability;
 import com.bookingsaas.availability.dto.DaySlotsResponse;
 import com.bookingsaas.availability.dto.SlotResponse;
+import com.bookingsaas.availability.dto.SlotResponse.AllocationOption;
 import com.bookingsaas.availability.dto.SlotResponse.ResourceOption;
 import com.bookingsaas.availability.dto.SlotResponse.SlotRequirement;
 import com.bookingsaas.availability.spi.BookedIntervalProvider;
@@ -16,6 +17,8 @@ import com.bookingsaas.business.OpeningHoursService;
 import com.bookingsaas.common.domain.TimeRange;
 import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
+import com.bookingsaas.resource.FloorPlanService;
+import com.bookingsaas.resource.FloorPlanService.Area;
 import com.bookingsaas.resource.Resource;
 import com.bookingsaas.resource.ResourceService;
 import com.bookingsaas.resource.ResourceType;
@@ -56,6 +59,7 @@ public class AvailabilityService {
     private final ResourceTypeService resourceTypeService;
     private final BlockedTimeService blockedTimeService;
     private final BookedIntervalProvider bookedIntervalProvider;
+    private final FloorPlanService floorPlanService;
     private final Clock clock;
 
     public AvailabilityService(AvailabilityEngine engine,
@@ -66,6 +70,7 @@ public class AvailabilityService {
                                ResourceTypeService resourceTypeService,
                                BlockedTimeService blockedTimeService,
                                BookedIntervalProvider bookedIntervalProvider,
+                               FloorPlanService floorPlanService,
                                Clock clock) {
         this.engine = engine;
         this.businessService = businessService;
@@ -75,6 +80,7 @@ public class AvailabilityService {
         this.resourceTypeService = resourceTypeService;
         this.blockedTimeService = blockedTimeService;
         this.bookedIntervalProvider = bookedIntervalProvider;
+        this.floorPlanService = floorPlanService;
         this.clock = clock;
     }
 
@@ -101,7 +107,7 @@ public class AvailabilityService {
         Loaded loaded = load(businessId, service, query.participants(), query.excludeReservationId(),
                 customerFacing, from, to);
         return engine.availableSlots(loaded.context(), from, to).stream()
-                .map(day -> toResponse(day, loaded.resources(), customerFacing))
+                .map(day -> toResponse(day, loaded, customerFacing))
                 .toList();
     }
 
@@ -119,7 +125,7 @@ public class AvailabilityService {
             throw evaluation.toException();
         }
         return toSlot(new AvailableSlot(java.time.LocalTime.from(start.atZone(loaded.context().zone())), start,
-                start.plus(service.duration()), evaluation.options()), loaded.resources(), false);
+                start.plus(service.duration()), evaluation.options()), loaded, false);
     }
 
     // --- allocation, used by reservations ----------------------------------
@@ -164,8 +170,8 @@ public class AvailabilityService {
 
     // --- context assembly --------------------------------------------------
 
-    /** The context plus the resource rows behind it, which the responses need for names. */
-    private record Loaded(AvailabilityContext context, Map<Long, Resource> resources) {
+    /** The context plus the resource rows and areas behind it, which the responses need for names. */
+    private record Loaded(AvailabilityContext context, Map<Long, Resource> resources, Map<Long, Area> areas) {
     }
 
     private Loaded load(Long businessId,
@@ -196,6 +202,7 @@ public class AvailabilityService {
                         && types.get(resource.getResourceTypeId()).isActive())
                 .toList();
         List<Long> resourceIds = resources.stream().map(Resource::getId).toList();
+        Map<Long, Area> areas = floorPlanService.areasOf(businessId, typeIds);
         Map<Long, List<Long>> restrictions = resourceService.serviceRestrictions(resourceIds);
 
         List<RequirementSpec> requirementSpecs = requirements.stream()
@@ -207,6 +214,7 @@ public class AvailabilityService {
                         requirement.getQuantity(),
                         requirement.isRequired(),
                         service.isAllowCustomerResourceSelection() && requirement.isCustomerCanChoose(),
+                        requirement.isCombineResources(),
                         resources.stream()
                                 .filter(resource -> resource.getResourceTypeId().equals(requirement.getResourceTypeId()))
                                 .filter(resource -> {
@@ -255,40 +263,55 @@ public class AvailabilityService {
                 resources.stream().collect(Collectors.toMap(Resource::getId,
                         resource -> new ResourceSpec(resource.getId(), resource.getResourceTypeId(),
                                 resource.getName(), resource.getCapacity(), resource.isSharedSeating(),
-                                resource.getMinPartySize()))),
+                                resource.getMinPartySize(),
+                                areas.containsKey(resource.getId()) ? areas.get(resource.getId()).id() : null))),
                 resourceService.hoursOf(businessId, resourceIds),
                 busy,
                 seatUse,
                 clock.instant());
-        return new Loaded(context, resources.stream().collect(Collectors.toMap(Resource::getId, Function.identity())));
+        return new Loaded(context, resources.stream().collect(Collectors.toMap(Resource::getId, Function.identity())),
+                areas);
     }
 
     // --- mapping -----------------------------------------------------------
 
-    private static DaySlotsResponse toResponse(DayAvailability day, Map<Long, Resource> resources,
-                                               boolean customerFacing) {
+    private static DaySlotsResponse toResponse(DayAvailability day, Loaded loaded, boolean customerFacing) {
         return new DaySlotsResponse(day.date(),
-                day.slots().stream().map(slot -> toSlot(slot, resources, customerFacing)).toList());
+                day.slots().stream().map(slot -> toSlot(slot, loaded, customerFacing)).toList());
     }
 
-    private static SlotResponse toSlot(AvailableSlot slot, Map<Long, Resource> resources, boolean customerFacing) {
+    private static SlotResponse toSlot(AvailableSlot slot, Loaded loaded, boolean customerFacing) {
         return new SlotResponse(slot.time(), slot.startTime(), slot.endTime(),
-                slot.options().stream().map(option -> toRequirement(option, resources, customerFacing)).toList());
+                slot.options().stream().map(option -> toRequirement(option, loaded, customerFacing)).toList());
     }
 
-    private static SlotRequirement toRequirement(RequirementOption option, Map<Long, Resource> resources,
-                                                 boolean customerFacing) {
+    private static SlotRequirement toRequirement(RequirementOption option, Loaded loaded, boolean customerFacing) {
         RequirementSpec requirement = option.requirement();
         // Customers only see concrete resources they are allowed to pick.
-        List<ResourceOption> free = customerFacing && !requirement.customerChoosable()
-                ? List.of()
-                : option.candidateIds().stream()
-                        .map(resources::get)
-                        .map(resource -> new ResourceOption(resource.getId(), resource.getName(), resource.getCapacity(),
-                                option.seatsLeft().get(resource.getId())))
-                        .toList();
+        boolean listed = !customerFacing || requirement.customerChoosable();
+        List<ResourceOption> free = listed
+                ? option.candidateIds().stream().map(id -> resourceOption(id, option, loaded)).toList()
+                : List.of();
+        List<AllocationOption> allocations = listed
+                ? option.allocations().stream().map(allocation -> allocationOption(allocation, option, loaded)).toList()
+                : List.of();
         return new SlotRequirement(requirement.requirementId(), requirement.resourceTypeId(),
                 requirement.resourceTypeName(), requirement.quantity(), requirement.required(),
-                requirement.customerChoosable(), free);
+                requirement.customerChoosable(), requirement.combinable(), free, allocations);
+    }
+
+    private static ResourceOption resourceOption(Long id, RequirementOption option, Loaded loaded) {
+        Resource resource = loaded.resources().get(id);
+        return new ResourceOption(resource.getId(), resource.getName(), resource.getCapacity(),
+                option.seatsLeft().get(resource.getId()));
+    }
+
+    private static AllocationOption allocationOption(AllocationFinder.Allocation allocation, RequirementOption option,
+                                                     Loaded loaded) {
+        Area area = loaded.areas().get(allocation.resources().get(0).id());
+        Integer capacity = allocation.capacity() >= Integer.MAX_VALUE ? null : (int) allocation.capacity();
+        return new AllocationOption(
+                allocation.resourceIds().stream().map(id -> resourceOption(id, option, loaded)).toList(),
+                capacity, area == null ? null : area.name());
     }
 }

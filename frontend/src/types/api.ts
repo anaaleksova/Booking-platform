@@ -50,6 +50,7 @@ export interface Business {
   websiteUrl?: string | null;
   showMap: boolean;
   showGallery: boolean;
+  darkTheme: boolean;
   phone?: string | null;
   email?: string | null;
   address?: string | null;
@@ -190,6 +191,8 @@ export interface Requirement {
   quantity: number;
   required: boolean;
   customerCanChoose: boolean;
+  /** Quantity is a minimum: resources are combined for groups one cannot seat. */
+  combineResources: boolean;
 }
 
 export interface Service {
@@ -223,7 +226,7 @@ export interface ServiceInput {
   bufferAfterMinutes: number;
   allowCustomerResourceSelection: boolean;
   active: boolean;
-  requirements: Array<Pick<Requirement, 'resourceTypeId' | 'quantity' | 'required' | 'customerCanChoose'>>;
+  requirements: Array<Pick<Requirement, 'resourceTypeId' | 'quantity' | 'required' | 'customerCanChoose' | 'combineResources'>>;
 }
 
 export interface ServiceDeletion {
@@ -275,8 +278,21 @@ export interface SlotRequirement {
   quantity: number;
   required: boolean;
   customerChoosable: boolean;
+  /** Resources are combined for larger groups; quantity is then a minimum. */
+  combinable: boolean;
   /** Free resources, best fit first. Customer-facing: only for choosable requirements. */
   resources: ResourceOption[];
+  /** For a combinable requirement: the best ways to seat the group at this time, best first. */
+  allocations: AllocationOption[];
+}
+
+/** One way to seat the group — one resource or several, found by the server. */
+export interface AllocationOption {
+  resources: ResourceOption[];
+  /** Combined capacity at this time; null when not limited by participants. */
+  capacity: number | null;
+  /** The floor plan the resources stand on, if any. */
+  area: string | null;
 }
 
 export interface Slot {
@@ -492,6 +508,7 @@ export interface PublicBusiness {
   facebookUrl?: string | null;
   websiteUrl?: string | null;
   showMap: boolean;
+  darkTheme: boolean;
   timezone: string;
   currency: string;
   openingHours: DayInterval[];
@@ -523,6 +540,8 @@ export interface ChoosableRequirement {
   requirementId: number;
   resourceTypeName: string;
   quantity: number;
+  /** Resources are combined for larger groups: whole combinations are offered per time. */
+  combinable: boolean;
   resources: ChoosableOption[];
   /** Maps of the place, one per floor, in order; empty when the business has not drawn any. */
   floorPlans: PublicFloorPlan[];

@@ -90,7 +90,7 @@ public class BookingPageService {
                                 .toList();
                         return new ChoosableRequirement(requirement.getId(),
                                 typeNames.getOrDefault(requirement.getId(), "Resource"), requirement.getQuantity(),
-                                options, plans.getOrDefault(requirement.getResourceTypeId(), List.of()).stream()
+                                requirement.isCombineResources(), options, plans.getOrDefault(requirement.getResourceTypeId(), List.of()).stream()
                                         .map(plan -> publicPlan(plan, options))
                                         .filter(Objects::nonNull)
                                         .toList());

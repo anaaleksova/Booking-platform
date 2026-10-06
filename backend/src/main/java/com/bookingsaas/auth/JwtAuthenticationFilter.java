@@ -72,6 +72,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 reject(request, response, ErrorCode.ACCESS_DENIED, "This account has been deactivated.");
                 return;
             }
+            // Issued before the password last changed: that session is over.
+            String passwordVersion = claims.get(JwtService.CLAIM_PASSWORD_VERSION, String.class);
+            if (passwordVersion != null
+                    && !passwordVersion.equals(JwtService.passwordFingerprint(principal.getPassword()))) {
+                reject(request, response, ErrorCode.TOKEN_EXPIRED,
+                        "Your password was changed. Please sign in again.");
+                return;
+            }
 
             var authentication = new UsernamePasswordAuthenticationToken(
                     principal, null, principal.getAuthorities());

@@ -35,7 +35,13 @@ public record ServiceRequest(
             @NotNull Long resourceTypeId,
             @NotNull @Min(value = 1, message = "must be at least 1") @Max(50) Integer quantity,
             @NotNull Boolean required,
-            @NotNull Boolean customerCanChoose
+            @NotNull Boolean customerCanChoose,
+            /* Combine resources for groups one cannot seat; absent means no. */
+            Boolean combineResources
     ) {
+
+        public boolean combines() {
+            return Boolean.TRUE.equals(combineResources);
+        }
     }
 }

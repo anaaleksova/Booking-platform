@@ -73,10 +73,16 @@ export function withoutMappedPicks(service: PublicService | undefined, picks: Re
   return next;
 }
 
-/** Only complete picks are sent; a partial pick for "choose 2" falls back to automatic assignment. */
+/**
+ * Only complete picks are sent; a partial pick for "choose 2" falls back to automatic assignment.
+ * A combinable requirement takes a whole combination, so any number from its minimum up.
+ */
 export function selectionsFrom(service: PublicService | undefined, picks: Record<number, number[]>): ResourceSelection[] {
   return (service?.choosableRequirements ?? [])
-    .filter((requirement) => picks[requirement.requirementId]?.length === requirement.quantity)
+    .filter((requirement) => {
+      const picked = picks[requirement.requirementId]?.length ?? 0;
+      return requirement.combinable ? picked >= requirement.quantity : picked === requirement.quantity;
+    })
     .map((requirement) => ({ requirementId: requirement.requirementId, resourceIds: picks[requirement.requirementId] }));
 }
 

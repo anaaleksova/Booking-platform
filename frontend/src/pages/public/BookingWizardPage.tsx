@@ -19,6 +19,9 @@ import { mediaUrl } from '@/features/media/api';
 import { createPublicReservation, fetchQuote, usePublicBusiness, usePublicServices } from '@/features/public/api';
 import { BusinessShell } from '@/features/public/BusinessShell';
 import { queryKeys } from '@/features/queryKeys';
+import { guessCountry } from '@/components/PhoneField';
+import { useAuth } from '@/features/auth/AuthContext';
+import { CustomerAuthPanel } from '@/features/public/wizard/CustomerAuthPanel';
 import { DetailsStep, EMPTY_CUSTOMER, customerErrors, type CustomerForm } from '@/features/public/wizard/DetailsStep';
 import { OptionsStep } from '@/features/public/wizard/OptionsStep';
 import { ReviewStep, type ReviewLine } from '@/features/public/wizard/ReviewStep';
@@ -55,6 +58,20 @@ export function BookingWizardPage() {
   const { choices, step: requestedStep, go } = useWizardState();
 
   const [customer, setCustomer] = useState<CustomerForm>(EMPTY_CUSTOMER);
+  const { user, initialising: authInitialising } = useAuth();
+
+  // Booking needs an account, and the details follow whoever is signed in:
+  // whenever the account changes (or signs out), start again from that
+  // account's name and email, so nothing typed for another person carries over.
+  // The customer can still edit the name afterwards.
+  useEffect(() => {
+    if (!user) {
+      setCustomer(EMPTY_CUSTOMER);
+      return;
+    }
+    const [first = '', ...rest] = user.fullName.trim().split(/\s+/);
+    setCustomer({ ...EMPTY_CUSTOMER, email: user.email, firstName: first, lastName: rest.join(' ') });
+  }, [user?.id, user?.email, user?.fullName]);
   const [showErrors, setShowErrors] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [appliedCode, setAppliedCode] = useState('');
@@ -73,10 +90,14 @@ export function BookingWizardPage() {
       if ((requestedStep === 'spot' || requestedStep === 'details' || requestedStep === 'review') && !(choices.date && choices.time)) {
         return 'time';
       }
+      // Signed out (or the details were lost on a reload): back to the details step.
+      if (requestedStep === 'review' && (!user || !customer.phone.trim())) {
+        return 'details';
+      }
       return requestedStep;
     }
     return needsOptions(service) ? 'options' : 'time';
-  }, [service, requestedStep, steps, choices.date, choices.time]);
+  }, [service, requestedStep, steps, choices.date, choices.time, user, customer.phone]);
   const stepIndex = steps.indexOf(step);
   const selections = useMemo(() => selectionsFrom(service, choices.picks), [service, choices.picks]);
   // Map choices come after the time, so they never narrow the times offered.
@@ -170,6 +191,9 @@ export function BookingWizardPage() {
       case 'spot':
         return { label: 'Continue', onClick: () => go('details') };
       case 'details':
+        if (!user) {
+          return null;  // the sign-in panel has its own button
+        }
         return {
           label: 'Continue',
           onClick: () => {
@@ -311,7 +335,18 @@ export function BookingWizardPage() {
                   onSlotGone={() => go('time', { time: null })}
                 />
               ) : null}
-              {step === 'details' ? <DetailsStep value={customer} onChange={setCustomer} showErrors={showErrors} /> : null}
+              {step === 'details' ? (
+                authInitialising ? null : user ? (
+                  <DetailsStep
+                    value={customer}
+                    onChange={setCustomer}
+                    showErrors={showErrors}
+                    defaultCountry={guessCountry(info?.phone)}
+                  />
+                ) : (
+                  <CustomerAuthPanel />
+                )
+              ) : null}
               {step === 'review' ? (
                 <ReviewStep
                   lines={reviewLines}

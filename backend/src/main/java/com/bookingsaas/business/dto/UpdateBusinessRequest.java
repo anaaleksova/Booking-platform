@@ -31,6 +31,7 @@ public record UpdateBusinessRequest(
         String websiteUrl,
         Boolean showMap,
         Boolean showGallery,
+        Boolean darkTheme,
         @Size(max = 40) String phone,
         @Email @Size(max = 320) String email,
         @Size(max = 500) String address,

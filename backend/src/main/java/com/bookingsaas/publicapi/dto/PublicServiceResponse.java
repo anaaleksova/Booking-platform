@@ -26,12 +26,15 @@ public record PublicServiceResponse(
 ) {
 
     /**
+     * @param combinable whether resources are combined for larger groups; the
+     *                   availability then offers whole combinations to choose
+     *                   from and {@code quantity} is a minimum
      * @param floorPlans maps of the place for this resource type, one per floor,
      *                   in order; empty when the business has not drawn any —
      *                   customers then pick from a list
      */
     public record ChoosableRequirement(Long requirementId, String resourceTypeName, int quantity,
-                                       List<Option> resources, List<FloorPlan> floorPlans) {
+                                       boolean combinable, List<Option> resources, List<FloorPlan> floorPlans) {
     }
 
     /**
