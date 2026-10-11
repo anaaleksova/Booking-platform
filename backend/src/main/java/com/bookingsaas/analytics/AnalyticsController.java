@@ -8,6 +8,7 @@ import com.bookingsaas.analytics.dto.AnalyticsDtos.ResourceUtilization;
 import com.bookingsaas.analytics.dto.AnalyticsDtos.RevenuePeriods;
 import com.bookingsaas.analytics.dto.AnalyticsDtos.RevenueReport;
 import com.bookingsaas.analytics.dto.AnalyticsDtos.ServiceStat;
+import com.bookingsaas.analytics.dto.AnalyticsDtos.SourceStat;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -72,6 +73,14 @@ public class AnalyticsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return analyticsService.services(from, to);
+    }
+
+    @GetMapping("/analytics/sources")
+    @Operation(summary = "Reservations and revenue per channel: website, admin, Instagram, Facebook, API")
+    public List<SourceStat> sources(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return analyticsService.sources(from, to);
     }
 
     @GetMapping("/analytics/resources")

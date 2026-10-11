@@ -48,6 +48,17 @@ public class CustomerService {
         return repository.countByBusinessId(businessId);
     }
 
+    /** The customer these contact details belong to, if any — matched on email first, then phone. */
+    @Transactional(readOnly = true)
+    public Optional<Customer> findByContact(Long businessId, String email, String phone) {
+        String cleanEmail = normalize(email);
+        String cleanPhone = normalize(phone);
+        return Optional.<Customer>empty()
+                .or(() -> cleanEmail == null ? Optional.empty() : repository.findByEmail(businessId, cleanEmail))
+                .or(() -> cleanPhone == null ? Optional.empty()
+                        : repository.findByBusinessIdAndPhone(businessId, cleanPhone));
+    }
+
     /**
      * Finds the existing customer behind a reservation, or creates one.
      *

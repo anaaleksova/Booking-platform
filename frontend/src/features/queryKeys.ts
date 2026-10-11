@@ -31,6 +31,8 @@ export const queryKeys = {
 
   discounts: ['discounts'] as const,
 
+  integrations: ['integrations'] as const,
+
   dashboard: ['analytics', 'dashboard'] as const,
   revenuePeriods: ['analytics', 'revenue-periods'] as const,
   revenue: (filters: object) => ['analytics', 'revenue', filters] as const,
@@ -38,6 +40,7 @@ export const queryKeys = {
   serviceStats: (filters: object) => ['analytics', 'services', filters] as const,
   resourceStats: (filters: object) => ['analytics', 'resources', filters] as const,
   customerStats: (filters: object) => ['analytics', 'customers', filters] as const,
+  sourceStats: (filters: object) => ['analytics', 'sources', filters] as const,
 
   publicBusiness: (slug: string) => ['public', slug] as const,
   publicServices: (slug: string) => ['public', slug, 'services'] as const,

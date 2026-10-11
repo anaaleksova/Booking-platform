@@ -25,6 +25,7 @@ import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
 import DesignServicesRoundedIcon from '@mui/icons-material/DesignServicesRounded';
 import EventNoteRoundedIcon from '@mui/icons-material/EventNoteRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
+import HubRoundedIcon from '@mui/icons-material/HubRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded';
@@ -73,6 +74,7 @@ const NAV_SECTIONS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { to: '/admin/revenue', label: 'Revenue', icon: <PaymentsRoundedIcon />, ownerOnly: true },
       { to: '/admin/analytics', label: 'Analytics', icon: <InsightsRoundedIcon />, ownerOnly: true },
+      { to: '/admin/integrations', label: 'Integrations', icon: <HubRoundedIcon />, ownerOnly: true },
       { to: '/admin/settings', label: 'Settings', icon: <SettingsRoundedIcon />, ownerOnly: true },
     ],
   },

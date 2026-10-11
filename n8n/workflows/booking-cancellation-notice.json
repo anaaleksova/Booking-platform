@@ -1,0 +1,232 @@
+{
+  "id": "bkCancelNotice00",
+  "name": "BOOKING - Cancellation Notice",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "cancelNotice-01",
+      "name": "When called by another workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BOOKING_API_URL }}/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        }
+      },
+      "id": "cancelNotice-02",
+      "name": "Who am I",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BOOKING_API_URL }}/businesses/{{ $json.body.businessId }}/reservations/{{ $('When called by another workflow').first().json.reservationId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        }
+      },
+      "id": "cancelNotice-03",
+      "name": "Get reservation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nif (response.statusCode !== 200) {\n  console.log('Could not load reservation', response.statusCode);\n  return [{ json: { send: false, reason: 'reservation not available' } }];\n}\nconst r = response.body;\n// Message the customer where they talk to the business; TEST identities are only logged.\nconst channel = (r.channels || [])[0];\nif (!channel) return [{ json: { send: false, reason: 'customer has no chat channel', reservationId: r.id } }];\nconst day = new Date(r.date + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });\nconst price = new Intl.NumberFormat('en-GB', { style: 'currency', currency: r.currency }).format(r.finalPrice);\nconst people = r.numberOfParticipants === 1 ? '1 person' : `${r.numberOfParticipants} people`;\n\nif (r.cancellationReason === 'Cancelled by the customer via chat') {\n  return [{ json: { send: false, reason: 'cancelled in the chat', reservationId: r.id } }];\n}\nconst text = `Your reservation for ${r.serviceName} on ${day} at ${r.start} has been cancelled.` +\n  (r.cancellationReason ? `\\nReason: ${r.cancellationReason}` : '') +\n  '\\nReply here if you would like to book another time.';\nreturn [{ json: { send: true, provider: channel.provider, recipientId: channel.externalUserId, text, tag: channel.provider === 'FACEBOOK' ? 'CONFIRMED_EVENT_UPDATE' : null } }];\n"
+      },
+      "id": "cancelNotice-04",
+      "name": "Compose message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.send }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cancelNotice-05",
+      "name": "Send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkSendMessage000",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "cancelNotice-06",
+      "name": "Send message",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        -60
+      ]
+    }
+  ],
+  "connections": {
+    "When called by another workflow": {
+      "main": [
+        [
+          {
+            "node": "Who am I",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Who am I": {
+      "main": [
+        [
+          {
+            "node": "Get reservation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get reservation": {
+      "main": [
+        [
+          {
+            "node": "Compose message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose message": {
+      "main": [
+        [
+          {
+            "node": "Send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send?": {
+      "main": [
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "description": "Tells the customer their reservation was cancelled — when the business cancelled it. Cancellations made in the chat were already confirmed there."
+  },
+  "tags": []
+}

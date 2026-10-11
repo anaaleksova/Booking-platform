@@ -1,0 +1,330 @@
+{
+  "id": "bkIncomingSocial",
+  "name": "BOOKING - Incoming Social Message",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## BOOKING - Incoming Social Message\n**Meta webhook**: `GET/POST /webhook/social/meta` — set it as the callback URL of your Meta app (Instagram + Messenger, field `messages`). Verify token: env `META_VERIFY_TOKEN`; signatures are checked with env `META_APP_SECRET` when it is set.\n\n**Test chat**: `POST /webhook/social/test` with `{\"userId\":\"tester-1\",\"message\":\"Hi, I want to book a massage tomorrow\"}` — the reply comes back in the response.",
+        "width": 560,
+        "height": 240
+      },
+      "id": "incoming-01",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -420
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "social/meta",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "incoming-02",
+      "name": "Meta verification",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -120
+      ],
+      "webhookId": "incoming-social/meta-get"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nconst ok = query['hub.mode'] === 'subscribe' && $env.META_VERIFY_TOKEN && query['hub.verify_token'] === $env.META_VERIFY_TOKEN;\nreturn [{ json: { ok, challenge: ok ? String(query['hub.challenge']) : 'forbidden' } }];\n"
+      },
+      "id": "incoming-03",
+      "name": "Check verify token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.challenge }}",
+        "options": {
+          "responseCode": "={{ $json.ok ? 200 : 403 }}"
+        }
+      },
+      "id": "incoming-04",
+      "name": "Answer verification",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social/meta",
+        "responseMode": "onReceived",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "incoming-05",
+      "name": "Meta webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "webhookId": "incoming-social/meta-post"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst item = $input.first();\nconst body = item.json.body || {};\n// Reject forged deliveries when the app secret is configured.\nif ($env.META_APP_SECRET) {\n  const raw = item.binary?.data ? await this.helpers.getBinaryDataBuffer(0, 'data') : Buffer.from(JSON.stringify(body));\n  const expected = 'sha256=' + crypto.createHmac('sha256', $env.META_APP_SECRET).update(raw).digest('hex');\n  const given = item.json.headers?.['x-hub-signature-256'] || '';\n  if (given.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected))) {\n    console.log('Rejected Meta delivery with a bad signature');\n    return [];\n  }\n}\nconst provider = body.object === 'instagram' ? 'INSTAGRAM' : body.object === 'page' ? 'FACEBOOK' : null;\nif (!provider) return [];\nconst messages = [];\nfor (const entry of body.entry || []) {\n  for (const event of entry.messaging || []) {\n    const message = event.message;\n    if (!message || message.is_echo || !event.sender?.id) continue;   // our own replies come back as echoes\n    const text = message.text || (message.quick_reply?.payload) || null;\n    if (!text) continue;   // stickers, images: nothing to interpret\n    messages.push({ json: { provider, externalUserId: event.sender.id, recipientId: event.sender.id, pageId: entry.id, displayName: null, text, mid: message.mid } });\n  }\n}\nreturn messages;\n"
+      },
+      "id": "incoming-06",
+      "name": "Read Meta messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkConversationTn",
+          "mode": "id"
+        },
+        "options": {},
+        "mode": "each"
+      },
+      "id": "incoming-07",
+      "name": "Conversation turn",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sources = $('Read Meta messages').all();\nreturn $input.all().map((item, index) => ({ json: {\n  provider: sources[index].json.provider,\n  recipientId: sources[index].json.recipientId,\n  text: item.json.reply,\n} }));\n"
+      },
+      "id": "incoming-08",
+      "name": "Reply to sender",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkSendMessage000",
+          "mode": "id"
+        },
+        "options": {},
+        "mode": "each"
+      },
+      "id": "incoming-09",
+      "name": "Send reply",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social/test",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "incoming-10",
+      "name": "Test chat",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        340
+      ],
+      "webhookId": "incoming-social/test-post"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nif (!body.message) {\n  return [{ json: { provider: 'TEST', externalUserId: 'invalid', text: '' , invalid: true } }];\n}\nreturn [{ json: { provider: 'TEST', externalUserId: String(body.userId || 'test-user'), displayName: body.name || null, text: String(body.message) } }];\n"
+      },
+      "id": "incoming-11",
+      "name": "Read test message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkConversationTn",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "incoming-12",
+      "name": "Test conversation turn",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ reply: $json.reply }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "incoming-13",
+      "name": "Return reply",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        340
+      ]
+    }
+  ],
+  "connections": {
+    "Meta verification": {
+      "main": [
+        [
+          {
+            "node": "Check verify token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check verify token": {
+      "main": [
+        [
+          {
+            "node": "Answer verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Meta messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Meta messages": {
+      "main": [
+        [
+          {
+            "node": "Conversation turn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation turn": {
+      "main": [
+        [
+          {
+            "node": "Reply to sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to sender": {
+      "main": [
+        [
+          {
+            "node": "Send reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test chat": {
+      "main": [
+        [
+          {
+            "node": "Read test message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read test message": {
+      "main": [
+        [
+          {
+            "node": "Test conversation turn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test conversation turn": {
+      "main": [
+        [
+          {
+            "node": "Return reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "description": "Receives Instagram and Facebook Messenger messages (Meta webhook) and test messages, runs one conversation turn per message and sends the reply."
+  },
+  "tags": []
+}

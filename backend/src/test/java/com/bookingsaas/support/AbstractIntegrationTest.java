@@ -111,7 +111,8 @@ public abstract class AbstractIntegrationTest {
         doAnswer(invocation -> resetCodes.put(invocation.getArgument(0), invocation.getArgument(2)))
                 .when(passwordResetCodeSender).send(anyString(), anyString(), anyString());
         jdbcTemplate.execute("""
-                TRUNCATE password_reset, pending_signup, notification, floor_plan_decor, floor_plan_item, floor_plan, gallery_image, media, reservation_resource, reservation, discount_service, discount,
+                TRUNCATE integration_event, integration_idempotency, integration_conversation, customer_external_identity,
+                         integration_token, integration, password_reset, pending_signup, notification, floor_plan_decor, floor_plan_item, floor_plan, gallery_image, media, reservation_resource, reservation, discount_service, discount,
                          blocked_time, resource_service, service_resource_requirement, service,
                          employee, resource_hours, resource, resource_type, customer, business_hours,
                          business_settings, business_user, business, app_user

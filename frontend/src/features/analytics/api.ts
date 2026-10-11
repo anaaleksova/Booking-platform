@@ -10,6 +10,7 @@ import type {
   RevenuePeriods,
   RevenueReport,
   ServiceStat,
+  SourceStat,
 } from '@/types/api';
 
 /** An inclusive range of business-local dates, "YYYY-MM-DD". */
@@ -65,4 +66,8 @@ export function useCustomerStats(range: DateRange) {
   return useQuery(
     rangeQuery<CustomerReport>(queryKeys.customerStats(range), '/api/admin/analytics/customers', range),
   );
+}
+
+export function useSourceStats(range: DateRange) {
+  return useQuery(rangeQuery<SourceStat[]>(queryKeys.sourceStats(range), '/api/admin/analytics/sources', range));
 }

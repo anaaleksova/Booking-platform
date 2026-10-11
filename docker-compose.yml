@@ -29,6 +29,63 @@ services:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
 
+  # Automation layer: social-channel conversations, confirmations, reminders.
+  # Editor at http://localhost:5678. Talks to the backend only through
+  # /api/integrations with a token created in Admin → Integrations.
+  n8n:
+    profiles: ["n8n", "full"]
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: booking-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      GENERIC_TIMEZONE: ${N8N_TIMEZONE:-Europe/Skopje}
+      TZ: ${N8N_TIMEZONE:-Europe/Skopje}
+      N8N_SECURE_COOKIE: "false"
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      N8N_RUNNERS_ENABLED: "true"
+      # The workflows read their configuration from these variables.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      # Webhook signatures are checked with Node's crypto module.
+      NODE_FUNCTION_ALLOW_BUILTIN: crypto
+      # From inside the container the backend on the host is host.docker.internal;
+      # with the "full" profile use http://backend:8080/api/integrations.
+      BOOKING_API_URL: ${BOOKING_API_URL:-http://host.docker.internal:8080/api/integrations}
+      # Admin → Integrations → n8n → Signing secret.
+      BOOKING_WEBHOOK_SECRET: ${BOOKING_WEBHOOK_SECRET:-}
+      META_VERIFY_TOKEN: ${META_VERIFY_TOKEN:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_GRAPH_VERSION: ${META_GRAPH_VERSION:-v21.0}
+      PRIVACY_BUSINESS_NAME: ${PRIVACY_BUSINESS_NAME:-BookingApp}
+      PRIVACY_CONTACT_EMAIL: ${PRIVACY_CONTACT_EMAIL:-}
+      # Which model reads messages the rules cannot: "anthropic" (Claude) or "ollama" (local, free).
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      # How replies are written: "template" (fixed texts, English/Macedonian) or "llm" (the model rephrases them).
+      REPLY_WRITER: ${REPLY_WRITER:-template}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-5-5}
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+      # Optional: a proxy in front of the Claude API. Empty = api.anthropic.com.
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      # Only for API keys that are not scoped to a workspace.
+      ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./n8n/workflows:/workflows:ro
+
+  # Local language model for chats, instead of Claude (LLM_PROVIDER=ollama).
+  # Pull a model once:  docker exec booking-ollama ollama pull qwen2.5:7b-instruct
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    container_name: booking-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
   backend:
     profiles: ["full"]
     build:
@@ -49,6 +106,7 @@ services:
       # Not read from .env: there FRONTEND_URL is the Vite dev server (5173),
       # but in this setup the SPA is the frontend container published on 3000.
       FRONTEND_URL: http://localhost:3000
+      INTEGRATIONS_PUBLIC_API_URL: http://localhost:${SERVER_PORT:-8080}
     ports:
       - "${SERVER_PORT:-8080}:8080"
 
@@ -66,3 +124,5 @@ services:
 
 volumes:
   postgres-data:
+  n8n-data:
+  ollama-data:

@@ -38,7 +38,11 @@ databaseChangeLog:
       file: db/changelog/changes/014-pending-signup.sql
   - include:
       file: db/changelog/changes/015-password-reset.sql
+  - include:
+      file: db/changelog/changes/016-integrations.sql
   # Demo data: only runs with the "dev" context (see application-dev.yml).
+  - include:
+      file: db/changelog/seed/099-seed-prerequisites.sql
   - include:
       file: db/changelog/seed/100-demo-data.sql
   - include:
@@ -55,3 +59,8 @@ databaseChangeLog:
       file: db/changelog/seed/106-demo-floor-names.sql
   - include:
       file: db/changelog/seed/107-demo-combined-tables.sql
+  - include:
+      file: db/changelog/seed/108-seed-cleanup.sql
+  # After the seed on purpose: the seed writes the old 'PUBLIC' source.
+  - include:
+      file: db/changelog/changes/017-reservation-sources.sql

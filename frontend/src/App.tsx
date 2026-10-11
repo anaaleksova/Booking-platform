@@ -42,6 +42,7 @@ const DiscountsPage = page(() => import('@/pages/admin/DiscountsPage'), 'Discoun
 const RevenuePage = page(() => import('@/pages/admin/RevenuePage'), 'RevenuePage');
 const AnalyticsPage = page(() => import('@/pages/admin/AnalyticsPage'), 'AnalyticsPage');
 const SettingsPage = page(() => import('@/pages/admin/SettingsPage'), 'SettingsPage');
+const IntegrationsPage = page(() => import('@/pages/admin/IntegrationsPage'), 'IntegrationsPage');
 
 function ToWizard() {
   const { slug, serviceId } = useParams();
@@ -85,6 +86,7 @@ export function App() {
           <Route path="discounts" element={<DiscountsPage />} />
           <Route path="revenue" element={<RevenuePage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
 

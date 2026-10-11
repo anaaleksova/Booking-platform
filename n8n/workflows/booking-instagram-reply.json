@@ -1,0 +1,128 @@
+{
+  "id": "bkInstagramReply",
+  "name": "BOOKING - Instagram Reply",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## BOOKING - Instagram Reply\nCalled by **Instagram Inbox Poller** with one message (`provider`, `externalUserId`, `recipientId`, `displayName`, `text`): runs a conversation turn and sends the reply.",
+        "width": 480,
+        "height": 160
+      },
+      "id": "reply-01",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -220
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "reply-02",
+      "name": "When called by the poller",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkConversationTn",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "reply-03",
+      "name": "Conversation turn",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst source = $('When called by the poller').first().json;\nreturn [{ json: { provider: source.provider, recipientId: source.recipientId, text: $input.first().json.reply } }];\n"
+      },
+      "id": "reply-04",
+      "name": "Reply to sender",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkSendMessage000",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "reply-05",
+      "name": "Send reply",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "When called by the poller": {
+      "main": [
+        [
+          {
+            "node": "Conversation turn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation turn": {
+      "main": [
+        [
+          {
+            "node": "Reply to sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to sender": {
+      "main": [
+        [
+          {
+            "node": "Send reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "description": "Runs one conversation turn for an Instagram message found by the poller and sends the reply."
+  },
+  "tags": []
+}

@@ -130,10 +130,10 @@ public class ReservationService {
                 request.customer().lastName(), email, request.customer().phone());
 
         Reservation reservation = build(business, service, customer, participants, allocation, quote,
-                ReservationSource.PUBLIC, request.notes(), null, null);
+                ReservationSource.WEB, request.notes(), null, null);
         Reservation saved = persist(reservation, quote);
 
-        log.info("Reservation created id={} business={} service={} participants={} resources={} source=PUBLIC",
+        log.info("Reservation created id={} business={} service={} participants={} resources={} source=WEB",
                 saved.getId(), businessId, service.getId(), participants, saved.resourceIds());
         events.publishEvent(ReservationNotificationEvent.created(payloadFor(business, saved, null)));
         return assembler.toPublic(business, saved, isCancellableByCustomer(business, saved));
@@ -161,6 +161,33 @@ public class ReservationService {
                 saved.getId(), businessId, service.getId(), participants, saved.resourceIds());
         events.publishEvent(ReservationNotificationEvent.created(payloadFor(business, saved, null)));
         return assembler.toResponse(business, saved);
+    }
+
+    /**
+     * A reservation made on the customer's behalf by an automation such as an
+     * Instagram conversation. Exactly the customer rules apply — lead times,
+     * customer-choosable resources only — and the price is computed here.
+     * The caller has already resolved the customer within this business.
+     */
+    @Transactional
+    public Reservation createFromIntegration(Long businessId, Customer customer, IntegrationReservationCommand command) {
+        Business business = businessService.requireById(businessId);
+        BookableService service = serviceCatalog.requireBookable(businessId, command.serviceId());
+        int participants = command.participants();
+
+        PriceQuote quote = pricingService.quote(business, service, participants, command.discountCode());
+        ResourceAllocation allocation = availabilityService.allocate(businessId, service,
+                toInstant(command.startTime(), business.zoneId()), participants,
+                selections(command.resourceSelections()), null, true);
+
+        Reservation reservation = build(business, service, customer, participants, allocation, quote,
+                command.source(), command.notes(), null, null);
+        Reservation saved = persist(reservation, quote);
+
+        log.info("Reservation created id={} business={} service={} participants={} resources={} source={}",
+                saved.getId(), businessId, service.getId(), participants, saved.resourceIds(), command.source());
+        events.publishEvent(ReservationNotificationEvent.created(payloadFor(business, saved, null)));
+        return saved;
     }
 
     private Reservation build(Business business,
@@ -347,8 +374,31 @@ public class ReservationService {
         Reservation reservation = repository.findByPublicReference(reference)
                 .orElseThrow(() -> ApiException.notFound("No reservation matches that reference"));
         Business business = businessService.requireById(reservation.getBusinessId());
-        BusinessSettings settings = businessService.settingsOf(business.getId());
+        cancelAsCustomer(business, reservation, reason);
+        log.info("Reservation cancelled id={} business={} by customer", reservation.getId(), business.getId());
+        return assembler.toPublic(business, reservation, false);
+    }
 
+    /**
+     * Cancellation requested by the customer through an automation (e.g. a
+     * reply to an Instagram reminder): the same policy as the website. A
+     * repeat of a cancellation that already happened is answered, not
+     * refused, so a retried workflow step is harmless.
+     */
+    @Transactional
+    public Reservation cancelFromIntegration(Long businessId, Long reservationId, String reason) {
+        Business business = businessService.requireById(businessId);
+        Reservation reservation = requireReservation(businessId, reservationId);
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            return reservation;
+        }
+        cancelAsCustomer(business, reservation, reason);
+        log.info("Reservation cancelled id={} business={} by customer via integration", reservationId, businessId);
+        return reservation;
+    }
+
+    private void cancelAsCustomer(Business business, Reservation reservation, String reason) {
+        BusinessSettings settings = businessService.settingsOf(business.getId());
         if (!settings.isAllowCustomerCancellation()) {
             throw ApiException.of(ErrorCode.CANCELLATION_NOT_ALLOWED,
                     "Please contact the business to change this reservation.");
@@ -361,11 +411,8 @@ public class ReservationService {
                     "Reservations can only be cancelled at least " + settings.getCancellationDeadlineHours()
                             + " hours in advance. Please contact the business.");
         }
-
         applyCancellation(reservation, reason);
-        log.info("Reservation cancelled id={} business={} by customer", reservation.getId(), business.getId());
         events.publishEvent(ReservationNotificationEvent.cancelled(payloadFor(business, reservation, reason)));
-        return assembler.toPublic(business, reservation, false);
     }
 
     /** Releases the resources and gives the discount use back. */
@@ -381,7 +428,7 @@ public class ReservationService {
 
     // --- helpers -----------------------------------------------------------
 
-    boolean isCancellableByCustomer(Business business, Reservation reservation) {
+    public boolean isCancellableByCustomer(Business business, Reservation reservation) {
         BusinessSettings settings = businessService.settingsOf(business.getId());
         return reservation.getStatus().isActive()
                 && settings.isAllowCustomerCancellation()

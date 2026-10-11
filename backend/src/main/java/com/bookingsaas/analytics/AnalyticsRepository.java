@@ -122,6 +122,24 @@ public class AnalyticsRepository {
                         rs.getLong("participants"), rs.getBigDecimal("revenue")));
     }
 
+    public record SourceRow(String source, long reservations, BigDecimal revenue) {
+    }
+
+    /** Reservations and revenue per channel (website, admin, Instagram, ...). */
+    public List<SourceRow> bySource(Long businessId, Instant from, Instant to) {
+        return jdbc.query("""
+                select source,
+                       count(*) filter (where status <> 'CANCELLED') as reservations,
+                       coalesce(sum(final_price) filter (where status in """ + REVENUE_STATUSES + """
+                       ), 0) as revenue
+                from reservation
+                where business_id = :businessId and start_time >= :from and start_time < :to
+                group by source
+                """, window(businessId, from, to),
+                (rs, i) -> new SourceRow(rs.getString("source"), rs.getLong("reservations"),
+                        rs.getBigDecimal("revenue")));
+    }
+
     /** Minutes each resource is held by non-cancelled reservations, clipped to the window. */
     public List<ResourceUsageRow> resourceUsage(Long businessId, Instant from, Instant to) {
         return jdbc.query("""

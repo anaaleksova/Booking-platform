@@ -105,7 +105,7 @@ public class Reservation extends Auditable {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
-    private ReservationSource source = ReservationSource.PUBLIC;
+    private ReservationSource source = ReservationSource.WEB;
 
     /** Unguessable handle for the customer's own reservation page. */
     @Column(name = "public_reference", nullable = false, unique = true)

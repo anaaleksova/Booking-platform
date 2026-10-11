@@ -1,0 +1,464 @@
+{
+  "id": "bkReservationEvt",
+  "name": "BOOKING - Reservation Events",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## BOOKING - Reservation Events\nPaste this webhook's production URL into **Admin → Integrations → n8n**.\nSignatures are checked with env `BOOKING_WEBHOOK_SECRET` (the signing secret shown on that page). Duplicate deliveries are ignored.",
+        "width": 520,
+        "height": 180
+      },
+      "id": "events-01",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "booking-events",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "events-02",
+      "name": "Platform event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "events-booking-events-post"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst item = $input.first();\nconst headers = item.json.headers || {};\nconst secret = $env.BOOKING_WEBHOOK_SECRET;\nconst raw = item.binary?.data ? (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8') : JSON.stringify(item.json.body);\nconst timestamp = Number(headers['x-booking-timestamp'] || 0);\nlet valid = false;\nif (secret) {\n  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex');\n  const given = String(headers['x-booking-signature'] || '');\n  valid = given.length === expected.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));\n}\n// Old deliveries are replays: refuse anything signed more than 10 minutes ago.\nconst fresh = Math.abs(Date.now() / 1000 - timestamp) < 600;\nconst event = JSON.parse(raw);\n// The platform retries until it gets a 2xx; remember recent deliveries so a retry is not acted on twice.\nconst memory = $getWorkflowStaticData('global');\nmemory.seen = memory.seen || [];\nconst duplicate = memory.seen.includes(event.deliveryId);\nif (valid && fresh && !duplicate) {\n  memory.seen.push(event.deliveryId);\n  memory.seen = memory.seen.slice(-500);\n}\nreturn [{ json: { valid: valid && fresh, duplicate, event } }];\n"
+      },
+      "id": "events-03",
+      "name": "Verify signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "events-04",
+      "name": "Signed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ received: true }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "events-05",
+      "name": "Accept",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'invalid signature' }) }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "events-06",
+      "name": "Reject",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ !$('Verify signature').first().json.duplicate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "events-07",
+      "name": "New delivery?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Verify signature').first().json.event.event }}",
+                    "rightValue": "reservation.created",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reservation.created"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Verify signature').first().json.event.event }}",
+                    "rightValue": "reservation.cancelled",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reservation.cancelled"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Verify signature').first().json.event.event }}",
+                    "rightValue": "reservation.reminder_due",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reservation.reminder_due"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "events-08",
+      "name": "Event",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { reservationId: $('Verify signature').first().json.event.reservationId, event: $('Verify signature').first().json.event.event } }];\n"
+      },
+      "id": "events-09",
+      "name": "Send confirmation input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkConfirmation00",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "events-10",
+      "name": "Send confirmation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { reservationId: $('Verify signature').first().json.event.reservationId, event: $('Verify signature').first().json.event.event } }];\n"
+      },
+      "id": "events-11",
+      "name": "Send cancellation notice input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkCancelNotice00",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "events-12",
+      "name": "Send cancellation notice",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { reservationId: $('Verify signature').first().json.event.reservationId, event: $('Verify signature').first().json.event.event } }];\n"
+      },
+      "id": "events-13",
+      "name": "Send reminder input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkReminder000000",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "events-14",
+      "name": "Send reminder",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Event": {
+      "main": [
+        [
+          {
+            "node": "Send confirmation input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send cancellation notice input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send reminder input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send confirmation input": {
+      "main": [
+        [
+          {
+            "node": "Send confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send cancellation notice input": {
+      "main": [
+        [
+          {
+            "node": "Send cancellation notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send reminder input": {
+      "main": [
+        [
+          {
+            "node": "Send reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Platform event": {
+      "main": [
+        [
+          {
+            "node": "Verify signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify signature": {
+      "main": [
+        [
+          {
+            "node": "Signed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signed?": {
+      "main": [
+        [
+          {
+            "node": "Accept",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accept": {
+      "main": [
+        [
+          {
+            "node": "New delivery?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New delivery?": {
+      "main": [
+        [
+          {
+            "node": "Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "description": "Receives signed events from the booking platform (reservation created / cancelled / reminder due) and starts the matching notification workflow."
+  },
+  "tags": []
+}

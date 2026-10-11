@@ -1,7 +1,13 @@
 package com.bookingsaas.reservation;
 
-/** Where a reservation came from — the customer pages, or the business itself. */
+/**
+ * The channel a reservation came through: the customer website, the business
+ * itself, a social channel via the automation layer, or another API client.
+ */
 public enum ReservationSource {
-    PUBLIC,
-    ADMIN
+    WEB,
+    ADMIN,
+    INSTAGRAM,
+    FACEBOOK,
+    API
 }

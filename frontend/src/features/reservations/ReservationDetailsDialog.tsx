@@ -34,6 +34,7 @@ import {
   formatMoney,
   formatWindow,
   pluralize,
+  SOURCE_DESCRIPTIONS,
   toLocalDateTimeString,
 } from '@/utils/format';
 
@@ -177,7 +178,7 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
                 </Detail>
                 <Detail label="Booked">
                   {formatLocalDate(reservation.createdAt)} ·{' '}
-                  {reservation.source === 'PUBLIC' ? 'online by the customer' : 'by the business'}
+                  {SOURCE_DESCRIPTIONS[reservation.source] ?? reservation.source}
                 </Detail>
                 {reservation.customerNotes ? <Detail label="Customer notes">{reservation.customerNotes}</Detail> : null}
                 {reservation.internalNotes ? <Detail label="Internal notes">{reservation.internalNotes}</Detail> : null}

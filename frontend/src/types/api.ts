@@ -337,7 +337,7 @@ export interface Reservation {
   localEndTime: string;
   timezone: string;
   status: ReservationStatus;
-  source: 'PUBLIC' | 'ADMIN';
+  source: ReservationSource;
   originalPrice: number;
   discountAmount: number;
   finalPrice: number;
@@ -450,6 +450,18 @@ export interface ReservationReport {
   total: number;
   cancelled: number;
   series: ReservationPoint[];
+}
+
+/** The channel a reservation came through. */
+export type ReservationSource = 'WEB' | 'ADMIN' | 'INSTAGRAM' | 'FACEBOOK' | 'API';
+
+export interface SourceStat {
+  source: ReservationSource;
+  reservations: number;
+  /** Of all non-cancelled reservations in the range, 0..1. */
+  share: number;
+  revenue: number;
+  revenueShare: number;
 }
 
 export interface ServiceStat {
@@ -609,4 +621,80 @@ export interface ApiError {
   message: string;
   path?: string;
   fieldErrors?: Record<string, string>;
+}
+
+// --- integrations ----------------------------------------------------------
+
+export type IntegrationStatus = 'NOT_CONNECTED' | 'CONNECTED' | 'DISABLED';
+
+export type IntegrationPermission =
+  | 'READ_BUSINESS'
+  | 'READ_SERVICES'
+  | 'READ_AVAILABILITY'
+  | 'CREATE_RESERVATION'
+  | 'READ_RESERVATION'
+  | 'CANCEL_RESERVATION'
+  | 'READ_CUSTOMER'
+  | 'CREATE_CUSTOMER'
+  | 'MANAGE_CONVERSATIONS';
+
+export interface N8nConnection {
+  status: IntegrationStatus;
+  webhookUrl?: string | null;
+  signingSecret?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface ChannelConnection {
+  provider: 'INSTAGRAM' | 'FACEBOOK';
+  status: IntegrationStatus;
+  externalAccountId?: string | null;
+  displayName?: string | null;
+  oauthAvailable: boolean;
+}
+
+export interface IntegrationToken {
+  id: number;
+  name: string;
+  prefix: string;
+  permissions: IntegrationPermission[];
+  createdAt: string;
+  lastUsedAt?: string | null;
+  revokedAt?: string | null;
+}
+
+export interface IntegrationEventDelivery {
+  id: number;
+  eventType: string;
+  reservationId?: number | null;
+  deliveryId: string;
+  status: 'PENDING' | 'DELIVERED' | 'FAILED' | 'SKIPPED';
+  attempts: number;
+  responseStatus?: number | null;
+  lastError?: string | null;
+  dueAt: string;
+  deliveredAt?: string | null;
+  createdAt: string;
+}
+
+export interface IntegrationsOverview {
+  businessId: number;
+  apiBaseUrl: string;
+  n8n: N8nConnection;
+  channels: ChannelConnection[];
+  tokens: IntegrationToken[];
+  recentEvents: IntegrationEventDelivery[];
+  availablePermissions: IntegrationPermission[];
+}
+
+export interface CreatedIntegrationToken {
+  token: IntegrationToken;
+  /** Shown once; only a hash is stored. */
+  secret: string;
+}
+
+export interface WebhookTestResult {
+  delivered: boolean;
+  httpStatus?: number | null;
+  error?: string | null;
 }

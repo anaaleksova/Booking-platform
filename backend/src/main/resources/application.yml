@@ -116,6 +116,13 @@ app:
     # How often the outbox worker drains pending notifications.
     dispatch-interval-ms: ${NOTIFICATION_DISPATCH_INTERVAL_MS:30000}
     reminder-scan-interval-ms: ${NOTIFICATION_REMINDER_INTERVAL_MS:300000}
+  integrations:
+    # Where automation tools reach this API; shown on Admin -> Integrations.
+    public-api-url: ${INTEGRATIONS_PUBLIC_API_URL:http://localhost:8080}
+    events-enabled: ${INTEGRATION_EVENTS_ENABLED:true}
+    dispatch-interval-ms: ${INTEGRATION_DISPATCH_INTERVAL_MS:10000}
+    # Set true in production: stops tenants pointing webhooks at internal addresses.
+    block-private-webhooks: ${INTEGRATIONS_BLOCK_PRIVATE_WEBHOOKS:false}
 
 logging:
   level:
@@ -123,4 +130,4 @@ logging:
     com.bookingsaas: INFO
     org.springframework.security: WARN
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}%X{integration:-}] %logger{36} - %msg%n"

@@ -2,8 +2,12 @@ package com.bookingsaas.common.security;
 
 import com.bookingsaas.auth.JwtAuthenticationFilter;
 import com.bookingsaas.common.config.AppProperties;
+import com.bookingsaas.integration.auth.IntegrationAuthenticationFilter;
+import com.bookingsaas.integration.auth.IntegrationTokenService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -23,7 +27,8 @@ import java.util.List;
  * Stateless JWT security.
  *
  * <p>Open areas: authentication, the customer-facing {@code /api/public/**}
- * API (except making a reservation, which needs a signed-in account), the API documentation and the health probe. Everything else requires a principal — and business-level
+ * API (except making a reservation, which needs a signed-in account), the API documentation and the health probe.
+ * {@code /api/integrations/**} has its own chain and accepts integration tokens only. Everything else requires a principal — and business-level
  * authorization then happens in the service layer through {@link CurrentTenant},
  * because URL patterns cannot express "this row belongs to your tenant".
  */
@@ -35,6 +40,31 @@ public class SecurityConfig {
 
     public SecurityConfig(AppProperties properties) {
         this.properties = properties;
+    }
+
+    /**
+     * The integration API: integration tokens only, no sessions, no browser
+     * CORS — it is called server to server by automation tools. Ordered first
+     * so its matcher wins over the catch-all chain below.
+     */
+    @Bean
+    @Order(1)
+    public SecurityFilterChain integrationFilterChain(HttpSecurity http,
+                                                      IntegrationTokenService tokenService,
+                                                      ObjectMapper objectMapper,
+                                                      RestAuthenticationEntryPoint entryPoint) throws Exception {
+        http
+                .securityMatcher("/api/integrations/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(entryPoint)
+                        .accessDeniedHandler(entryPoint))
+                .authorizeHttpRequests(auth -> auth.anyRequest().hasAuthority(IntegrationAuthenticationFilter.AUTHORITY))
+                .addFilterBefore(new IntegrationAuthenticationFilter(tokenService, objectMapper),
+                        UsernamePasswordAuthenticationFilter.class);
+        return http.build();
     }
 
     @Bean

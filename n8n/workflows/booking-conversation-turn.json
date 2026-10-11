@@ -1,0 +1,1161 @@
+{
+  "id": "bkConversationTn",
+  "name": "BOOKING - Conversation Turn",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## BOOKING - Conversation Turn\nCalled with `provider`, `externalUserId`, `displayName`, `text`.\n\n1. Ask the platform where the chat stands\n2. Read the message: rules first (numbers, times, dates, yes/no, names, phones — English and Macedonian); the language model (`LLM_PROVIDER`) only for messages the rules cannot read\n3. The platform applies them and says what to ask next\n4. Create / cancel the reservation when the customer confirmed\n5. Write the reply from the platform's facts with fixed templates in the customer's language; `REPLY_WRITER=llm` lets the model rephrase them\n\nReturns `{ reply }`.",
+        "width": 520,
+        "height": 300
+      },
+      "id": "turn-01",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -360
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "turn-02",
+      "name": "When called by another workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BOOKING_API_URL }}/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        }
+      },
+      "id": "turn-03",
+      "name": "Who am I",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BOOKING_API_URL }}/businesses/{{ $json.body.businessId }}/conversations/current?provider={{ $('When called by another workflow').first().json.provider }}&externalUserId={{ encodeURIComponent($('When called by another workflow').first().json.externalUserId) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        }
+      },
+      "id": "turn-04",
+      "name": "Get conversation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('When called by another workflow').first().json;\nconst me = $('Who am I').first().json;\nconst ctx = $input.first().json;\nconst text = String(input.text ?? '').slice(0, 2000);\nif (me.statusCode !== 200 || ctx.statusCode !== 200) {\n  // Even the apology goes out in the customer's language.\n  return [{ json: { failed: true, rulesUnderstood: true, language: /[Ѐ-ӿ]/.test(text) ? 'mk' : 'en', reason: 'booking platform unavailable', status: me.statusCode ?? ctx.statusCode ?? me.error } }];\n}\nconst context = ctx.body;\nconst lower = text.toLowerCase().normalize('NFKC').replace(/[’`]/g, \"'\");\nconst words = lower.split(/[^\\p{L}\\p{N}']+/u).filter(Boolean);\nconst padded = ' ' + words.join(' ') + ' ';\nconst has = (...phrases) => phrases.some(p => padded.includes(' ' + p + ' '));\nconst options = context.options || [];\nconst asked = context.asked;\nconst inProgress = context.conversationId != null;\n\n// --- Language: Cyrillic means Macedonian; otherwise count typical words. A message\n// without telling words (\"3\", \"ok\", a phone number) keeps the customer's last language.\nconst MK_WORDS = new Set(['sakam', 'sakame', 'saka', 'utre', 'denes', 'zadutre', 'zdravo', 'termin', 'termini', 'fala', 'blagodaram', 'moze', 'mozhe', 'mozam', 'kolku', 'kade', 'dali', 'vikam', 'rezervacija', 'rezerviram', 'zakazam', 'zakazham', 'popladne', 'vecer', 'navecer', 'nautro', 'broj', 'telefonski', 'ime', 'imate', 'slobodno', 'slobodni', 'nedela', 'sabota', 'petok', 'cetvrtok', 'chetvrtok', 'sreda', 'vtornik', 'ponedelnik', 'vazi', 'vazhi', 'ajde', 'nema', 'sum', 'vo', 'za', 'od', 'mi', 'da', 'ne', 'ova', 'toa', 'sega', 'otkazi', 'otkazam']);\nconst EN_WORDS = new Set(['i', 'want', 'would', 'like', 'book', 'booking', 'appointment', 'tomorrow', 'today', 'the', 'and', 'my', 'is', 'please', 'can', 'could', 'time', 'yes', 'hello', 'hi', 'hey', 'thanks', 'thank', 'you', 'name', 'phone', 'number', 'at', 'for', 'what', 'where', 'how', 'much', 'price', 'from', 'reserve', 'reservation', 'have', 'any', 'free', 'available', 'a', 'an', 'to', 'me', 'it', 'that', 'this', 'with', 'in', 'on', 'of', 'morning', 'afternoon', 'evening', 'cancel', 'no', 'nope', 'sure', 'yeah', 'yep', 'great', 'perfect', 'okay']);\nfunction detectLanguage() {\n  if (/[Ѐ-ӿ]/.test(text)) return 'mk';\n  let mk = 0, en = 0;\n  for (const w of words) { if (MK_WORDS.has(w)) mk++; if (EN_WORDS.has(w)) en++; }\n  if (mk > en) return 'mk';\n  if (en > 0) return 'en';\n  return null;\n}\nconst store = $getWorkflowStaticData('global');\nstore.languages = store.languages || {};\nconst languageKey = input.provider + ':' + input.externalUserId;\nconst detected = detectLanguage();\nconst language = detected || store.languages[languageKey]?.lang || 'en';\nif (detected) store.languages[languageKey] = { lang: detected, at: Date.now() };\nfor (const [k, v] of Object.entries(store.languages)) if (Date.now() - v.at > 30 * 86400000) delete store.languages[k];\n\n// --- Small vocabularies --------------------------------------------------------\nconst YES = ['yes', 'yeah', 'yep', 'yup', 'sure', 'ok', 'okay', 'okey', 'correct', 'confirm', 'confirmed', 'please do', 'go ahead', 'sounds good', 'perfect', 'great', 'thats right', \"that's right\", 'yes please', 'da', 'moze', 'mozhe', 'vazi', 'vazhi', 'ajde', 'potvrdi', 'potvrduvam', 'да', 'може', 'важи', 'во ред', 'потврди', 'потврдувам', 'ок', 'се', 'секако', 'sekako'];\nconst NO = ['no', 'nope', 'nah', 'not really', 'no thanks', 'no thank you', 'ne', 'не', 'никако', 'nikako', 'ne fala', 'не фала'];\nconst ABORT = ['never mind', 'nevermind', 'forget it', 'stop', 'cancel it', 'cancel that', 'nema veze', 'zaboravi', 'заборави', 'нема врска', 'нема везе', 'не сакам веќе', 'ne sakam veke', 'откажи', 'otkazi'];\nconst GREETING = ['hi', 'hello', 'hey', 'hiya', 'good morning', 'good afternoon', 'good evening', 'zdravo', 'здраво', 'cao', 'ћао', 'чао', 'pozdrav', 'поздрав', 'добар ден', 'dobar den', 'добро утро', 'dobro utro'];\nconst THANKS = ['thanks', 'thank you', 'thx', 'ty', 'fala', 'blagodaram', 'фала', 'благодарам', 'ви благодарам', 'vi blagodaram', 'thanks a lot', 'fala mnogu', 'фала многу'];\nconst NO_PREFERENCE = ['any', 'anyone', 'anybody', 'no preference', 'doesnt matter', \"doesn't matter\", 'does not matter', 'whoever', 'either', 'whoever is free', 'any is fine', 'seedno', 'svejedno', 'bilo koj', 'koj bilo', 'сеедно', 'свеедно', 'било кој', 'кој било', 'нема врска', 'nema veze'];\nconst NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eden: 1, edna: 1, edno: 1, dva: 2, dve: 2, dvajca: 2, tri: 3, trojca: 3, cetiri: 4, chetiri: 4, pet: 5, shest: 6, еден: 1, една: 1, едно: 1, два: 2, две: 2, двајца: 2, три: 3, тројца: 3, четири: 4, четворица: 4, пет: 5, петмина: 5, шест: 6 };\nconst ORDINALS = { first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3, fourth: 4, '4th': 4, fifth: 5, '5th': 5, sixth: 6, '6th': 6, prv: 1, prva: 1, prvo: 1, prviot: 1, vtor: 2, vtora: 2, vtoro: 2, vtoriot: 2, tret: 3, treta: 3, treto: 3, tretiot: 3, прв: 1, прва: 1, прво: 1, првиот: 1, втор: 2, втора: 2, второ: 2, вториот: 2, трет: 3, трета: 3, трето: 3, третиот: 3, четврт: 4, четврта: 4, четвртиот: 4 };\nconst WEEKDAYS = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, недела: 0, понеделник: 1, вторник: 2, среда: 3, четврток: 4, петок: 5, сабота: 6, nedela: 0, ponedelnik: 1, vtornik: 2, sreda: 3, cetvrtok: 4, chetvrtok: 4, petok: 5, sabota: 6 };\nconst MONTHS = { january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4, may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8, september: 9, sep: 9, sept: 9, october: 10, oct: 10, november: 11, nov: 11, december: 12, dec: 12, јануари: 1, февруари: 2, март: 3, април: 4, мај: 5, јуни: 6, јули: 7, август: 8, септември: 9, октомври: 10, ноември: 11, декември: 12, januari: 1, fevruari: 2, mart: 3, maj: 5, juni: 6, juli: 7, avgust: 8, septemvri: 9, oktomvri: 10, noemvri: 11, dekemvri: 12 };\nconst TIME_WORDS = ['at', 'from', 'around', 'about', 'after', 'before', 'vo', 'od', 'okolu', 'posle', 'во', 'од', 'околу', 'после', 'am', 'pm', 'h', 'ч', 'часот', 'casot', 'chasot', 'saat', 'саат'];\nconst PREFERENCES = { morning: 'MORNING', afternoon: 'AFTERNOON', evening: 'EVENING', utro: 'MORNING', nautro: 'MORNING', popladne: 'AFTERNOON', vecer: 'EVENING', navecer: 'EVENING', наутро: 'MORNING', утро: 'MORNING', попладне: 'AFTERNOON', вечер: 'EVENING', навечер: 'EVENING' };\nconst CANCEL_WORDS = ['cancel', 'otkazi', 'otkazam', 'otkazhi', 'откажи', 'откажам', 'откажете'];\nconst BOOKING_WORDS = ['booking', 'reservation', 'appointment', 'termin', 'terminot', 'rezervacija', 'rezervacijata', 'термин', 'терминот', 'резервација', 'резервацијата', 'my', 'мојата', 'мојот', 'mojot', 'mojata'];\nconst QUESTION_TOPICS = {\n  price: ['price', 'prices', 'cost', 'costs', 'how much', 'cena', 'ceni', 'kolku cini', 'kolku chini', 'цена', 'цени', 'колку чини', 'колку чинат', 'cenovnik', 'ценовник'],\n  address: ['address', 'where', 'located', 'location', 'adresa', 'kade', 'адреса', 'каде', 'локација', 'lokacija'],\n  hours: ['hours', 'open', 'opening', 'close', 'closing', 'working', 'rabotno', 'rabotite', 'otvoreno', 'работно', 'работите', 'отворено'],\n};\nconst whole = (list) => list.includes(words.join(' ')) || list.includes(lower.replace(/[!.?\\s👍✅🙂😊]+$/u, '').trim());\n\n// --- Readers -------------------------------------------------------------------\nfunction optionByNumber() {\n  if (!options.length || words.length > 8) return null;\n  const digits = lower.match(/\\d+/g) || [];\n  if (digits.length === 1 && !/[:.]\\d{2}/.test(lower) && !TIME_WORDS.some(w => has(w)) && !/\\d\\s*(am|pm|h)\\b/.test(lower)) {\n    const n = Number(digits[0]);\n    if (n >= 1 && n <= options.length) return n;\n  }\n  for (const w of words) {\n    if (ORDINALS[w] && ORDINALS[w] <= options.length) return ORDINALS[w];\n    if ((w === 'last' || w.startsWith('последн') || w.startsWith('posledn'))) return options.length;\n  }\n  if (words.length === 1 && NUMBER_WORDS[words[0]] && NUMBER_WORDS[words[0]] <= options.length) return NUMBER_WORDS[words[0]];\n  return null;\n}\nconst pad = (n) => String(n).padStart(2, '0');\nfunction readTime() {\n  if (has('noon', 'midday', 'pladne', 'пладне')) return { h: 12, m: 0, ampm: null };\n  // Prefer the number that is clearly a time: \"at 8\", \"во 20\", \"8:30\", \"8pm\".\n  const re = /(?:^|[^\\d])((?:at|from|around|about|after|before|vo|od|okolu|posle|во|од|околу|после)\\s+)?(\\d{1,2})(?:[:.](\\d{2}))?\\s*(a\\.?m\\.?|p\\.?m\\.?|h|ч|часот|casot|chasot|saat|саат)?(?=$|[^\\d])/gu;\n  const found = [...lower.matchAll(re)].filter(m => Number(m[2]) <= 23 && (!m[3] || Number(m[3]) <= 59));\n  const m = found.find(x => x[1] || x[3] || x[4]) || found[0];\n  if (!m) return null;\n  const ampm = m[4] && m[4].startsWith('a') ? 'am' : m[4] && m[4].startsWith('p') ? 'pm' : null;\n  let h = Number(m[2]);\n  if (!ampm && h < 12 && has('tonight', 'evening', 'вечерва', 'вечер', 'навечер', 'vecerva', 'vecer', 'navecer')) h += 12;\n  return { h, m: m[3] ? Number(m[3]) : 0, ampm, raw: m[0] };\n}\nfunction timeChoice(t) {\n  const hours = [];\n  if (t.ampm === 'pm') hours.push(t.h < 12 ? t.h + 12 : t.h);\n  else if (t.ampm === 'am') hours.push(t.h === 12 ? 0 : t.h);\n  else { hours.push(t.h); if (t.h <= 11) hours.push(t.h + 12); }\n  for (const h of hours) {\n    const option = options.find(o => o.value === pad(h) + ':' + pad(t.m));\n    if (option) return { optionNumber: option.number };\n  }\n  // Not offered: say it as a time; the platform explains and offers the nearest ones.\n  const h = t.ampm || t.h >= 8 ? hours[0] : t.h + 12;\n  return { time: pad(h) + ':' + pad(t.m) };\n}\nfunction isoPlus(days) {\n  const [y, mo, d] = context.today.split('-').map(Number);\n  return new Date(Date.UTC(y, mo - 1, d + days)).toISOString().slice(0, 10);\n}\nfunction readDate(allowNumeric) {\n  if (has('day after tomorrow', 'задутре', 'zadutre')) return isoPlus(2);\n  if (has('today', 'денес', 'denes', 'tonight', 'вечерва', 'vecerva')) return isoPlus(0);\n  if (has('tomorrow', 'утре', 'utre')) return isoPlus(1);\n  const [y, mo, d] = context.today.split('-').map(Number);\n  const todayWd = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();\n  for (const w of words) {\n    if (WEEKDAYS[w] !== undefined) {\n      let diff = (WEEKDAYS[w] - todayWd + 7) % 7;\n      if (diff === 0 && has('next', 'sledniot', 'следниот', 'slednata', 'следната')) diff = 7;\n      return isoPlus(diff);\n    }\n  }\n  const resolve = (day, month, year) => {\n    if (month < 1 || month > 12 || day < 1 || day > 31) return null;\n    let yr = year ? (year < 100 ? 2000 + year : year) : y;\n    let iso = `${yr}-${pad(month)}-${pad(day)}`;\n    if (!year && iso < context.today) iso = `${yr + 1}-${pad(month)}-${pad(day)}`;\n    return iso;\n  };\n  for (let i = 0; i < words.length; i++) {\n    const month = MONTHS[words[i]];\n    if (!month) continue;\n    const before = parseInt(words[i - 1]), after = parseInt(words[i + 1]);\n    const day = !isNaN(before) ? before : !isNaN(after) ? after : (words[i - 1] === 'of' && !isNaN(parseInt(words[i - 2])) ? parseInt(words[i - 2]) : NaN);\n    if (!isNaN(day)) return resolve(day, month);\n  }\n  if (allowNumeric) {\n    const m = lower.match(/(?:^|[^\\d])(\\d{1,2})[./-](\\d{1,2})(?:[./-](\\d{2,4}))?(?=$|[^\\d])/);\n    if (m) return resolve(Number(m[1]), Number(m[2]), m[3] ? Number(m[3]) : null);\n  }\n  return null;\n}\nfunction readCount(without) {\n  if (has('just me', 'only me', 'myself', 'alone', 'sam', 'sama', 'само јас', 'samo jas', 'сам', 'сама')) return 1;\n  if (has('couple', 'me and my', 'the two of us', 'both of us', 'двајца', 'dvajca', 'нас двајца')) return 2;\n  const digits = (without ? lower.replace(without, ' ') : lower).match(/\\d+/g) || [];\n  if (digits.length === 1 && Number(digits[0]) >= 1 && Number(digits[0]) <= 50) return Number(digits[0]);\n  for (const w of words) if (NUMBER_WORDS[w]) return NUMBER_WORDS[w];\n  return null;\n}\nconst LATIN = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', ѓ: 'gj', е: 'e', ж: 'zh', з: 'z', ѕ: 'dz', и: 'i', ј: 'j', к: 'k', л: 'l', љ: 'lj', м: 'm', н: 'n', њ: 'nj', о: 'o', п: 'p', р: 'r', с: 's', т: 't', ќ: 'kj', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', џ: 'dzh', ш: 'sh' };\nconst latin = (s) => s.toLowerCase().split('').map(c => LATIN[c] ?? c).join('');\nfunction close(a, b) {\n  if (a === b) return true;\n  if (a.length < 3 || b.length < 3) return false;\n  if (a.startsWith(b) || b.startsWith(a)) return Math.min(a.length, b.length) >= 3;\n  if (Math.abs(a.length - b.length) > 1) return false;\n  let i = 0, j = 0, edits = 0;\n  while (i < a.length && j < b.length) {\n    if (a[i] === b[j]) { i++; j++; continue; }\n    if (++edits > 1) return false;\n    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }\n  }\n  return edits + (a.length - i) + (b.length - j) <= 1;\n}\nfunction optionByName() {\n  const said = words.map(latin).filter(w => w.length >= 3);\n  const hits = options.filter(o => {\n    const name = o.label.split(' · ')[0].split(' (')[0];\n    const parts = name.toLowerCase().split(/[^\\p{L}\\p{N}]+/u).filter(p => p.length >= 3).map(latin);\n    return parts.length && parts.every(p => said.some(w => close(w, p)));\n  });\n  return hits.length === 1 ? hits[0].number : null;\n}\nconst STOP = new Set(['and', 'my', 'phone', 'number', 'is', 'mobile', 'mob', 'tel', 'telephone', 'cell', 'contact', 'here', 'it', 'its', \"it's\", 'the', 'thanks', 'thank', 'you', 'please', 'a', 'or', 'i', 'me', 'name', 'ok', 'okay', 'sure', 'yes', 'hi', 'hello', 'email', 'mail', 'at', 'on', 'broj', 'telefon', 'telefonski', 'mobilen', 'mi', 'e', 'moj', 'mojot', 'fala', 've', 'molam', 'eve', 'ime', 'imeto', 'и', 'мој', 'мојот', 'ми', 'е', 'телефон', 'телефонски', 'број', 'бројот', 'мобилен', 'фала', 'ве', 'молам', 'еве', 'име', 'името', 'да', 'da', 'а']);\nfunction readCustomerInfo() {\n  const result = {};\n  const email = text.match(/[^\\s@,;]+@[^\\s@,;]+\\.[^\\s@,;]+/);\n  if (email) result.email = email[0];\n  const phone = text.replace(email ? email[0] : '', ' ').match(/\\+?\\d[\\d\\s\\-()\\/.]{5,}\\d/);\n  if (phone) result.phone = phone[0].trim();\n  // While the name is being asked for, a name in the message also corrects an earlier one.\n  if (!context.collected?.firstName || asked === 'CUSTOMER_INFO') {\n    const named = text.match(/(?:my name is|name is|my name's|i am|i'm|this is|se vikam|ime mi e|imeto mi e|jas sum|се викам|име ми е|името ми е|јас сум)\\s+([\\p{L}'-]{2,25})(?:\\s+([\\p{Lu}][\\p{L}'-]{1,25}))?/iu);\n    let first = named?.[1], last = named?.[2];\n    if (!first) {\n      const rest = text.replace(email ? email[0] : '', ' ').replace(phone ? phone[0] : '', ' ');\n      const tokens = rest.split(/[^\\p{L}'-]+/u).filter(Boolean).filter(t => !STOP.has(t.toLowerCase()));\n      // Ordinary words (\"whoever is free\", \"yes please\") are never a name.\n      const vocabulary = knownWords();\n      if (tokens.length >= 1 && tokens.length <= 3 && tokens.every(t => /^\\p{L}[\\p{L}'-]{1,24}$/u.test(t) && !vocabulary.has(latin(t)))) {\n        [first, last] = [tokens[0], tokens.slice(1).join(' ') || undefined];\n      }\n    }\n    if (first && !STOP.has(first.toLowerCase())) {\n      const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);\n      result.firstName = cap(first);\n      if (last) result.lastName = last.split(' ').map(cap).join(' ');\n    }\n  }\n  return Object.keys(result).length ? result : null;\n}\nfunction questionTopics() {\n  return Object.entries(QUESTION_TOPICS).filter(([, list]) => list.some(p => has(p))).map(([topic]) => topic);\n}\n\n// --- What does this message say? null = let the language model read it. --------------\n// The rules only answer for a message they understood completely. Every word must be\n// known vocabulary, part of an offered option, a number/time, or the name/phone/email read\n// from it; one unknown word (\"11 doesn't work, maybe later?\") hands the message to the model.\nconst CHAT = ['кај', 'kaj', 'with', 'by', 'works', 'work', 'fine', 'good', 'great', 'perfect', 'sounds', 'that', 'then', 'instead', 'actually', 'rather', 'prefer', 'ok', 'okay', 'lets', \"let's\", 'go', 'take', 'choose', 'pick', 'option', 'number', 'be', 'will', 'does', 'what', 'where', 'how', 'much', 'when', 'are', 'your', 'yours', 'open', 'prices', 'price', 'cost', 'costs', 'address', 'located', 'location', 'hours', 'working', 'so', 'yes', 'no', 'thanks', 'thank', 'name', 'phone', 'mobile', 'is', 'am', 'pm', 'o', 'clock', \"o'clock\", 'oclock', 'around', 'about',\n  'одговара', 'добро', 'супер', 'ок', 'нека', 'биде', 'тоа', 'ова', 'тогаш', 'сепак', 'подобро', 'избирам', 'бирам', 'земам', 'опција', 'број', 'бројот', 'каде', 'колку', 'чини', 'чинат', 'цена', 'цени', 'кога', 'работите', 'работно', 'време', 'адреса', 'се', 'наоѓате', 'име', 'телефон', 'ве', 'фала', 'благодарам', 'од', 'до', 'часот', 'саат',\n  'odgovara', 'dobro', 'super', 'ok', 'neka', 'bide', 'toa', 'ova', 'togas', 'togash', 'sepak', 'podobro', 'izbiram', 'biram', 'zemam', 'opcija', 'broj', 'kade', 'kolku', 'cini', 'chini', 'cena', 'ceni', 'koga', 'rabotite', 'rabotno', 'vreme', 'adresa', 'se', 'naogjate', 'ime', 'telefon', 'fala', 'blagodaram', 'od', 'do', 'casot', 'chasot'];\nconst phraseWords = (lists) => lists.flat(Infinity).flatMap(p => p.split(/\\s+/));\nfunction knownWords() {\n  const optionWords = options.flatMap(o => o.label.toLowerCase().split(/[^\\p{L}\\p{N}]+/u)).filter(Boolean).map(latin);\n  const serviceWords = (context.serviceNames || []).flatMap(n => n.toLowerCase().split(/[^\\p{L}\\p{N}]+/u)).filter(Boolean).map(latin);\n  return new Set([...FILLER, ...BOOK_WORDS, ...CHAT, ...CANCEL_WORDS, ...BOOKING_WORDS, ...TIME_WORDS, ...phraseWords([YES, NO, ABORT, GREETING, THANKS, NO_PREFERENCE, Object.values(QUESTION_TOPICS)]),\n    ...Object.keys(NUMBER_WORDS), ...Object.keys(ORDINALS), ...Object.keys(WEEKDAYS), ...Object.keys(MONTHS), ...Object.keys(PREFERENCES),\n    'call', 'called', 'this', 'se', 'vikam', 'jas', 'sum', 'ime', 'imeto', 'mi', 'e', 'се', 'викам', 'јас', 'сум', 'име', 'името', 'ми', 'е',\n    'today', 'tomorrow', 'tonight', 'day', 'after', 'next', 'last', 'денес', 'утре', 'задутре', 'вечерва', 'следниот', 'следната', 'denes', 'utre', 'zadutre', 'sledniot', 'slednata', ...optionWords, ...serviceWords].map(w => latin(w)));\n}\nfunction understoodAll(result) {\n  let rest = text;\n  for (const v of [result.phone, result.email]) if (v) rest = rest.replace(v, ' ');\n  const nameWords = [result.firstName, result.lastName].filter(Boolean).join(' ').toLowerCase().split(/\\s+/).filter(Boolean);\n  const known = knownWords();\n  return rest.toLowerCase().split(/[^\\p{L}\\p{N}':.]+/u).map(w => w.replace(/^[':.]+|[':.]+$/g, '')).filter(Boolean).every(w =>\n    /^\\d{1,2}([:.]\\d{2})?(am|pm|h)?$/.test(w) || /^\\d+(st|nd|rd|th)?$/.test(w) || nameWords.includes(w)\n    || known.has(latin(w)) || (latin(w).length >= 4 && [...known].some(k => k.length >= 4 && close(latin(w), k)))\n    || (latin(w).length >= 3 && options.some(o => o.label.toLowerCase().split(/[^\\p{L}\\p{N}]+/u).some(p => p.length >= 3 && close(latin(w), latin(p))))));\n}\nfunction read() {\n  const result = readParts();\n  if (result === null || !inProgress || result.abort || result.intent === 'CANCEL') return result;\n  return understoodAll(result) ? result : null;\n}\nfunction readParts() {\n  if (!text.trim()) return {};\n  if (whole(ABORT) && inProgress) return { abort: true };\n  if (CANCEL_WORDS.some(w => has(w)) && (BOOKING_WORDS.some(w => has(w)) || !inProgress)) return { intent: 'CANCEL' };\n  // Contact details are unmistakable whenever they come: keep them for later.\n  if (inProgress && asked !== 'CUSTOMER_INFO' && /\\+?\\d[\\d\\s\\-()\\/.]{6,}\\d|@/.test(text)) {\n    const info = readCustomerInfo();\n    if (info && (info.phone || info.email)) return info;\n  }\n  if (inProgress) {\n    switch (asked) {\n      case 'CONFIRMATION':\n      case 'CANCEL_CONFIRMATION':\n        if (whole(YES)) return { confirmation: 'YES' };\n        if (whole(NO)) return { confirmation: 'NO' };\n        break;\n      case 'SERVICE': {\n        const n = optionByNumber() ?? optionByName();\n        if (n) return { optionNumber: n };\n        // A short name: the platform matches it and lists the candidates if several fit.\n        if (words.length <= 4 && !questionTopics().length) return { service: text.trim() };\n        break;\n      }\n      case 'PARTICIPANTS': {\n        const n = readCount();\n        if (n && words.length <= 6) return { participants: n };\n        break;\n      }\n      case 'DATE': {\n        const n = optionByNumber();\n        if (n) return { optionNumber: n };\n        const date = readDate(true);\n        const t = readTime();\n        // \"12.10\" here is a date; only \"at 11\", \"11:00\" or \"11am\" is a time.\n        const timeMarked = t && (TIME_WORDS.some(w => has(w)) || /\\d:\\d{2}/.test(lower));\n        if (date) return timeMarked ? { date, ...timeChoiceFree(t) } : { date };\n        if (timeMarked) return timeChoiceFree(t);   // \"from 11\": kept for when the day is chosen\n        break;\n      }\n      case 'TIME': {\n        const date = readDate(false);\n        const t = readTime();\n        if (date) return t ? { date, ...timeChoiceFree(t) } : { date };\n        const n = optionByNumber();\n        if (n) return { optionNumber: n };\n        if (t && words.length <= 8) return timeChoice(t);\n        const pref = has('after lunch', 'posle rucek', 'после ручек') ? 'AFTERNOON' : has('before lunch', 'pred rucek', 'пред ручек') ? 'MORNING' : words.map(w => PREFERENCES[w]).find(Boolean);\n        if (pref) return { timePreference: pref };\n        break;\n      }\n      case 'RESOURCE': {\n        if (whole(NO_PREFERENCE) || NO_PREFERENCE.some(p => p.includes(' ') && has(p))) return { noPreference: true };\n        const n = optionByNumber() ?? optionByName();\n        if (n) return { optionNumber: n };\n        if (whole(YES) && options.length === 1) return { optionNumber: 1 };\n        break;\n      }\n      case 'CUSTOMER_INFO': {\n        const info = readCustomerInfo();\n        if (info) return info;\n        break;\n      }\n      case 'CANCEL_SELECTION': {\n        const n = optionByNumber();\n        if (n) return { optionNumber: n };\n        const date = readDate(true);\n        if (date) return { date };\n        break;\n      }\n    }\n  }\n  if (whole(GREETING) || whole(THANKS)) return { intent: 'GREETING' };\n  // \"yes\"/\"ok\" to a question that is not a yes/no question (or to nothing): nothing new.\n  if (whole(YES) || whole(NO)) return {};\n  if (questionTopics().length && words.length <= 12 && !BOOK_WORDS.some(w => has(w))) return { intent: 'QUESTION' };\n  if (!inProgress) return bookingRequest();\n  return null;\n}\n// A plain booking request (\"Hi, I'd like to book a massage tomorrow at 5\"): read it with\n// the rules only when every word is understood; anything unusual goes to the model.\nconst BOOK_WORDS = ['book', 'booking', 'reserve', 'reservation', 'appointment', 'schedule', 'zakazam', 'zakazham', 'zakazheme', 'rezerviram', 'rezervacija', 'termin', 'закажам', 'закажеме', 'закажете', 'резервирам', 'резервација', 'термин'];\nconst FILLER = ['i', \"i'd\", 'id', \"i'm\", 'im', 'want', 'would', 'like', 'love', 'to', 'a', 'an', 'the', 'for', 'me', 'please', 'pls', 'can', 'could', 'we', 'make', 'get', 'have', 'need', 'do', 'you', 'there', 'any', 'free', 'slot', 'time', 'on', 'at', 'in', 'is', 'it', 'possible', 'available', 'and', 'my', 'hi', 'hello', 'hey', 'good', 'some', 'just', 'also', 'maybe', 'this', 'one', 'session', 'people', 'persons', 'person', 'us', 'of', 'table', 'room', 'court', 'seat', 'seats', 'spot', 'place', 'lesson', 'class', 'visit', 'guests', 'guest', 'party', 'everyone', 'with', 'friends', 'family',\n  'сакам', 'сакаме', 'би', 'да', 'за', 'во', 'на', 'ве', 'молам', 'здраво', 'може', 'ли', 'имате', 'слободен', 'слободно', 'ми', 'треба', 'еден', 'една', 'лица', 'лице', 'нас', 'и', 'маса', 'место', 'места', 'соба', 'терен', 'час', 'гости', 'гостин',\n  'sakam', 'sakame', 'bi', 'da', 'za', 'vo', 'na', 've', 'molam', 'zdravo', 'moze', 'mozhe', 'li', 'imate', 'sloboden', 'slobodno', 'mi', 'treba', 'lica', 'lice', 'nas', 'masa', 'mesto', 'mesta', 'soba', 'teren', 'gosti'];\nfunction bookingRequest() {\n  if (!BOOK_WORDS.some(w => has(w))) return null;\n  const serviceTokens = (context.serviceNames || []).map(n => n.toLowerCase().split(/[^\\p{L}\\p{N}]+/u).filter(Boolean));\n  const known = new Set([...FILLER, ...BOOK_WORDS, ...serviceTokens.flat(), ...Object.keys(WEEKDAYS), ...Object.keys(MONTHS), ...Object.keys(NUMBER_WORDS), ...Object.keys(PREFERENCES), ...TIME_WORDS,\n    'today', 'tomorrow', 'tonight', 'day', 'after', 'next', 'денес', 'утре', 'задутре', 'вечерва', 'denes', 'utre', 'zadutre', 'couple', 'just', 'only', 'myself', 'alone', 'both', 'two', 'двајца', 'dvajca']);\n  if (words.some(w => !known.has(w) && !/^\\d{1,2}([:.]\\d{2})?(am|pm|h)?$/.test(w))) return null;\n  const result = { intent: 'BOOK' };\n  const full = (context.serviceNames || []).filter((n, i) => serviceTokens[i].every(t => has(t)));\n  if (full.length === 1) result.service = full[0];\n  else {\n    const mentioned = [...new Set(serviceTokens.flat())].filter(t => has(t));\n    if (mentioned.length) result.service = mentioned.join(' ');\n  }\n  const date = readDate(false);\n  if (date) result.date = date;\n  const digits = lower.match(/\\d+/g) || [];\n  const t = readTime();\n  const timeMarked = t && (TIME_WORDS.some(w => has(w)) || /\\d[:.]\\d{2}/.test(lower));\n  const countWords = has('people', 'persons', 'person', 'guests', 'guest', 'of us', 'лица', 'lica', 'гости', 'gosti', 'couple', 'двајца', 'dvajca', 'just me', 'only me', 'myself', 'alone', 'both of us');\n  if (timeMarked) Object.assign(result, timeChoiceFree(t));\n  // Whatever number is left after the time is the group size (\"a table for 4 at 8\").\n  const rest = ((timeMarked ? lower.replace(t.raw, ' ') : lower).match(/\\d+/g) || []);\n  if (rest.length > 1) return null;\n  if (rest.length === 1 && !countWords && !has('for', 'за', 'za')) return null;   // a bare number: let the model decide\n  if (countWords || rest.length === 1) {\n    const n = readCount(timeMarked ? t.raw : null);\n    if (n) result.participants = n;\n  }\n  const pref = words.map(w => PREFERENCES[w]).find(Boolean);\n  if (pref && !result.time) result.timePreference = pref;\n  return result;\n}\n// A time given together with a new date: the offered options belong to the old date.\nfunction timeChoiceFree(t) {\n  const h = t.ampm === 'pm' && t.h < 12 ? t.h + 12 : t.ampm === 'am' && t.h === 12 ? 0 : (!t.ampm && t.h < 8 ? t.h + 12 : t.h);\n  return { time: pad(h) + ':' + pad(t.m) };\n}\nconst rules = read();\n// Facts the rules can read even in a message they do not fully understand. When the model\n// reads the message, these overrule it: a small model resolves \"Monday\" to the wrong date.\nfunction sureFacts() {\n  const sure = {};\n  // \"not Monday, Tuesday\" or \"11 doesn't work\": a negation makes any single reading unsafe.\n  const negated = has('not', \"doesn't\", 'doesnt', \"don't\", 'dont', \"can't\", 'cant', \"won't\", 'instead', 'не', 'ne', 'nemozam', 'неможам', 'немам', 'наместо', 'namesto');\n  const dayWords = words.filter(w => WEEKDAYS[w] !== undefined || ['today', 'tomorrow', 'денес', 'утре', 'задутре', 'denes', 'utre', 'zadutre'].includes(w));\n  if (!negated && dayWords.length <= 1) {\n    const date = readDate(false);\n    if (date) sure.date = date;\n    const t = readTime();\n    if (t && (TIME_WORDS.some(w => has(w)) || /\\d:\\d{2}/.test(lower)) && (lower.match(/\\d+/g) || []).length <= 2) Object.assign(sure, timeChoiceFree(t));\n  }\n  if (/\\+?\\d[\\d\\s\\-()\\/.]{6,}\\d/.test(text)) { const info = readCustomerInfo(); if (info?.phone) sure.phone = info.phone; }\n  const email = text.match(/[^\\s@,;]+@[^\\s@,;]+\\.[^\\s@,;]+/);\n  if (email) sure.email = email[0];\n  return sure;\n}\n\nconst prompt = [\n  `TODAY: ${context.today} (${new Date(context.today + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })}), now ${context.now}, timezone ${context.timezone}`,\n  `SERVICES: ${(context.serviceNames || []).join('; ')}`,\n  `CONVERSATION: ${context.conversationId ? `${context.flow}, state ${context.state}` : 'none in progress'}`,\n  `LAST QUESTION ASKED: ${context.asked ?? 'none'}`,\n  `OFFERED OPTIONS: ${options.map(o => `${o.number}. ${o.label}`).join(' | ') || 'none'}`,\n  `ALREADY KNOWN: ${JSON.stringify(context.collected ?? {})}`,\n  '',\n  `CUSTOMER MESSAGE: ${text}`,\n].join('\\n');\nconst claudeModel = $env.CLAUDE_MODEL || 'claude-opus-5-5';\nconst tuned = !claudeModel.startsWith('claude-haiku');   // Haiku takes neither effort nor fallbacks\nconst system = \"You interpret one chat message sent to a business that takes reservations (a spa, a restaurant, a salon...). You never answer the customer; you only extract what they said into the JSON schema.\\n\\nHow to fill the fields:\\n- intent: BOOK (wants to make a reservation), CANCEL (wants to cancel an existing reservation), RESCHEDULE (wants to move one), QUESTION (asks something: prices, address, opening hours...), GREETING (hello/thanks with nothing else), or null when the message simply answers the question the business asked last. Use UNKNOWN only when nothing fits.\\n- When the business offered numbered options and the customer picks one — by number, by name (\\\"Anna\\\"), by time (\\\"the 5:30 one\\\") or by position (\\\"the first\\\") — set optionNumber to that option's number. Prefer optionNumber over other fields whenever an offered option matches.\\n- service: the service as the customer named it, only if they named one.\\n- participants: the group size, only if stated or unmistakable (\\\"for me and my wife\\\" = 2, \\\"just me\\\" = 1).\\n- date: an ISO date (YYYY-MM-DD). Resolve relative dates (\\\"tomorrow\\\", \\\"next Friday\\\", \\\"on the 10th\\\") against TODAY in the business timezone. Never guess a date the customer did not express.\\n- time: 24-hour HH:mm for an explicit time (\\\"half past five\\\" = 17:30 when evening is meant). timePreference: MORNING, AFTERNOON or EVENING for vague times (\\\"in the evening\\\").\\n- confirmation: YES or NO when the customer answers a yes/no question (confirm a booking, confirm a cancellation).\\n- noPreference: true when they say any option is fine (\\\"whoever is free\\\", \\\"doesn't matter\\\").\\n- abort: true when they want to stop what is in progress (\\\"forget it\\\", \\\"never mind\\\") — not when they cancel an existing reservation.\\n- firstName, lastName, phone, email, discountCode: only when the customer wrote them. Keep phone numbers as written.\\n- language: the language the customer writes in, e.g. \\\"English\\\", \\\"Macedonian\\\".\\nOnly fill what THIS message says; never repeat values from ALREADY KNOWN. Leave every field you are not sure about null. Never invent values.\\n\\nExamples (last question asked | message -> the non-null fields):\\n- DATE | \\\"I want to book from 11\\\" -> {\\\"time\\\":\\\"11:00\\\"}\\n- TIME | \\\"can I come a bit earlier, like 9?\\\" -> {\\\"time\\\":\\\"09:00\\\"}\\n- TIME | \\\"11 doesn't work for me, something in the evening?\\\" -> {\\\"timePreference\\\":\\\"EVENING\\\"}\\n- TIME | \\\"anything after lunch?\\\" -> {\\\"timePreference\\\":\\\"AFTERNOON\\\"} (never pick a time the customer did not write)\\n- TIME | \\\"is there anything on Friday instead\\\" -> {\\\"date\\\":\\\"<the coming Friday>\\\"}\\n- DATE | \\\"Ana\\\" -> {\\\"firstName\\\":\\\"Ana\\\"}\\n- RESOURCE | \\\"whoever is available is fine\\\" -> {\\\"noPreference\\\":true}\\n- CONFIRMATION | \\\"actually make it 12 instead\\\" -> {\\\"time\\\":\\\"12:00\\\"}\\n- CONFIRMATION | \\\"sounds good, see you then\\\" -> {\\\"confirmation\\\":\\\"YES\\\"}\\n- none | \\\"can I get a table for my parents and me next week\\\" -> {\\\"intent\\\":\\\"BOOK\\\",\\\"participants\\\":3} (\\\"next week\\\" is not a date)\\n- none | \\\"do you do kids haircuts?\\\" -> {\\\"intent\\\":\\\"QUESTION\\\",\\\"service\\\":\\\"kids haircut\\\"}\\n- PARTICIPANTS | \\\"we'll be 5, maybe 6\\\" -> {\\\"participants\\\":6}\";\nconst schema = {\"type\": \"object\", \"additionalProperties\": false, \"properties\": {\"intent\": {\"anyOf\": [{\"type\": \"string\", \"enum\": [\"BOOK\", \"CANCEL\", \"RESCHEDULE\", \"QUESTION\", \"GREETING\", \"UNKNOWN\"]}, {\"type\": \"null\"}]}, \"service\": {\"type\": [\"string\", \"null\"]}, \"participants\": {\"type\": [\"integer\", \"null\"]}, \"date\": {\"type\": [\"string\", \"null\"]}, \"time\": {\"type\": [\"string\", \"null\"]}, \"timePreference\": {\"anyOf\": [{\"type\": \"string\", \"enum\": [\"MORNING\", \"AFTERNOON\", \"EVENING\"]}, {\"type\": \"null\"}]}, \"optionNumber\": {\"type\": [\"integer\", \"null\"]}, \"confirmation\": {\"anyOf\": [{\"type\": \"string\", \"enum\": [\"YES\", \"NO\"]}, {\"type\": \"null\"}]}, \"noPreference\": {\"type\": [\"boolean\", \"null\"]}, \"abort\": {\"type\": [\"boolean\", \"null\"]}, \"firstName\": {\"type\": [\"string\", \"null\"]}, \"lastName\": {\"type\": [\"string\", \"null\"]}, \"phone\": {\"type\": [\"string\", \"null\"]}, \"email\": {\"type\": [\"string\", \"null\"]}, \"discountCode\": {\"type\": [\"string\", \"null\"]}, \"language\": {\"type\": [\"string\", \"null\"]}}, \"required\": [\"intent\", \"service\", \"participants\", \"date\", \"time\", \"timePreference\", \"optionNumber\", \"confirmation\", \"noPreference\", \"abort\", \"firstName\", \"lastName\", \"phone\", \"email\", \"discountCode\", \"language\"]};\nreturn [{ json: {\n  businessId: me.body.businessId,\n  language,\n  rules,\n  rulesUnderstood: rules !== null,\n  inProgress,\n  flow: context.flow,\n  collected: context.collected,\n  mentionsCount: readCount() !== null,\n  sure: sureFacts(),\n  // What the model may claim: an option only if the message names one, a time only if it has one.\n  options: options.map(o => o.number),\n  mentionsOption: /\\d/.test(lower) || words.some(w => ORDINALS[w] || w === 'last' || w.startsWith('последн') || w.startsWith('posledn')) || optionByName() !== null,\n  mentionsTime: /\\d/.test(lower) || has('noon', 'midday', 'pladne', 'пладне', 'midnight'),\n  anthropicRequest: {\n    model: claudeModel,\n    max_tokens: 2000,\n    ...(tuned ? { fallbacks: 'default' } : {}),\n    output_config: { ...(tuned ? { effort: 'low' } : {}), format: { type: 'json_schema', schema } },\n    system,\n    messages: [{ role: 'user', content: prompt }],\n  },\n  ollamaRequest: {\n    model: $env.OLLAMA_MODEL || 'qwen2.5:7b-instruct',\n    stream: false,\n    keep_alive: '30m',\n    format: schema,\n    options: { temperature: 0, num_ctx: 8192 },\n    messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],\n  },\n} }];\n"
+      },
+      "id": "turn-05",
+      "name": "Prepare understanding",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('When called by another workflow').first().json;\nconst prepared = $('Prepare understanding').first().json;\nif (prepared.failed) {\n  return [{ json: { failed: true, reason: prepared.reason } }];\n}\nlet extracted = {};\nlet understood = true;\nif (prepared.rulesUnderstood) {\n  // Read with the rules: an answer to the question just asked.\n  extracted = { ...prepared.rules };\n} else {\n  const response = $input.first().json;\n  understood = response.statusCode === 200;\n  if (understood && response.body?.stop_reason !== 'refusal') {\n    // Claude answers in content[], Ollama in message.content.\n    const text = response.body.message?.content ?? (response.body.content || []).filter(b => b.type === 'text').map(b => b.text).join('');\n    try { extracted = JSON.parse(text); } catch (e) { extracted = {}; }\n  }\n  delete extracted.language;   // the language is decided by the rules, per customer\n  for (const key of Object.keys(extracted)) {\n    if (extracted[key] === null || extracted[key] === '') delete extracted[key];\n  }\n  // What the rules read for certain wins over the model's reading.\n  for (const [key, value] of Object.entries(prepared.sure || {})) {\n    if (key === 'time' && extracted.optionNumber != null) continue;   // the model matched the time to an option\n    extracted[key] = value;\n  }\n  // A model must not pick for the customer: an option or a time only counts when the\n  // message contains one (\"anything after lunch?\" is a preference, not 14:30).\n  if (extracted.optionNumber != null && (!prepared.mentionsOption || !(prepared.options || []).includes(extracted.optionNumber))) delete extracted.optionNumber;\n  if (extracted.time && !prepared.mentionsTime) delete extracted.time;\n  if (extracted.phone && !/\\d{6,}/.test(String(input.text ?? '').replace(/[\\s\\-()\\/.]/g, ''))) delete extracted.phone;\n  // A small model tends to repeat what is already known; repeated values would reset\n  // later answers (a \"new\" time clears the chosen employee), so keep only real changes.\n  if (prepared.inProgress) {\n    const known = prepared.collected || {};\n    const same = (a, b) => a != null && b != null && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();\n    if (extracted.intent === 'BOOK' && prepared.flow === 'BOOKING') delete extracted.intent;\n    if (same(extracted.service, known.serviceName)) delete extracted.service;\n    if (same(extracted.date, known.date)) delete extracted.date;\n    if (same(extracted.time, known.time)) delete extracted.time;\n    if (extracted.participants != null && (same(extracted.participants, known.participants) || !prepared.mentionsCount)) delete extracted.participants;\n    if (same(extracted.firstName, known.firstName)) delete extracted.firstName;\n    if (same(extracted.phone, known.phone)) delete extracted.phone;\n    // A lone name is a first name, whatever the model called it.\n    if (extracted.lastName && !extracted.firstName && !known.firstName) { extracted.firstName = extracted.lastName; delete extracted.lastName; }\n  }\n}\n// Without an interpretation the platform simply repeats its current question.\nreturn [{ json: {\n  businessId: prepared.businessId,\n  language: prepared.language,\n  understood,\n  turnRequest: {\n    provider: input.provider,\n    externalUserId: String(input.externalUserId),\n    displayName: input.displayName || null,\n    message: String(input.text ?? '').slice(0, 2000),\n    extracted,\n    executionId: String($execution.id),\n  },\n} }];\n"
+      },
+      "id": "turn-06",
+      "name": "Prepare turn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BOOKING_API_URL }}/businesses/{{ $json.businessId }}/conversations/turn",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            },
+            {
+              "name": "X-External-User-Id",
+              "value": "={{ $json.turnRequest.externalUserId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.turnRequest) }}"
+      },
+      "id": "turn-07",
+      "name": "Submit turn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prepared = $('Prepare turn').first().json;\nconst response = $input.first().json;\nif (prepared.failed || response.statusCode !== 200) {\n  return [{ json: { route: 'ERROR', reason: prepared.reason || `turn failed: ${response.statusCode ?? response.error}` } }];\n}\nconst turn = response.body;\nreturn [{ json: { route: turn.nextAction, turn, facts: { turn } } }];\n"
+      },
+      "id": "turn-08",
+      "name": "Check turn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "CREATE_RESERVATION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CREATE_RESERVATION"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "CANCEL_RESERVATION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CANCEL_RESERVATION"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "REPLY",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "REPLY"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "turn-09",
+      "name": "Next action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkCreateReservat",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "turn-10",
+      "name": "Create reservation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        2000,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const turn = $input.first().json.turn;\nreturn [{ json: {\n  idempotencyKey: turn.action.idempotencyKey,\n  reservation: turn.action.reservation,\n  conversationId: turn.conversationId,\n} }];\n"
+      },
+      "id": "turn-11",
+      "name": "Booking request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1880,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconst turn = $('Check turn').first().json.turn;\nif (result.ok) {\n  return [{ json: { ok: true, facts: { turn: { ...turn, ask: 'NOTHING', options: [] }, outcome: 'RESERVATION_CREATED', reservation: result.reservation } } }];\n}\nreturn [{ json: { ok: false, conversationId: turn.conversationId, failure: { errorCode: result.errorCode || 'TEMPORARY_ERROR', message: result.message || 'The reservation could not be created.', executionId: String($execution.id) } } }];\n"
+      },
+      "id": "turn-12",
+      "name": "After booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "turn-13",
+      "name": "Booked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2440,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const turn = $input.first().json.turn;\nreturn [{ json: { reservationId: turn.action.reservationId, conversationId: turn.conversationId } }];\n"
+      },
+      "id": "turn-14",
+      "name": "Cancellation request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1880,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkCancelReservat",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "turn-15",
+      "name": "Cancel reservation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        2000,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconst turn = $('Check turn').first().json.turn;\nif (result.ok) {\n  return [{ json: { ok: true, facts: { turn: { ...turn, ask: 'NOTHING' }, outcome: 'RESERVATION_CANCELLED', reservation: result.reservation } } }];\n}\nreturn [{ json: { ok: false, conversationId: turn.conversationId, failure: { errorCode: result.errorCode || 'TEMPORARY_ERROR', message: result.message || 'The reservation could not be cancelled.', executionId: String($execution.id) } } }];\n"
+      },
+      "id": "turn-16",
+      "name": "After cancellation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "turn-17",
+      "name": "Cancelled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2440,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BOOKING_API_URL }}/businesses/{{ $('Prepare turn').first().json.businessId }}/conversations/{{ $json.conversationId }}/action-failed",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.failure) }}"
+      },
+      "id": "turn-18",
+      "name": "Report failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2680,
+        -100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nif (response.statusCode !== 200) {\n  return [{ json: { route: 'ERROR', reason: `action-failed returned ${response.statusCode ?? response.error}` } }];\n}\nreturn [{ json: { facts: { turn: response.body } } }];\n"
+      },
+      "id": "turn-19",
+      "name": "Fresh options",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2900,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst understood = $('Prepare understanding').first().json;\nconst lang = understood.language === 'mk' ? 'mk' : 'en';\nconst message = String($('When called by another workflow').first().json.text ?? '');\nconst context = $('Get conversation').first().json.body || {};\nconst extracted = $('Prepare turn').first().json.turnRequest?.extracted || {};\nconst useModel = ($env.REPLY_WRITER || 'template') === 'llm';\n\nconst FALLBACK = {\n  en: \"Sorry, I'm having trouble checking availability right now. Please try again in a few minutes.\",\n  mk: 'Извинете, моментално не можам да ја проверам достапноста. Ве молам обидете се повторно за неколку минути.',\n};\nif (item.route === 'ERROR' || !item.facts) {\n  return [{ json: { fallback: true, useModel: false, templateReply: FALLBACK[lang] } }];\n}\nconst facts = item.facts;\nconst turn = facts.turn || {};\nconst outcome = facts.outcome || turn.outcome || null;\nconst reservation = facts.reservation || turn.reservation || null;\nconst summary = turn.summary || {};\nconst business = turn.business || {};\nconst problems = turn.problems || [];\n\n// --- Formatting -----------------------------------------------------------------\nconst DAYS = { en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], mk: ['недела', 'понеделник', 'вторник', 'среда', 'четврток', 'петок', 'сабота'] };\nconst MONTHS = { en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'], mk: ['јануари', 'февруари', 'март', 'април', 'мај', 'јуни', 'јули', 'август', 'септември', 'октомври', 'ноември', 'декември'] };\nfunction day(iso) {\n  if (!iso) return '';\n  const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);\n  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();\n  return `${DAYS[lang][wd]}, ${d} ${MONTHS[lang][m - 1]}`;\n}\nconst money = (amount, currency) => amount == null ? '' : `${Number(amount).toFixed(2).replace(/\\.00$/, '')} ${currency || ''}`.trim();\nconst list = (opts) => opts.map(o => `${o.number}. ${o.label}`).join('\\n');\nconst phone = business.phone || '';\nconst callUs = phone ? (lang === 'mk' ? ` на ${phone}` : ` at ${phone}`) : '';\nfunction localLabel(o) {\n  if (turn.ask === 'DATE' && /^\\d{4}-\\d{2}-\\d{2}$/.test(o.value)) return { ...o, label: day(o.value) };\n  if (lang === 'mk') return { ...o, label: o.label.replace(/ min\\b/g, ' мин').replace(/ per person/g, ' по лице') };\n  return o;\n}\nconst options = (turn.options || []).map(localLabel);\nfunction serviceLines() {\n  return (business.services || []).map(s => `• ${s.name}, ${s.durationMinutes} ${lang === 'mk' ? 'мин' : 'min'}, ${money(s.price, s.currency)}${s.pricePerParticipant ? (lang === 'mk' ? ' по лице' : ' per person') : ''}`).join('\\n');\n}\nconst HOURS_MK = { Mon: 'пон', Tue: 'вто', Wed: 'сре', Thu: 'чет', Fri: 'пет', Sat: 'саб', Sun: 'нед' };\nconst hours = () => lang === 'mk' ? String(business.openingHours || '').replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\\b/g, d => HOURS_MK[d]).replace('Closed', 'затворено') : (business.openingHours || '');\n\n// --- Answers to questions in between ---------------------------------------------\nconst lower = ' ' + message.toLowerCase().split(/[^\\p{L}\\p{N}]+/u).join(' ') + ' ';\nconst asks = (...p) => p.some(x => lower.includes(' ' + x + ' '));\nconst answers = [];\nif (asks('price', 'prices', 'cost', 'costs', 'how much', 'cena', 'ceni', 'kolku cini', 'цена', 'цени', 'колку чини', 'колку чинат', 'ценовник', 'cenovnik')) {\n  answers.push((lang === 'mk' ? 'Нашите цени:\\n' : 'Our prices:\\n') + serviceLines());\n}\nif (business.address && asks('address', 'where', 'located', 'location', 'adresa', 'kade', 'адреса', 'каде', 'локација', 'lokacija')) {\n  answers.push(lang === 'mk' ? `Се наоѓаме на ${business.address}.` : `We're at ${business.address}.`);\n}\nif (business.openingHours && asks('hours', 'open', 'opening', 'close', 'closing', 'working', 'rabotno', 'rabotite', 'otvoreno', 'работно', 'работите', 'отворено')) {\n  answers.push((lang === 'mk' ? 'Работно време: ' : 'Opening hours: ') + hours());\n}\nconst thanked = asks('thanks', 'thank you', 'thx', 'fala', 'blagodaram', 'фала', 'благодарам');\n\n// --- Problems to mention first ----------------------------------------------------\nfunction problemText(p) {\n  const time = (p.message || '').match(/^(\\d{2}:\\d{2})/)?.[1];\n  const max = (p.message || '').match(/up to (\\d+)/)?.[1];\n  const T = {\n    TIME_NOT_AVAILABLE: { en: `Sorry, ${time || 'that time'} isn't free that day.`, mk: `За жал, ${time ? 'во ' + time : 'тој термин'} не е слободно тој ден.` },\n    NO_AVAILABILITY_ON_DATE: { en: \"Sorry, we're fully booked that day.\", mk: 'За жал, тој ден немаме слободни термини.' },\n    DATE_IN_PAST: { en: 'That date has already passed.', mk: 'Тој датум веќе помина.' },\n    NO_TIMES_IN_PREFERENCE: { en: 'Nothing is free at that time of day.', mk: 'Во тој дел од денот нема слободни термини.' },\n    SERVICE_NOT_FOUND: { en: \"Sorry, we don't offer that service.\", mk: 'За жал, таа услуга не ја нудиме.' },\n    SERVICE_AMBIGUOUS: { en: 'A few of our services match that.', mk: 'Повеќе наши услуги одговараат на тоа.' },\n    SERVICE_UNAVAILABLE: { en: \"Sorry, that service can't be booked right now.\", mk: 'За жал, таа услуга моментално не може да се закаже.' },\n    INVALID_PARTICIPANTS: { en: `That service is for up to ${max || 'a few'} people.`, mk: `Таа услуга е за најмногу ${max || 'неколку'} лица.` },\n    OPTION_NOT_RECOGNISED: { en: \"That number isn't on the list.\", mk: 'Тој број го нема во листата.' },\n    RESOURCE_NOT_AVAILABLE: { en: \"That choice isn't available at that time.\", mk: 'Тој избор не е слободен во тоа време.' },\n    INVALID_PHONE: { en: \"That phone number doesn't look right. Could you check it?\", mk: 'Телефонскиот број не изгледа точно. Може ли да го проверите?' },\n    DISCOUNT_INVALID: { en: \"That discount code can't be used, so I've left it off.\", mk: 'Тој код за попуст не може да се искористи, па не го додадов.' },\n    SLOT_JUST_TAKEN: { en: 'Sorry, someone just booked that time.', mk: 'За жал, некој штотуку го резервираше тој термин.' },\n    INVALID_CUSTOMER_DETAILS: { en: \"Something in your details didn't work. Could you send your phone number again?\", mk: 'Нешто не е во ред со податоците. Може ли повторно да го испратите телефонскиот број?' },\n    TEMPORARY_ERROR: { en: 'Sorry, something went wrong on our side.', mk: 'Извинете, нешто тргна наопаку кај нас.' },\n    RESCHEDULE_NOT_SUPPORTED: { en: `I can't move a booking in chat yet. You can cancel it and book a new time, or call us${callUs}.`, mk: `Не можам да преместам резервација преку порака. Можете да го откажете и да закажете нов, или јавете ни се${callUs}.` },\n  };\n  return T[p.code]?.[lang] ?? null;\n}\n\n// --- The message for each step ----------------------------------------------------\nconst svc = summary.serviceName || reservation?.serviceName || '';\nconst when = day(summary.date);\nconst at = summary.start || '';\n// The resource type is whatever the business configured: \"Employee\", \"Table\", \"Court\", \"Room\"...\n// People get \"who\"; anything else is named by its type.\nconst missing = turn.missingFields || [];\nconst resourceType = turn.ask === 'RESOURCE' ? String(missing[0] || '') : '';\nconst isPerson = /employee|staff|therap|stylist|specialist|master|doctor|barber|trainer|coach|teacher|instructor|person|вработ|терапевт|фризер|доктор|тренер|инструктор/i.test(resourceType);\nconst name = summary.customerName ? summary.customerName.split(' ')[0] : (turn.customer?.firstName || '');\n\nfunction bookingLines(r) {\n  const lines = [r.serviceName, `${day(r.date)}, ${r.start}–${r.end}`];\n  const chosen = (r.resources || []).map(x => x.name || x).filter(Boolean);\n  if (chosen.length) lines.push((lang === 'mk' ? 'Избрано: ' : 'Selected: ') + chosen.join(', '));\n  if (r.numberOfParticipants > 1) lines.push(lang === 'mk' ? `За ${r.numberOfParticipants} лица` : `For ${r.numberOfParticipants} people`);\n  return lines;\n}\nfunction step() {\n  const en = lang === 'en';\n  if (outcome) {\n    switch (outcome) {\n      case 'RESERVATION_CREATED': {\n        const r = reservation || {};\n        // Only what the customer chose; rooms or chairs the business assigns stay internal.\n        const lines = bookingLines({ serviceName: r.serviceName || svc, date: r.date || summary.date, start: r.start || at, end: r.end || summary.end, resources: summary.resources || [], numberOfParticipants: r.numberOfParticipants || summary.numberOfParticipants });\n        return en\n          ? `You're booked! ✅\\n\\n${lines.join('\\n')}\\nBooking number: ${r.id}\\n\\nSee you then! If you need to cancel, just message us here.`\n          : `Резервирано! ✅\\n\\n${lines.join('\\n')}\\nБрој на резервација: ${r.id}\\n\\nВе очекуваме! Ако треба да откажете, само пишете ни тука.`;\n      }\n      case 'RESERVATION_CANCELLED':\n        return en ? `Done, your ${reservation?.serviceName || 'booking'} on ${day(reservation?.date)} at ${reservation?.start} is cancelled. We hope to see you another time!`\n          : `Готово, вашата резервација (${reservation?.serviceName || ''}, ${day(reservation?.date)} во ${reservation?.start}) е откажана. Се надеваме дека ќе се видиме друг пат!`;\n      case 'BOOKING_ABANDONED':\n        return en ? \"No problem, I've stopped the booking. Message us any time you'd like to book.\" : 'Нема проблем, ја прекинав резервацијата. Пишете ни кога и да сакате да резервирате.';\n      case 'CANCELLATION_ABORTED':\n        return en ? 'Okay, your booking stays as it is.' : 'Во ред, вашата резервација останува како што е.';\n      case 'NO_UPCOMING_RESERVATIONS':\n        return en ? `I couldn't find any upcoming bookings made from this account. If you booked another way, please call us${callUs}.`\n          : `Не најдов претстојни резервации направени од овој профил. Ако сте резервирале на друг начин, јавете ни се${callUs}.`;\n      case 'CANCELLATION_NOT_ALLOWED':\n        return en ? `This booking can't be cancelled here any more. Please call us${callUs} and we'll help you.`\n          : `Оваа резервација веќе не може да се откаже тука. Ве молам јавете ни се${callUs} и ќе ви помогнеме.`;\n      case 'CANCELLATION_FAILED':\n        return en ? `Sorry, I couldn't cancel it just now. Please try again in a moment, or call us${callUs}.`\n          : `Извинете, не успеав да ја откажам во моментов. Обидете се повторно за малку, или јавете ни се${callUs}.`;\n    }\n  }\n  switch (turn.ask) {\n    case 'SERVICE':\n      return en ? `Which service would you like to book?\\n\\n${list(options)}\\n\\nJust reply with the number.` : `Која услуга сакате да ја закажете?\\n\\n${list(options)}\\n\\nОдговорете само со бројот.`;\n    case 'PARTICIPANTS': {\n      const max = summary.maxParticipants > 1 ? summary.maxParticipants : null;\n      return en ? `How many people is the ${svc} for?${max ? ` (up to ${max})` : ''}` : `За колку лица е ${svc}?${max ? ` (најмногу ${max})` : ''}`;\n    }\n    case 'DATE':\n      if (options.length) return en ? `These are the next days with free times:\\n\\n${list(options)}\\n\\nReply with the number, or tell me another day.` : `Ова се следните денови со слободни термини:\\n\\n${list(options)}\\n\\nОдговорете со бројот или напишете друг ден.`;\n      return en ? `What day would you like to book ${svc} for?` : `За кој ден би сакале да резервирате ${svc}?`;\n    case 'TIME':\n      return en ? `Here are the free times for ${svc} on ${when}:\\n\\n${list(options)}\\n\\nReply with the number or the time that suits you.` : `Слободни термини за ${svc}, ${when}:\\n\\n${list(options)}\\n\\nОдговорете со бројот или со часот што ви одговара.`;\n    case 'RESOURCE': {\n      const type = resourceType.toLowerCase();\n      if (isPerson) return en ? `Who would you like for your ${svc} on ${when} at ${at}?\\n\\n${list(options)}\\n\\nReply with the number or the name, or say \"no preference\".` : `Кај кого би сакале да резервирате (${svc}, ${when} во ${at})?\\n\\n${list(options)}\\n\\nОдговорете со бројот или името, или напишете „сеедно“.`;\n      return en ? `Which ${type || 'option'} would you like for ${svc} on ${when} at ${at}?\\n\\n${list(options)}\\n\\nReply with the number or the name, or say \"no preference\".` : `Изберете${type ? ' ' + type : ''} (${svc}, ${when} во ${at}):\\n\\n${list(options)}\\n\\nОдговорете со бројот или името, или напишете „сеедно“.`;\n    }\n    case 'CUSTOMER_INFO':\n      if (missing.includes('firstName') && missing.includes('phone')) return en ? `Almost done! To book ${svc} on ${when} at ${at}, I just need your first name and phone number.` : `Уште малку! За да ја направам резервацијата (${svc}, ${when} во ${at}), ми требаат вашето име и телефонски број.`;\n      if (missing.includes('phone')) return en ? `Thanks${name ? ', ' + name : ''}! And what's your phone number?` : `Ви благодарам${name ? ', ' + name : ''}! Кој е вашиот телефонски број?`;\n      return en ? 'Thanks! And what name should I put the booking under?' : 'Ви благодарам! На кое име да ја запишам резервацијата?';\n    case 'CONFIRMATION': {\n      const lines = bookingLines({ serviceName: svc, date: summary.date, start: at, end: summary.end, resources: summary.resources, numberOfParticipants: summary.numberOfParticipants });\n      if (summary.customerName) lines.push((en ? 'Name: ' : 'Име: ') + summary.customerName);\n      const p = summary.price;\n      if (p) {\n        const discounted = p.discountAmount && Number(p.discountAmount) > 0;\n        lines.push((en ? 'Price: ' : 'Цена: ') + money(p.finalPrice, p.currency) + (discounted ? (en ? ` (instead of ${money(p.originalPrice, p.currency)})` : ` (наместо ${money(p.originalPrice, p.currency)})`) : ''));\n      }\n      return en ? `Here's your booking:\\n\\n${lines.join('\\n')}\\n\\nShall I confirm it? Reply yes or no.` : `Еве ја вашата резервација:\\n\\n${lines.join('\\n')}\\n\\nДа ја потврдам? Одговорете со да или не.`;\n    }\n    case 'CANCEL_SELECTION': {\n      const rs = turn.reservations || [];\n      const opts = options.map(o => { const r = rs.find(x => String(x.id) === String(o.value)); return r ? { ...o, label: `${r.serviceName}, ${day(r.date)} ${en ? 'at' : 'во'} ${r.start}` } : o; });\n      return en ? `Which booking would you like to cancel?\\n\\n${list(opts)}\\n\\nReply with the number.` : `Која резервација сакате да ја откажете?\\n\\n${list(opts)}\\n\\nОдговорете со бројот.`;\n    }\n    case 'CANCEL_CONFIRMATION': {\n      const r = reservation || {};\n      return en ? `You have ${r.serviceName} on ${day(r.date)} at ${r.start}. Do you want me to cancel it? Reply yes or no.` : `Имате резервација за ${r.serviceName}, ${day(r.date)} во ${r.start}. Дали сакате да ја откажам? Одговорете со да или не.`;\n    }\n  }\n  // Nothing in progress: answer, thank, or introduce what the bot does.\n  if (answers.length) return en ? 'Would you like to make a booking?' : 'Дали сакате да направите резервација?';\n  if (thanked) return en ? \"You're welcome! 😊\" : 'Нема на што! 😊';\n  return en ? `Welcome to ${business.name || 'us'}! I can make a booking for you right here.\\n\\nWe offer:\\n${serviceLines()}\\n\\nJust tell me what you'd like and when.`\n    : `Добредојдовте во ${business.name || 'нас'}! Можам да направам резервација за вас веднаш тука.\\n\\nНудиме:\\n${serviceLines()}\\n\\nСамо напишете што сакате и кога.`;\n}\n\n// Greeting and short notes go in front of the step, on one line; longer blocks get their own paragraph.\nconst prefix = [];\nif (!context.conversationId && !outcome && !(turn.ask === 'NOTHING' && (answers.length || thanked))) prefix.push(lang === 'mk' ? 'Здраво!' : 'Hi!');\nconst sameQuestion = context.conversationId && turn.ask === context.asked && !outcome;\nif (sameQuestion && !Object.keys(extracted).length && !problems.length && !answers.length) {\n  prefix.push(lang === 'mk' ? 'Извинете, не ве разбрав добро.' : \"Sorry, I didn't quite catch that.\");\n}\nfor (const p of problems) { const t = problemText(p); if (t) prefix.push(t); }\nconst blocks = [prefix.join(' '), ...answers, step()].filter(Boolean);\nconst templateReply = blocks.some(b => b.includes('\\n')) || blocks.length > 2 ? blocks.join('\\n\\n') : blocks.join(' ');\n\n// Optional: let a language model rephrase the same facts (REPLY_WRITER=llm).\nconst LANGUAGE_NAME = { en: 'English', mk: 'Macedonian' };\nconst modelFacts = { ...facts, customerLanguage: LANGUAGE_NAME[lang], conversationStarted: !!context.conversationId };\nconst system = \"You write the next chat message from a business to its customer on Instagram or Facebook Messenger. You are the business's friendly booking assistant: warm, brief, natural — never robotic, never stiff.\\n\\nYou are given FACTS from the booking system and a DRAFT reply that is already correct. Rephrase the draft naturally in customerLanguage without changing any fact, number, time, name or option. Keep the numbered options exactly as in the draft. Do not greet again when conversationStarted is true. Never say a booking is made unless the draft says so. Plain text only, no markdown, at most one emoji, under 700 characters. Return only the message text.\";\nconst content = `CUSTOMER WROTE: ${message.slice(0, 2000)}\\n\\nFACTS:\\n${JSON.stringify(modelFacts, null, 1)}\\n\\nDRAFT:\\n${templateReply}`;\nconst claudeModel = $env.CLAUDE_MODEL || 'claude-opus-5-5';\nconst tuned = !claudeModel.startsWith('claude-haiku');\nreturn [{ json: {\n  useModel,\n  templateReply,\n  anthropicRequest: { model: claudeModel, max_tokens: 4000, ...(tuned ? { fallbacks: 'default', output_config: { effort: 'low' } } : {}), system, messages: [{ role: 'user', content }] },\n  ollamaRequest: { model: $env.OLLAMA_MODEL || 'qwen2.5:7b-instruct', stream: false, keep_alive: '30m', options: { temperature: 0.3, num_ctx: 8192 }, messages: [{ role: 'system', content: system }, { role: 'user', content }] },\n} }];\n"
+      },
+      "id": "turn-20",
+      "name": "Prepare reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prepared = $('Prepare reply').first().json;\nlet reply = null;\nif (prepared.useModel) {\n  const response = $input.first().json;\n  if (response.statusCode === 200 && response.body?.stop_reason !== 'refusal') {\n    reply = (response.body.message?.content ?? (response.body.content || []).filter(b => b.type === 'text').map(b => b.text).join('')).trim();\n  }\n}\n// The template is always correct; it is also the fallback when the model fails.\nreply = reply || prepared.templateReply || \"Sorry, I'm having trouble checking availability right now. Please try again in a few minutes.\";\nreturn [{ json: { reply: reply.slice(0, 1900), fallback: prepared.fallback === true } }];\n"
+      },
+      "id": "turn-21",
+      "name": "Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ ($env.LLM_PROVIDER || 'anthropic') === 'ollama' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "turn-22",
+      "name": "Local model? (understand message)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com' }}/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={{ JSON.stringify(Object.assign({ 'anthropic-version': '2023-06-01' }, $json.anthropicRequest.fallbacks ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {}, $env.ANTHROPIC_WORKSPACE_ID ? { 'anthropic-workspace-id': $env.ANTHROPIC_WORKSPACE_ID } : {})) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.anthropicRequest) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "turn-23",
+      "name": "Claude: understand message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        120
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "bkAnthropicCred1",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OLLAMA_URL || 'http://ollama:11434' }}/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.ollamaRequest) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 600000
+        }
+      },
+      "id": "turn-24",
+      "name": "Ollama: understand message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ ($env.LLM_PROVIDER || 'anthropic') === 'ollama' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "turn-25",
+      "name": "Local model? (write reply)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3340,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com' }}/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={{ JSON.stringify(Object.assign({ 'anthropic-version': '2023-06-01' }, $json.anthropicRequest.fallbacks ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {}, $env.ANTHROPIC_WORKSPACE_ID ? { 'anthropic-workspace-id': $env.ANTHROPIC_WORKSPACE_ID } : {})) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.anthropicRequest) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "turn-26",
+      "name": "Claude: write reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3560,
+        120
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "bkAnthropicCred1",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OLLAMA_URL || 'http://ollama:11434' }}/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.ollamaRequest) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 600000
+        }
+      },
+      "id": "turn-27",
+      "name": "Ollama: write reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3560,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.rulesUnderstood }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "turn-28",
+      "name": "Rules understood it?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.useModel }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "turn-29",
+      "name": "Write with a model?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3340,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "When called by another workflow": {
+      "main": [
+        [
+          {
+            "node": "Who am I",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Who am I": {
+      "main": [
+        [
+          {
+            "node": "Get conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get conversation": {
+      "main": [
+        [
+          {
+            "node": "Prepare understanding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare understanding": {
+      "main": [
+        [
+          {
+            "node": "Rules understood it?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local model? (understand message)": {
+      "main": [
+        [
+          {
+            "node": "Ollama: understand message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claude: understand message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: understand message": {
+      "main": [
+        [
+          {
+            "node": "Prepare turn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama: understand message": {
+      "main": [
+        [
+          {
+            "node": "Prepare turn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare turn": {
+      "main": [
+        [
+          {
+            "node": "Submit turn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit turn": {
+      "main": [
+        [
+          {
+            "node": "Check turn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check turn": {
+      "main": [
+        [
+          {
+            "node": "Next action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next action": {
+      "main": [
+        [
+          {
+            "node": "Booking request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cancellation request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking request": {
+      "main": [
+        [
+          {
+            "node": "Create reservation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create reservation": {
+      "main": [
+        [
+          {
+            "node": "After booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "After booking": {
+      "main": [
+        [
+          {
+            "node": "Booked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booked?": {
+      "main": [
+        [
+          {
+            "node": "Prepare reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancellation request": {
+      "main": [
+        [
+          {
+            "node": "Cancel reservation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel reservation": {
+      "main": [
+        [
+          {
+            "node": "After cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "After cancellation": {
+      "main": [
+        [
+          {
+            "node": "Cancelled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancelled?": {
+      "main": [
+        [
+          {
+            "node": "Prepare reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report failure": {
+      "main": [
+        [
+          {
+            "node": "Fresh options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fresh options": {
+      "main": [
+        [
+          {
+            "node": "Prepare reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare reply": {
+      "main": [
+        [
+          {
+            "node": "Write with a model?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local model? (write reply)": {
+      "main": [
+        [
+          {
+            "node": "Ollama: write reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claude: write reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: write reply": {
+      "main": [
+        [
+          {
+            "node": "Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama: write reply": {
+      "main": [
+        [
+          {
+            "node": "Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rules understood it?": {
+      "main": [
+        [
+          {
+            "node": "Prepare turn",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Local model? (understand message)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write with a model?": {
+      "main": [
+        [
+          {
+            "node": "Local model? (write reply)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "description": "One customer message in, one reply out. Rules (or a language model, as a fallback) read the message, the booking platform decides everything in between, and the reply comes from fixed templates in the customer's language."
+  },
+  "tags": []
+}

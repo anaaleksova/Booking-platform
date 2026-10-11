@@ -16,6 +16,7 @@ const ADMIN_PAGES = [
   () => import('@/pages/admin/DiscountsPage'),
   () => import('@/pages/admin/RevenuePage'),
   () => import('@/pages/admin/AnalyticsPage'),
+  () => import('@/pages/admin/IntegrationsPage'),
   () => import('@/pages/admin/SettingsPage'),
 ];
 

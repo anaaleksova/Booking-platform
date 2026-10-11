@@ -71,6 +71,17 @@ public final class AnalyticsDtos {
                                       long availableMinutes, double utilization) {
     }
 
+    /**
+     * One reservation channel. Counts exclude cancellations; revenue follows
+     * the revenue definition.
+     *
+     * @param share        of all non-cancelled reservations in the range, 0..1
+     * @param revenueShare of all revenue in the range, 0..1
+     */
+    public record SourceStat(String source, long reservations, double share, BigDecimal revenue,
+                             double revenueShare) {
+    }
+
     public record TopCustomer(Long customerId, String name, long reservations, BigDecimal spent) {
     }
 

@@ -14,6 +14,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -87,6 +88,14 @@ public class GlobalExceptionHandler {
                 .body(ApiErrorResponse.of(ErrorCode.MALFORMED_REQUEST,
                         "The request could not be read. Check the payload and parameter types.",
                         request.getRequestURI()));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ApiErrorResponse> handleMissingHeader(MissingRequestHeaderException ex,
+                                                                HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiErrorResponse.of(ErrorCode.VALIDATION_FAILED,
+                        "The " + ex.getHeaderName() + " header is required.", request.getRequestURI()));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

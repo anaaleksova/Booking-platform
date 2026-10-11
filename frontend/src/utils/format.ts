@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import type { DayInterval, DiscountState, ReservationStatus } from '@/types/api';
+import type { DayInterval, DiscountState, ReservationSource, ReservationStatus } from '@/types/api';
 
 /**
  * Formatting helpers.
@@ -90,6 +90,23 @@ export const STATUS_COLORS: Record<ReservationStatus, 'default' | 'primary' | 's
   CONFIRMED: 'primary',
   CANCELLED: 'error',
   COMPLETED: 'success',
+};
+
+export const SOURCE_LABELS: Record<ReservationSource, string> = {
+  WEB: 'Website',
+  ADMIN: 'Admin',
+  INSTAGRAM: 'Instagram',
+  FACEBOOK: 'Facebook',
+  API: 'API',
+};
+
+/** How a reservation was made, as a phrase: "Booked · online by the customer". */
+export const SOURCE_DESCRIPTIONS: Record<ReservationSource, string> = {
+  WEB: 'online by the customer',
+  ADMIN: 'by the business',
+  INSTAGRAM: 'by the customer via Instagram',
+  FACEBOOK: 'by the customer via Facebook',
+  API: 'through the API',
 };
 
 export const DISCOUNT_STATE_LABELS: Record<DiscountState, string> = {

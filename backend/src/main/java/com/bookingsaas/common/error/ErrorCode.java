@@ -60,6 +60,10 @@ public enum ErrorCode {
     CANCELLATION_NOT_ALLOWED(HttpStatus.FORBIDDEN),
     CANCELLATION_DEADLINE_PASSED(HttpStatus.UNPROCESSABLE_ENTITY),
 
+    // --- integrations -----------------------------------------------------
+    /** An Idempotency-Key sent again with a different request body. */
+    IDEMPOTENCY_KEY_REUSED(HttpStatus.UNPROCESSABLE_ENTITY),
+
     // --- discounts --------------------------------------------------------
     DUPLICATE_DISCOUNT_CODE(HttpStatus.CONFLICT),
     DISCOUNT_INVALID(HttpStatus.UNPROCESSABLE_ENTITY),

@@ -1,0 +1,207 @@
+{
+  "id": "bkInstagramPoll0",
+  "name": "BOOKING - Instagram Inbox Poller",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## BOOKING - Instagram Inbox Poller\nFallback for when Meta does not deliver the `messages` webhook: every 20 seconds it reads the Page's Instagram conversations and hands each new customer message to **Instagram Reply** without waiting, so a slow model reply never makes the next poll pick the same message up again.\nUses the **Meta Page Access Token** credential. Unpublish this workflow once the webhook in **Incoming Social Message** works, or customers get two replies.",
+        "width": 560,
+        "height": 220
+      },
+      "id": "poll-01",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 20
+            }
+          ]
+        }
+      },
+      "id": "poll-02",
+      "name": "Every 20 seconds",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/{{ $env.META_GRAPH_VERSION || 'v21.0' }}/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "instagram_business_account"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "poll-03",
+      "name": "Get Instagram account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "bkMetaPageToken1",
+          "name": "Meta Page Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/{{ $env.META_GRAPH_VERSION || 'v21.0' }}/me/conversations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "instagram"
+            },
+            {
+              "name": "fields",
+              "value": "updated_time,messages.limit(5){message,from,created_time}"
+            },
+            {
+              "name": "limit",
+              "value": "10"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "poll-04",
+      "name": "Get conversations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "bkMetaPageToken1",
+          "name": "Meta Page Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Turns new customer DMs into conversation turns. Seen message ids live in the workflow's\n// static data; the first run only records what is already there, so old DMs are not answered.\nconst own = $('Get Instagram account').first().json.instagram_business_account?.id;\nconst conversations = $input.first().json.data || [];\nconst store = $getWorkflowStaticData('global');\nconst firstRun = !store.seen;\nstore.seen = store.seen || {};\nconst cutoff = Date.now() - 15 * 60 * 1000;\nconst out = [];\nfor (const conversation of conversations) {\n  const messages = [...(conversation.messages?.data || [])].reverse();   // oldest first\n  for (const m of messages) {\n    if (store.seen[m.id]) continue;\n    store.seen[m.id] = Date.now();\n    if (firstRun || !own) continue;\n    if (!m.message || !m.from?.id || m.from.id === own) continue;      // our own replies\n    if (new Date(m.created_time).getTime() < cutoff) continue;\n    out.push({ json: { provider: 'INSTAGRAM', externalUserId: m.from.id, recipientId: m.from.id, displayName: m.from.username || null, text: m.message, mid: m.id } });\n  }\n}\nconst ids = Object.keys(store.seen);\nif (ids.length > 1000) ids.sort((a, b) => store.seen[a] - store.seen[b]).slice(0, ids.length - 500).forEach(id => delete store.seen[id]);\nreturn out;\n"
+      },
+      "id": "poll-05",
+      "name": "Read new messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkInstagramReply",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "poll-06",
+      "name": "Answer in background",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Every 20 seconds": {
+      "main": [
+        [
+          {
+            "node": "Get Instagram account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Instagram account": {
+      "main": [
+        [
+          {
+            "node": "Get conversations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get conversations": {
+      "main": [
+        [
+          {
+            "node": "Read new messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read new messages": {
+      "main": [
+        [
+          {
+            "node": "Answer in background",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "description": "Polls the Instagram inbox every 20 seconds and answers new DMs; a fallback for the Meta messages webhook."
+  },
+  "tags": []
+}

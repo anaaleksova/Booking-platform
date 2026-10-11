@@ -1,0 +1,109 @@
+{
+  "id": "bkPrivacyPolicy0",
+  "name": "BOOKING - Privacy Policy",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## BOOKING - Privacy Policy\nPublic page at `GET /webhook/privacy` for the Meta app settings (Privacy Policy URL and data deletion instructions).\nSet `PRIVACY_BUSINESS_NAME` and `PRIVACY_CONTACT_EMAIL` in `.env` to show your own name and contact.",
+        "width": 520,
+        "height": 160
+      },
+      "id": "privacy-01",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "privacy",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "privacy-02",
+      "name": "Privacy page",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "privacy-policy-get"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst contact = ($env.PRIVACY_CONTACT_EMAIL || '').trim();\nconst business = ($env.PRIVACY_BUSINESS_NAME || 'BookingApp').trim();\nconst esc = s => String(s).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));\nconst contactLine = contact\n  ? 'email us at <a href=\"mailto:' + esc(contact) + '\">' + esc(contact) + '</a>'\n  : 'send us a direct message on our Instagram account';\nconst html = '<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Privacy Policy - ' + esc(business) + '</title>' +\n'<style>body{font:16px/1.6 system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 16px;color:#1f2933}h1{font-size:28px}h2{font-size:19px;margin-top:28px}a{color:#0b63c5}</style></head><body>' +\n'<h1>Privacy Policy</h1><p>Last updated: 8 October 2026</p>' +\n'<p>This policy explains how ' + esc(business) + ' (\"we\", \"us\") handles personal data when you book a reservation with us through our website or by messaging our Instagram or Facebook account.</p>' +\n'<h2>What we collect</h2><ul>' +\n'<li><b>Messages you send us</b> on Instagram or Messenger, and the platform-issued ID of your account (we cannot see your password or private profile data).</li>' +\n'<li><b>Booking details</b> you give us: name, phone number, email address, the service, date, time and party size you want.</li>' +\n'<li><b>Reservation history</b>: your past and upcoming bookings with us.</li></ul>' +\n'<h2>How we use it</h2><ul>' +\n'<li>To understand your request, check availability, and create, change or cancel your reservation.</li>' +\n'<li>To send confirmations and reminders about your booking.</li>' +\n'<li>To keep records of our bookings and to improve our service.</li></ul>' +\n'<p>We do not sell your data and we do not use it for advertising.</p>' +\n'<h2>Who processes it</h2><p>Your messages are received through Meta (Instagram and Facebook) and processed by our booking system and automation tools. An automated language model is used to read your message and write the reply; it only receives what is needed to handle the conversation. These providers act on our instructions. Meta handles your data under its own privacy policy.</p>' +\n'<h2>How long we keep it</h2><p>We keep conversation and booking data for as long as needed to manage your reservations and meet legal obligations, and delete it when it is no longer needed or when you ask us to.</p>' +\n'<h2>Your rights and deleting your data</h2><p>You can ask us at any time to see, correct or delete the data we hold about you, including your conversation history. To do so, ' + contactLine + ', and tell us the account or phone number you used to book. We will confirm once your data has been deleted, normally within 30 days.</p>' +\n'<h2>Security</h2><p>Access to our booking system is restricted and connections are encrypted. No system is perfectly secure, but we take reasonable steps to protect your data.</p>' +\n'<h2>Changes</h2><p>We may update this policy and will change the date above when we do.</p>' +\n'<h2>Contact</h2><p>Questions about this policy: ' + contactLine + '.</p></body></html>';\nreturn [{ json: { html } }];\n"
+      },
+      "id": "privacy-03",
+      "name": "Build page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "privacy-04",
+      "name": "Return page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Privacy page": {
+      "main": [
+        [
+          {
+            "node": "Build page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build page": {
+      "main": [
+        [
+          {
+            "node": "Return page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "description": "Serves the public privacy policy page that Meta requires for the app."
+  },
+  "tags": []
+}

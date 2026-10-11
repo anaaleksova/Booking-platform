@@ -322,6 +322,194 @@ discount expired …) and 500 unexpected.
 
 ---
 
+## Automation and social booking (n8n)
+
+Customers can book and cancel by messaging the business on Instagram or
+Facebook. **n8n** connects the platform to those channels, and **Claude**
+(called from n8n) reads each message and writes the replies. The platform stays
+the single source of truth:
+
+```text
+Customer ─▶ Instagram / Messenger ─▶ n8n ──REST──▶ /api/integrations ─▶ reservation engine ─▶ PostgreSQL
+                                      ▲                                         │
+                                      └──── signed webhooks (events) ◀──────────┘
+```
+
+| Who | Does |
+|---|---|
+| Claude (in n8n) | Turns a message into fields ("couples massage", "tomorrow", option 2, "yes"), and writes a natural reply from the facts it is given. It never decides what is free, what it costs, or whether something can be booked. |
+| n8n | Receives messages and events, calls the API, sends replies. It holds no booking rules. |
+| Platform | Owns the conversation state (`integration_conversation`), availability, resource assignment, price, discounts, cancellation policy and the reservation itself. |
+
+### How a chat booking works
+
+Each incoming message is one **turn**:
+
+1. `GET …/conversations/current`: where the chat stands (last question, numbered options offered, today's date in the business timezone).
+2. Claude extracts structured fields (JSON schema output, low effort).
+3. `POST …/conversations/turn`: the platform merges the fields into the
+   stored state, checks them against the real engines and answers with what to
+   ask next. That is `ask` plus numbered `options`, `problems` (a taken time, a
+   date in the past), and a `summary` with the server's price.
+4. Only when the customer answers **yes to a summary they have already been
+   shown**, unchanged, does the turn return `nextAction: CREATE_RESERVATION`
+   with the exact request and an `Idempotency-Key`. A time that is only
+   mentioned never books anything.
+5. n8n calls `POST …/reservations`. If the slot was taken in the meantime it
+   reports `…/action-failed`, and the platform steps back to fresh times.
+6. Claude writes the reply from those facts only.
+
+Cancelling works the same way: the customer's upcoming reservations, which one,
+a confirmation, then `nextAction: CANCEL_RESERVATION`. The business's
+cancellation policy applies exactly as on the website.
+
+### Integration API
+
+All endpoints are under `/api/integrations` and accept **only integration
+tokens** (`Authorization: Bearer bkp_…`), created by the owner in **Admin →
+Integrations**:
+- Each token belongs to one business.
+- Each token carries its own permissions (`READ_SERVICES`, `READ_AVAILABILITY`,
+  `CREATE_RESERVATION`, `CANCEL_RESERVATION`, `READ_CUSTOMER`, `CREATE_CUSTOMER`,
+  `MANAGE_CONVERSATIONS`, …).
+- Only a SHA-256 of the token is stored.
+- Tokens cannot open the admin API, and user sessions cannot open this one.
+
+| Endpoint | |
+|---|---|
+| `GET /me` | The business and permissions behind the token |
+| `GET /businesses/{id}` · `/services` · `/services/{sid}` | Business facts and the booking page's services |
+| `GET /businesses/{id}/availability?serviceId&date&numberOfParticipants` | Free start times, from the website's engine |
+| `POST /businesses/{id}/quote` | The server's price, validating a discount code |
+| `POST /businesses/{id}/customers` · `GET …/customers?provider&externalUserId` | Find or create the customer behind a social user |
+| `POST /businesses/{id}/reservations` | Create; **`Idempotency-Key` required** (a repeat returns the first reservation, 200 + `Idempotent-Replayed: true`) |
+| `GET /businesses/{id}/reservations/{rid}` · `POST …/{rid}/cancel` | Read; cancel under the customer policy (repeat-safe) |
+| `GET …/conversations/current` · `POST …/conversations/turn` · `POST …/conversations/{cid}/action-failed` | Chat conversations |
+
+Full schemas are in Swagger (`/swagger-ui.html`, tag *Integrations*).
+
+Social users are linked to customers through `customer_external_identity`.
+A social user is linked only to a customer record created for them. Contact
+details typed into a chat are not verified, so someone entering another
+person's phone number cannot see or cancel that person's bookings.
+
+Reservations record their **source**: `WEB`, `ADMIN`, `INSTAGRAM`, `FACEBOOK`
+or `API`. They appear in the admin panel like any other. **Analytics →
+Reservations by channel** shows the count and revenue for each source.
+
+The platform logs every automated step with
+`business=… token=… execution=… conversation=… externalUser=…`, taken from the
+headers n8n sends, so you can follow one booking through the logs.
+
+### Events to n8n
+
+When a reservation is created, cancelled or rescheduled, the platform writes an
+event to the `integration_event` table **in the same transaction**. A worker
+then posts it to the n8n webhook:
+- It retries with backoff for up to 8 attempts.
+- It schedules `reservation.reminder_due` for the business's reminder lead time.
+- Each body is small (`event`, `deliveryId`, `reservationId`), and n8n fetches
+  the details with its token.
+- Deliveries are signed as `X-Booking-Signature: sha256=HMAC(secret, "<X-Booking-Timestamp>.<body>")`.
+
+Admin → Integrations shows recent deliveries.
+
+### Running n8n locally
+
+1. **Start it:**
+   ```bash
+   docker compose --profile n8n up -d n8n
+   ```
+   The editor is at <http://localhost:5678>. Create the owner account the first
+   time. Workflows are mounted read-only at `/workflows` in the container.
+
+2. **Platform side:** sign in as the business owner, open **Admin →
+   Integrations** and:
+   - Create an **API token** with all permissions, and copy it (it is shown once).
+   - Under **n8n**, enter `http://localhost:5678/webhook/booking-events`,
+     switch on *Send events to n8n* and save. Copy the **signing secret**.
+     If the backend runs in Docker too (`--profile full`), use
+     `http://n8n:5678/webhook/booking-events` instead.
+
+3. **Configure n8n** with environment variables, in a `.env` file next to
+   `docker-compose.yml`. Then recreate the container with
+   `docker compose --profile n8n up -d n8n`.
+
+   | Variable | Value |
+   |---|---|
+   | `BOOKING_API_URL` | `http://host.docker.internal:8080/api/integrations` (default; `http://backend:8080/api/integrations` with `--profile full`) |
+   | `BOOKING_WEBHOOK_SECRET` | The signing secret from step 2 |
+   | `META_VERIFY_TOKEN` | Any string; the same value goes into the Meta app's webhook settings |
+   | `META_APP_SECRET` | The Meta app secret (checks the `X-Hub-Signature-256` signature on incoming messages) |
+   | `ANTHROPIC_BASE_URL` | Optional; only for a proxy in front of the Claude API |
+   | `ANTHROPIC_WORKSPACE_ID` | Only if your API key is not scoped to a workspace (the API then answers "must include the anthropic-workspace-id header") |
+
+4. **Credentials** (n8n → *Credentials* → *Add credential*). Keep these exact
+   names, because the workflows refer to them:
+   - **Booking Platform API**, type *Header Auth*: name `Authorization`, value `Bearer bkp_…`.
+   - **Anthropic account**, type *Anthropic*: your Claude API key.
+   - **Meta Page Access Token**, type *Query Auth*: name `access_token`, value
+     the Page access token (needed only for real Instagram/Messenger sending).
+
+5. **Import the workflows:**
+   ```bash
+   docker exec booking-n8n n8n import:workflow --separate --input=/workflows
+   ```
+   (In Git Bash, prefix with `MSYS_NO_PATHCONV=1`.) Or use *Import from file*
+   in the editor with the files in [n8n/workflows](n8n/workflows). Open each
+   workflow and select the credentials if n8n asks. Then **publish (activate)
+   all nine**: n8n 2.x runs only published sub-workflows.
+
+   | Workflow | Role |
+   |---|---|
+   | BOOKING - Incoming Social Message | Meta webhook (`/webhook/social/meta`, GET verify + POST messages) and a test chat (`/webhook/social/test`) |
+   | BOOKING - Conversation Turn | Context → Claude (understand) → turn → create/cancel → Claude (reply) |
+   | BOOKING - Create Reservation / Cancel Reservation | One API call each, with idempotency and error mapping |
+   | BOOKING - Send Message | Sends through the Graph API (`/me/messages`); TEST messages are only logged |
+   | BOOKING - Reservation Events | Verifies the signature, drops duplicate deliveries, routes the event |
+   | BOOKING - Confirmation / Reminder / Cancellation Notice | Message the customer on their chat channel. A booking or cancellation the customer made in that chat is not announced twice. |
+
+   Both Claude calls use `claude-opus-5-5` at low effort, with
+   `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`). If a model
+   declines, the request is retried on another model. If Claude or the platform
+   is unreachable, the customer gets a polite "please try again" message, never
+   an error.
+
+6. **Test without Instagram:**
+   ```bash
+   curl -X POST http://localhost:5678/webhook/social/test \
+        -H "Content-Type: application/json" \
+        -d '{"userId":"tester-1","message":"Hi, I want to book a couples massage tomorrow"}'
+   ```
+   The reply comes back in the response. Keep sending messages with the same
+   `userId` ("2", "17:30", "Ana, +389 70 123 456", "yes"). The reservation then
+   appears in the admin panel with source *API*. Use *Send test event* on the
+   Integrations page to check the event webhook.
+
+7. **Connect Instagram / Facebook:**
+   - In a Meta developer app with Messenger and Instagram messaging, set the
+     webhook callback to `https://<public n8n host>/webhook/social/meta`, using
+     the verify token from step 3, and subscribe to `messages`.
+   - Meta needs a public HTTPS URL. Locally, use a tunnel (for example
+     `ngrok http 5678`) and set `N8N_WEBHOOK_URL` to it.
+   - Enter the account or Page id in Admin → Integrations → Instagram/Facebook
+     and switch on *Take bookings here*.
+   - "Connect with Meta" (OAuth) is not built yet. The model stores the
+     connection per provider so it can be added later.
+
+**Meta's messaging window:** businesses can freely message a user within 24
+hours of that user's last message. Reminders and notices usually fall outside
+that window. On Messenger they are sent with the `CONFIRMED_EVENT_UPDATE` tag.
+Instagram has no equivalent tag, so Instagram reminders only arrive while the
+window is open.
+
+**In production:**
+- Set `INTEGRATIONS_BLOCK_PRIVATE_WEBHOOKS=true`, so a business cannot point
+  webhooks at internal addresses.
+- Set `INTEGRATIONS_PUBLIC_API_URL` to the public API address shown to admins.
+
+---
+
 ## Tests
 
 ```bash
@@ -341,6 +529,12 @@ cd backend
     moving a reservation, customer recognition
   - revenue and analytics
   - multi-tenant isolation
+  - integration API: token scope and permissions, idempotent creation
+    (including simultaneous retries), social identities, cancellation policy,
+    events, analytics by source
+  - chat conversations: a full booking from the first message, no booking
+    without a confirmed summary, cancelling in chat, a slot taken between the
+    summary and the "yes"
 
 ---
 

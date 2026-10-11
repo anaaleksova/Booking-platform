@@ -19,6 +19,7 @@ import {
   useResourceStats,
   useRevenue,
   useServiceStats,
+  useSourceStats,
   type DateRange,
 } from '@/features/analytics/api';
 import { useBusiness } from '@/features/business/api';
@@ -31,6 +32,7 @@ import {
   formatPercent,
   formatShortDate,
   pluralize,
+  SOURCE_LABELS,
 } from '@/utils/format';
 
 /** Everything computed from the database for the chosen range: revenue, volume, services, resources, customers. */
@@ -46,6 +48,7 @@ export function AnalyticsPage() {
   const revenue = useRevenue(range, granularity);
   const reservations = useReservationStats(range);
   const services = useServiceStats(range);
+  const sources = useSourceStats(range);
   const resources = useResourceStats(range);
   const customers = useCustomerStats(range);
 
@@ -148,6 +151,31 @@ export function AnalyticsPage() {
                     display: formatMoney(service.revenue, currency),
                   }))}
               />
+            ) : (
+              <LoadingState />
+            )}
+          </ChartCard>
+        </Grid>
+
+        <Grid item xs={12}>
+          <ChartCard title="Reservations by channel" subtitle="Where bookings come from: share of reservations, with the revenue each channel brought in">
+            {sources.data ? (
+              sources.data.some((source) => source.reservations > 0) ? (
+                <RankedBars
+                  max={1}
+                  items={sources.data
+                    .filter((source) => source.reservations > 0 || source.source !== 'API')
+                    .map((source) => ({
+                      key: source.source,
+                      label: SOURCE_LABELS[source.source],
+                      sublabel: `${pluralize(source.reservations, 'reservation')} · ${formatMoney(source.revenue, currency)} revenue (${formatPercent(source.revenueShare)})`,
+                      value: source.share,
+                      display: formatPercent(source.share),
+                    }))}
+                />
+              ) : (
+                <Typography variant="body2" color="text.secondary">No reservations in this range.</Typography>
+              )
             ) : (
               <LoadingState />
             )}

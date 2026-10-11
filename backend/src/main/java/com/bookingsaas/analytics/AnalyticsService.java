@@ -10,6 +10,7 @@ import com.bookingsaas.analytics.dto.AnalyticsDtos.ReservationPoint;
 import com.bookingsaas.analytics.dto.AnalyticsDtos.ReservationReport;
 import com.bookingsaas.analytics.dto.AnalyticsDtos.ResourceUtilization;
 import com.bookingsaas.analytics.dto.AnalyticsDtos.ServiceStat;
+import com.bookingsaas.analytics.dto.AnalyticsDtos.SourceStat;
 import com.bookingsaas.analytics.dto.AnalyticsDtos.TopCustomer;
 import com.bookingsaas.business.Business;
 import com.bookingsaas.business.BusinessService;
@@ -19,6 +20,7 @@ import com.bookingsaas.common.domain.TimeRange;
 import com.bookingsaas.common.security.CurrentTenant;
 import com.bookingsaas.customer.Customer;
 import com.bookingsaas.customer.CustomerRepository;
+import com.bookingsaas.reservation.ReservationSource;
 import com.bookingsaas.resource.Resource;
 import com.bookingsaas.resource.ResourceService;
 import com.bookingsaas.resource.ResourceType;
@@ -34,6 +36,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -100,6 +103,30 @@ public class AnalyticsService {
             series.add(point);
         }
         return new ReservationReport(scope.period().from(), scope.period().to(), total, cancelled, series);
+    }
+
+    /**
+     * Reservations and revenue per channel, every channel listed even at zero
+     * so a business can see that, say, Instagram has not brought anything yet.
+     */
+    @Transactional(readOnly = true)
+    public List<SourceStat> sources(LocalDate from, LocalDate to) {
+        Scope scope = scope(from, to);
+        Map<String, AnalyticsRepository.SourceRow> rows = repository.bySource(scope.businessId(),
+                        scope.period().start(), scope.period().end())
+                .stream().collect(Collectors.toMap(AnalyticsRepository.SourceRow::source, Function.identity()));
+        long total = rows.values().stream().mapToLong(AnalyticsRepository.SourceRow::reservations).sum();
+        BigDecimal revenue = rows.values().stream().map(AnalyticsRepository.SourceRow::revenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return Arrays.stream(ReservationSource.values())
+                .map(source -> {
+                    AnalyticsRepository.SourceRow row = rows.get(source.name());
+                    long count = row == null ? 0 : row.reservations();
+                    BigDecimal amount = row == null ? BigDecimal.ZERO : row.revenue();
+                    return new SourceStat(source.name(), count, total == 0 ? 0 : (double) count / total, amount,
+                            revenue.signum() == 0 ? 0 : amount.doubleValue() / revenue.doubleValue());
+                })
+                .toList();
     }
 
     /** Most booked services first; ties broken by revenue. */

@@ -1,0 +1,232 @@
+{
+  "id": "bkConfirmation00",
+  "name": "BOOKING - Confirmation",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "confirmation-01",
+      "name": "When called by another workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BOOKING_API_URL }}/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        }
+      },
+      "id": "confirmation-02",
+      "name": "Who am I",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BOOKING_API_URL }}/businesses/{{ $json.body.businessId }}/reservations/{{ $('When called by another workflow').first().json.reservationId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        }
+      },
+      "id": "confirmation-03",
+      "name": "Get reservation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nif (response.statusCode !== 200) {\n  console.log('Could not load reservation', response.statusCode);\n  return [{ json: { send: false, reason: 'reservation not available' } }];\n}\nconst r = response.body;\n// Message the customer where they talk to the business; TEST identities are only logged.\nconst channel = (r.channels || [])[0];\nif (!channel) return [{ json: { send: false, reason: 'customer has no chat channel', reservationId: r.id } }];\nconst day = new Date(r.date + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });\nconst price = new Intl.NumberFormat('en-GB', { style: 'currency', currency: r.currency }).format(r.finalPrice);\nconst people = r.numberOfParticipants === 1 ? '1 person' : `${r.numberOfParticipants} people`;\n\nif (r.source === channel.provider || (r.source === 'API' && channel.provider === 'TEST')) {\n  return [{ json: { send: false, reason: 'already confirmed in the chat', reservationId: r.id } }];\n}\nconst resources = (r.resources || []).map(x => x.name).join(', ');\nconst text = [\n  'Reservation confirmed!',\n  '',\n  r.serviceName,\n  `${day} at ${r.start}`,\n  people,\n  price,\n  resources ? `With: ${resources}` : null,\n  '',\n  `Reservation #${r.id}`,\n].filter(line => line !== null).join('\\n');\nreturn [{ json: { send: true, provider: channel.provider, recipientId: channel.externalUserId, text } }];\n"
+      },
+      "id": "confirmation-04",
+      "name": "Compose message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.send }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "confirmation-05",
+      "name": "Send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "bkSendMessage000",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "confirmation-06",
+      "name": "Send message",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        -60
+      ]
+    }
+  ],
+  "connections": {
+    "When called by another workflow": {
+      "main": [
+        [
+          {
+            "node": "Who am I",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Who am I": {
+      "main": [
+        [
+          {
+            "node": "Get reservation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get reservation": {
+      "main": [
+        [
+          {
+            "node": "Compose message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose message": {
+      "main": [
+        [
+          {
+            "node": "Send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send?": {
+      "main": [
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "description": "Confirms a new reservation to the customer on their chat channel — unless it was booked in that chat, where the conversation already confirmed it."
+  },
+  "tags": []
+}
