@@ -159,6 +159,48 @@ class ReservationIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void a_customer_and_the_owner_cancelling_at_once_give_the_discount_use_back_once() throws Exception {
+        send(post("/api/admin/discounts"), token, """
+                {"name":"Open","code":"OPEN","type":"PERCENTAGE","value":10,"active":true,
+                 "appliesToAllServices":true}""", 201);
+        // A second use keeps the count above zero, where a double release would show.
+        reserve("08:00", 1, "OPEN", "keeper@example.com", 201);
+
+        String[] times = {"09:00", "10:00", "11:00", "12:00", "13:00"};
+        for (String time : times) {
+            JsonNode reservation = reserve(time, 1, "OPEN", "racer." + time.replace(":", "") + "@example.com", 201);
+            long id = adminIdOf(reservation);
+            String reference = reservation.get("reference").asText();
+            assertThat(usageOf("OPEN")).isEqualTo(2);
+
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            CountDownLatch start = new CountDownLatch(1);
+            Future<Integer> byCustomer = pool.submit(() -> {
+                start.await();
+                return mockMvc.perform(post("/api/public/reservations/" + reference + "/cancel")
+                        .contentType("application/json").content("{}")).andReturn().getResponse().getStatus();
+            });
+            Future<Integer> byOwner = pool.submit(() -> {
+                start.await();
+                return mockMvc.perform(patch("/api/admin/reservations/" + id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                        .contentType("application/json").content("""
+                                {"status":"CANCELLED","reason":"race"}""")).andReturn().getResponse().getStatus();
+            });
+            start.countDown();
+            List<Integer> statuses = List.of(byCustomer.get(), byOwner.get());
+            pool.shutdown();
+
+            // Whoever comes second is refused (409 when truly simultaneous) or finds it already
+            // cancelled; never a server error, and never a second release.
+            assertThat(statuses).contains(200).allMatch(status -> status == 200 || status == 409 || status == 422);
+            assertThat(usageOf("OPEN")).as("discount uses after cancelling the %s reservation", time).isEqualTo(1);
+            assertThat(jdbcTemplate.queryForObject("select status from reservation where id = ?", String.class, id))
+                    .isEqualTo("CANCELLED");
+        }
+    }
+
+    @Test
     void an_unknown_discount_code_is_rejected_and_nothing_is_written() throws Exception {
         JsonNode rejected = reserve("10:00", 1, "NOPE", "ana@example.com", 422);
 
@@ -281,6 +323,10 @@ class ReservationIT extends AbstractIntegrationTest {
             }
         }
         throw new AssertionError("reservation " + reference + " not listed");
+    }
+
+    private int usageOf(String code) {
+        return jdbcTemplate.queryForObject("select usage_count from discount where code = ?", Integer.class, code);
     }
 
     private void cancel(long id) throws Exception {

@@ -8,6 +8,13 @@ spring:
 app:
   jwt:
     secret: integration-test-secret-value-at-least-32-characters
+  integrations:
+    # Events are still written; the timer that delivers them stays off, so
+    # tests that claim events themselves are not racing it.
+    events-enabled: false
+  rate-limit:
+    # Every test request comes from one address. RateLimitIT switches it on.
+    enabled: false
   notifications:
     # Nothing is queued or sent: tests assert on bookings, not on mail.
     enabled: false

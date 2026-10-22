@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -97,12 +98,14 @@ public class Notification extends Auditable {
         this.lastError = null;
     }
 
-    /** Fails permanently once the retry budget is gone. */
-    public void markAttemptFailed(String error) {
+    /** Retries after 1, 2, 3, 4 minutes; fails permanently once the retry budget is gone. */
+    public void markAttemptFailed(Instant now, String error) {
         this.attempts++;
         this.lastError = error == null ? null : error.substring(0, Math.min(error.length(), 1000));
         if (attempts >= MAX_ATTEMPTS) {
             this.status = NotificationStatus.FAILED;
+        } else {
+            this.scheduledAt = now.plus(Duration.ofMinutes(attempts));
         }
     }
 

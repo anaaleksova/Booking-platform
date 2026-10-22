@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.net.URI;
@@ -44,6 +46,8 @@ public class IntegrationEventDispatcher {
     private static final Logger log = LoggerFactory.getLogger(IntegrationEventDispatcher.class);
     private static final int BATCH_SIZE = 25;
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    /** Longer than a whole batch can take (25 posts with 5 s connect + 10 s response timeouts). */
+    private static final Duration LEASE = Duration.ofMinutes(10);
 
     private final IntegrationEventRepository repository;
     private final IntegrationRepository integrations;
@@ -51,6 +55,7 @@ public class IntegrationEventDispatcher {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final boolean enabled;
+    private final TransactionTemplate transaction;
     private final HttpClient http = HttpClient.newBuilder()
             // HTTP/2 would start with an h2c upgrade on plain http, which some
             // webhook receivers never answer.
@@ -64,7 +69,9 @@ public class IntegrationEventDispatcher {
                                       ReservationRepository reservations,
                                       ObjectMapper objectMapper,
                                       Clock clock,
-                                      @Value("${app.integrations.events-enabled:true}") boolean enabled) {
+                                      @Value("${app.integrations.events-enabled:true}") boolean enabled,
+                                      PlatformTransactionManager transactionManager) {
+        this.transaction = new TransactionTemplate(transactionManager);
         this.repository = repository;
         this.integrations = integrations;
         this.reservations = reservations;
@@ -82,9 +89,27 @@ public class IntegrationEventDispatcher {
         if (!enabled) {
             return;
         }
-        for (IntegrationEvent event : repository.findDue(clock.instant(), PageRequest.of(0, BATCH_SIZE))) {
+        for (IntegrationEvent event : claimDue()) {
             dispatch(event);
         }
+    }
+
+    /**
+     * Locks and leases the next batch in one short transaction, so a second
+     * instance does not deliver the same events. An instance that dies
+     * mid-batch leaves its events to be retried when the lease runs out.
+     */
+    List<IntegrationEvent> claimDue() {
+        List<IntegrationEvent> claimed = transaction.execute(status -> {
+            Instant now = clock.instant();
+            List<Long> ids = repository.lockDue(now, BATCH_SIZE);
+            if (ids.isEmpty()) {
+                return List.<IntegrationEvent>of();
+            }
+            repository.lease(ids, now.plus(LEASE));
+            return repository.findAllById(ids);
+        });
+        return claimed == null ? List.of() : claimed;
     }
 
     void dispatch(IntegrationEvent event) {

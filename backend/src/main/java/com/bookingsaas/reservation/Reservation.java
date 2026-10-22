@@ -12,6 +12,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -45,6 +47,15 @@ public class Reservation extends Auditable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /**
+     * Optimistic lock. Two transactions that both read this reservation and
+     * both change it (a customer and the owner cancelling at once) cannot both
+     * commit; the second gets a 409 and none of its side effects.
+     */
+    @Version
+    @Setter(AccessLevel.NONE)
+    private long version;
 
     @Column(name = "business_id", nullable = false)
     private Long businessId;
