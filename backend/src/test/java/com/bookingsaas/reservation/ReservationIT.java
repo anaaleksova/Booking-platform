@@ -287,6 +287,29 @@ class ReservationIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void a_phone_number_someone_else_gave_does_not_hand_them_the_booking() throws Exception {
+        String sharedPhone = "+389 70 555 444";
+        send(post("/api/public/businesses/" + slug + "/reservations"), customerToken("first@example.com"), """
+                {"serviceId":%d,"participants":1,"startTime":"%sT10:00:00",
+                 "customer":{"firstName":"First","lastName":"Person","phone":"%s"}}
+                """.formatted(serviceId, day, sharedPhone), 201);
+
+        // Another account types the same number.
+        send(post("/api/public/businesses/" + slug + "/reservations"), customerToken("second@example.com"), """
+                {"serviceId":%d,"participants":1,"startTime":"%sT12:00:00",
+                 "customer":{"firstName":"Second","lastName":"Person","phone":"%s"}}
+                """.formatted(serviceId, day, sharedPhone), 201);
+
+        List<String> bookedBy = jdbcTemplate.queryForList("""
+                select c.email from reservation r join customer c on c.id = r.customer_id order by r.start_time""",
+                String.class);
+        assertThat(bookedBy).containsExactly("first@example.com", "second@example.com");
+        // The number stays with the customer who gave it first.
+        assertThat(jdbcTemplate.queryForList("select email from customer where phone is not null", String.class))
+                .containsExactly("first@example.com");
+    }
+
+    @Test
     void times_outside_opening_hours_and_oversized_groups_are_rejected() throws Exception {
         assertThat(reserve("19:30", 1, null, "late@example.com", 422).get("error").asText())
                 .isEqualTo("OUTSIDE_BUSINESS_HOURS");

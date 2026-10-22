@@ -61,7 +61,12 @@ data: two businesses, roughly two months of history and two weeks of upcoming
 reservations, all relative to the day it first runs.
 
 - API: <http://localhost:8080>
-- OpenAPI / Swagger UI: <http://localhost:8080/swagger-ui.html>
+- OpenAPI / Swagger UI: <http://localhost:8080/swagger-ui.html> (dev profile only;
+  elsewhere set `API_DOCS_ENABLED=true` to turn it on)
+
+Without the `dev` profile the backend does not start unless `JWT_SECRET` is
+set to a real secret (`openssl rand -base64 48`); the example values in this
+repository are refused.
 
 ### 3. Frontend
 
@@ -122,8 +127,8 @@ Each business is reachable only through its own link. Nothing on its pages
 leads to another business, and there is no public list of businesses.
 
 API: customer-facing endpoints live under `/api/public/**` (no login), admin
-endpoints under `/api/admin/**` (JWT) and auth under `/api/auth/**`. The full
-reference is in Swagger UI.
+endpoints under `/api/admin/**` (signed in) and auth under `/api/auth/**`. The
+full reference is in Swagger UI.
 
 ---
 
@@ -347,6 +352,49 @@ admin endpoints staff may call. Everything else under `/api/admin` is
 owner-only, so a new endpoint is closed to staff unless it is added to that
 list on purpose. `ReservationAccess` then limits staff to their own rows.
 
+## Security
+
+**Sessions.** Signing in sets an httpOnly `SameSite=Lax` cookie
+(`booking_session`, path `/api`). No script on the page can read it, and the
+token never appears in a response body. A write made with the cookie must
+also carry `X-Requested-With`, which a cross-site form cannot add. API
+clients may still send `Authorization: Bearer …` instead. Changing the
+password ends every older session. Set `SESSION_COOKIE_SECURE=true` wherever
+the site is served over HTTPS.
+
+**Sign-up.** Business owners and customers both confirm their email with a
+6-digit code before an account exists.
+
+**Rate limits.** Per client address, per minute:
+
+| What | Limit |
+|---|---|
+| `POST /api/auth/**` (sign-in, sign-up, codes, reset) | 20 |
+| Availability searches | 120 |
+| Other public writes (quote, book, cancel) | 30 |
+
+Per account: 10 failed sign-ins lock it for 15 minutes, and at most 5 codes
+an hour are emailed to one address. Over the limit the API answers `429
+TOO_MANY_REQUESTS` with `Retry-After`. The counters are kept in memory, so
+each backend instance counts on its own; behind several instances, move them
+to Redis or limit at the gateway. The client address comes from
+`X-Forwarded-For`, trusted only from private-network proxies.
+
+**Headers.** nginx sends a Content-Security-Policy (scripts only from the
+site, the Google Maps embed as the only frame), `X-Frame-Options: DENY`,
+`nosniff` and a strict referrer policy. Actuator is not proxied.
+
+**Concurrent changes.** Reservations carry a version. When a customer and the
+owner change the same reservation at the same moment, the second change gets
+`409 CONFLICT` instead of overwriting the first (and, for example, giving a
+discount use back twice).
+
+**Background work on several instances.** The email and webhook workers lock
+each batch with `FOR UPDATE SKIP LOCKED` and lease it for 10 minutes before
+sending, with no database transaction open while they send. Two instances
+never send the same message, and a crashed instance's batch is retried when
+its lease runs out.
+
 ## No-shows
 
 Once a reservation has started, the business can mark it as a **no-show**
@@ -533,7 +581,9 @@ Admin → Integrations shows recent deliveries.
    (In Git Bash, prefix with `MSYS_NO_PATHCONV=1`.) Or use *Import from file*
    in the editor with the files in [n8n/workflows](n8n/workflows). Open each
    workflow and select the credentials if n8n asks. Then **publish (activate)
-   all nine**: n8n 2.x runs only published sub-workflows.
+   all of them except the two inbox pollers**, which are only for channels
+   whose webhook does not work (see the table). n8n 2.x runs only published
+   sub-workflows.
 
    | Workflow | Role |
    |---|---|
@@ -543,6 +593,7 @@ Admin → Integrations shows recent deliveries.
    | BOOKING - Send Message | Sends through the Graph API (`/me/messages`); TEST messages are only logged |
    | BOOKING - Reservation Events | Verifies the signature, drops duplicate deliveries, routes the event |
    | BOOKING - Confirmation / Reminder / Cancellation Notice | Message the customer on their chat channel. A booking or cancellation the customer made in that chat is not announced twice. |
+   | BOOKING - Privacy Policy | Serves the privacy policy page Meta requires for the app (`/webhook/privacy`) |
    | BOOKING - Instagram Inbox Poller / Messenger Inbox Poller | For when Meta does not deliver the `messages` webhook: every 20 seconds each reads the Page's Instagram or Messenger conversations and answers new messages through **BOOKING - Instagram Reply** (despite its name, it replies on either channel). Publish only the pollers whose channel has no working webhook, or customers get two replies. Messenger needs the `pages_messaging` permission on the Page token. |
 
    Both Claude calls use `claude-opus-5-5` at low effort, with
@@ -592,7 +643,27 @@ window is open.
 cd backend
 ./mvnw test      # unit tests: availability engine, discount rules, pricing
 ./mvnw verify    # plus integration tests on real PostgreSQL (Testcontainers; needs Docker)
+
+cd frontend
+npm run lint && npm run typecheck && npm test    # ESLint, TypeScript, Vitest
+npm run test:e2e                                 # Playwright, against a running stack (below)
 ```
+
+GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs all
+of it except the end-to-end tests on every push and pull request.
+
+**End-to-end tests** drive a real browser through the app: signing in, the
+session cookie, business sign-up with the emailed code, a customer booking,
+every admin page, and the security headers. Start the stack with
+`docker compose --profile full up --build` (it uses the dev profile, so the
+demo businesses exist), then `npm run test:e2e`. `E2E_BASE_URL` and
+`E2E_MAILPIT_URL` point them elsewhere.
+
+**API types.** `npm run gen:api` regenerates `src/types/api.generated.ts` from
+`backend/target/openapi.json`, which `OpenApiSpecIT` writes during
+`./mvnw verify`. `src/types/api.contract.ts` checks at compile time that the
+hand-written types in `api.ts` still match the API. CI fails if the generated
+file is out of date.
 
 - **Unit tests:** resource available or booked, several requirements at once,
   participants and capacity, best fit, opening hours, closures, resource

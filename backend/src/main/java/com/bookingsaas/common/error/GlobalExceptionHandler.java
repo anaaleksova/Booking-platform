@@ -18,6 +18,7 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
@@ -153,6 +154,16 @@ public class GlobalExceptionHandler {
                 .body(ApiErrorResponse.of(ErrorCode.CONFLICT,
                         "This record was modified by someone else. Reload and try again.",
                         request.getRequestURI()));
+    }
+
+    /**
+     * The client went away (closed the tab, navigated on) before the response
+     * was written. Nothing is wrong with the server and there is no one left
+     * to answer, so it is not logged as an error.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientGone(AsyncRequestNotUsableException ex, HttpServletRequest request) {
+        log.debug("Client went away before the response to {} was written", request.getRequestURI());
     }
 
     @ExceptionHandler(Exception.class)

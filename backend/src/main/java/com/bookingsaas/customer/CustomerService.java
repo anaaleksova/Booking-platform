@@ -60,6 +60,39 @@ public class CustomerService {
     }
 
     /**
+     * The customer record of a signed-in account, found by the account's
+     * verified email and nothing else.
+     *
+     * <p>Not by phone: a phone number is typed, not proven, and matching on it
+     * would attach this booking to whoever else gave that number — their
+     * history would show it and the confirmation would go to their address.
+     * When another customer already has the number, the new record is created
+     * without it.
+     */
+    @Transactional
+    public Customer findOrCreateForAccount(Long businessId, String firstName, String lastName, String verifiedEmail,
+                                           String phone) {
+        String email = normalize(verifiedEmail);
+        String cleanPhone = normalize(phone);
+        Optional<Customer> existing = repository.findByEmail(businessId, email);
+        boolean phoneFree = cleanPhone != null && repository.findByBusinessIdAndPhone(businessId, cleanPhone).isEmpty();
+        if (existing.isPresent()) {
+            Customer customer = existing.get();
+            if (customer.getPhone() == null && phoneFree) {
+                customer.setPhone(cleanPhone);
+            }
+            return repository.save(customer);
+        }
+        Customer customer = new Customer();
+        customer.setBusinessId(businessId);
+        customer.setFirstName(firstName.trim());
+        customer.setLastName(lastName == null ? "" : lastName.trim());
+        customer.setEmail(email);
+        customer.setPhone(phoneFree ? cleanPhone : null);
+        return repository.save(customer);
+    }
+
+    /**
      * Finds the existing customer behind a reservation, or creates one.
      *
      * <p>Matching on email first, then phone, keeps a regular from accumulating
