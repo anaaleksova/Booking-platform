@@ -1,16 +1,19 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { apiClient, setSessionExpiredHandler, tokenStorage } from '@/api/client';
+import { apiClient, setSessionExpiredHandler } from '@/api/client';
 import type { AuthResponse, CurrentUser } from '@/types/api';
 
 interface AuthContextValue {
   user: CurrentUser | null;
-  /** True until the stored token has been checked against the server. */
+  /** True until the server has said whether there is a session. */
   initialising: boolean;
   isAuthenticated: boolean;
   isOwner: boolean;
   /** Resolves to the signed-in user, so callers can tell a customer account from a business one. */
   login: (email: string, password: string) => Promise<CurrentUser>;
+  /** Business sign-up, step 1: emails a 6-digit code. Nothing is created yet. */
   register: (input: RegisterInput) => Promise<void>;
+  /** Step 2: the code creates the account and the business, and signs in. */
+  verifyRegistration: (email: string, code: string) => Promise<void>;
   /** Booking-only sign-up, step 1: emails a 6-digit code. No account yet. */
   startCustomerSignup: (input: CustomerRegisterInput) => Promise<void>;
   /** Step 2: the code creates the account (no business) and signs in. */
@@ -19,7 +22,8 @@ interface AuthContextValue {
   requestPasswordReset: (email: string) => Promise<void>;
   /** Step 2: the code sets the new password and signs in. */
   resetPassword: (email: string, code: string, newPassword: string) => Promise<CurrentUser>;
-  logout: () => void;
+  /** Ends the session at once here, and resolves when the server has cleared the cookie. */
+  logout: () => Promise<void>;
   /** Signs in with a session another endpoint issued (e.g. accepting a staff invitation). */
   adoptSession: (data: AuthResponse) => void;
 }
@@ -41,19 +45,23 @@ export interface CustomerRegisterInput {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
- * Holds the session.
+ * Holds the signed-in user.
  *
- * <p>The token lives in localStorage so a refresh does not sign the user out;
- * on start-up it is verified against `/api/auth/me` rather than trusted, which
- * also picks up a role change made since the token was issued.
+ * <p>The session itself is an httpOnly cookie that only the server reads and
+ * writes. On start-up `/api/auth/session` says who it belongs to (or 204 for
+ * nobody), which also picks up a role change made since sign-in.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [initialising, setInitialising] = useState(true);
 
-  const logout = useCallback(() => {
-    tokenStorage.clear();
+  const logout = useCallback(async () => {
     setUser(null);
+    try {
+      await apiClient.post('/api/auth/logout');
+    } catch {
+      // Signed out here regardless; the cookie expires on its own.
+    }
   }, []);
 
   useEffect(() => {
@@ -61,20 +69,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const token = tokenStorage.get();
-    if (!token) {
-      setInitialising(false);
-      return;
-    }
     apiClient
-      .get<CurrentUser>('/api/auth/me')
-      .then((response) => setUser(response.data))
-      .catch(() => tokenStorage.clear())
+      .get<CurrentUser | ''>('/api/auth/session')
+      .then((response) => setUser(response.status === 200 && response.data ? response.data : null))
+      .catch(() => setUser(null))
       .finally(() => setInitialising(false));
   }, []);
 
   const applySession = useCallback((data: AuthResponse) => {
-    tokenStorage.set(data.accessToken);
     setUser(data.user);
   }, []);
 
@@ -87,9 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applySession],
   );
 
-  const register = useCallback(
-    async (input: RegisterInput) => {
-      const { data } = await apiClient.post<AuthResponse>('/api/auth/register', input);
+  const register = useCallback(async (input: RegisterInput) => {
+    await apiClient.post('/api/auth/register', input);
+  }, []);
+
+  const verifyRegistration = useCallback(
+    async (email: string, code: string) => {
+      const { data } = await apiClient.post<AuthResponse>('/api/auth/register/verify', { email, code });
       applySession(data);
     },
     [applySession],
@@ -128,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isOwner: user?.activeBusiness?.role === 'BUSINESS_OWNER',
       login,
       register,
+      verifyRegistration,
       startCustomerSignup,
       verifyCustomerSignup,
       requestPasswordReset,
@@ -135,7 +142,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       adoptSession: applySession,
     }),
-    [user, initialising, login, register, startCustomerSignup, verifyCustomerSignup, requestPasswordReset, resetPassword, logout, applySession],
+    [
+      user,
+      initialising,
+      login,
+      register,
+      verifyRegistration,
+      startCustomerSignup,
+      verifyCustomerSignup,
+      requestPasswordReset,
+      resetPassword,
+      logout,
+      applySession,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

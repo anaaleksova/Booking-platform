@@ -20,12 +20,13 @@ class PasswordResetIT extends AbstractIntegrationTest {
         assertThat(resetCodes).containsKey(EMAIL);
 
         JsonNode session = reset(EMAIL, resetCodes.get(EMAIL), "brand-new-pass", 200);
-        assertThat(session.get("accessToken").asText()).isNotBlank();
+        String newSession = lastSessionToken();
+        assertThat(newSession).isNotBlank();
 
         login(EMAIL, "password123", 401);
         login(EMAIL, "brand-new-pass", 200);
         // The new session works; one from before the change does not.
-        send(get("/api/auth/me"), session.get("accessToken").asText(), null, 200);
+        send(get("/api/auth/me"), newSession, null, 200);
         assertThat(send(get("/api/auth/me"), oldSession, null, 401).get("error").asText()).isEqualTo("TOKEN_EXPIRED");
     }
 

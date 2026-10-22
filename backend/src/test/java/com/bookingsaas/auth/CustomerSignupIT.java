@@ -22,7 +22,8 @@ class CustomerSignupIT extends AbstractIntegrationTest {
                 {"email":"%s","password":"password123"}""".formatted(EMAIL), 401);
 
         JsonNode session = verify(EMAIL, sentCodes.get(EMAIL), 201);
-        assertThat(session.get("accessToken").asText()).isNotBlank();
+        assertThat(lastSessionToken()).isNotBlank();
+        assertThat(session.has("accessToken")).as("the token is only ever in the httpOnly cookie").isFalse();
         assertThat(session.get("user").hasNonNull("activeBusiness")).isFalse();
 
         send(post("/api/auth/login"), null, """

@@ -11,7 +11,7 @@ import lombok.Setter;
 import java.time.Instant;
 
 /**
- * A customer sign-up waiting for the code emailed to it. Holds the already
+ * A sign-up (a customer's, or a business owner's) waiting for the code emailed to it. Holds the already
  * hashed password, so the plaintext never has to be sent twice; the code itself
  * is stored only as a hash.
  */
@@ -45,4 +45,11 @@ public class PendingSignup {
 
     @Column(name = "sent_at", nullable = false)
     private Instant sentAt;
+
+    /** Set for a business owner's sign-up: confirming the code also creates this business. */
+    @Column(name = "business_name", length = 160)
+    private String businessName;
+
+    @Column(length = 64)
+    private String timezone;
 }

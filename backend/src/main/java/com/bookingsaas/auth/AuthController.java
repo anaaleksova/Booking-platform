@@ -11,7 +11,9 @@ import com.bookingsaas.auth.dto.VerifySignupRequest;
 import com.bookingsaas.common.security.CurrentTenant;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,8 +23,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Logout is intentionally absent: the token is stateless, so signing out is a
- * client-side discard of the token.
+ * Sign-up, sign-in and the session. Every endpoint returning an
+ * {@link AuthResponse} also sets the session cookie (see {@link SessionCookieAdvice}).
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -31,16 +33,46 @@ public class AuthController {
 
     private final AuthService authService;
     private final CurrentTenant currentTenant;
+    private final SessionCookies sessionCookies;
 
-    public AuthController(AuthService authService, CurrentTenant currentTenant) {
+    public AuthController(AuthService authService, CurrentTenant currentTenant, SessionCookies sessionCookies) {
         this.authService = authService;
         this.currentTenant = currentTenant;
+        this.sessionCookies = sessionCookies;
     }
 
+    /**
+     * A business owner's sign-up, step one: emails a 6-digit code. The account
+     * and the business are created by {@code /register/verify}.
+     */
     @PostMapping("/register")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void register(@Valid @RequestBody RegisterRequest request) {
+        authService.startOwnerSignup(request);
+    }
+
+    /** The emailed code creates the owner's account and business, and signs them in. */
+    @PostMapping("/register/verify")
     @ResponseStatus(HttpStatus.CREATED)
-    public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
-        return authService.register(request);
+    public AuthResponse verifyOwnerSignup(@Valid @RequestBody VerifySignupRequest request) {
+        return authService.verifySignup(request);
+    }
+
+    /**
+     * Who is signed in, or 204 for nobody. Unlike {@code /me} it is not an
+     * error to ask without a session, so the app can check on every start.
+     */
+    @GetMapping("/session")
+    public ResponseEntity<CurrentUserResponse> session() {
+        return currentTenant.optionalUser()
+                .map(user -> ResponseEntity.ok(CurrentUserResponse.from(user)))
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /** Ends the browser session. The token is stateless, so this clears the cookie that holds it. */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout() {
+        return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, sessionCookies.clear()).build();
     }
 
     /** Emails a 6-digit code; calling again sends a new one. No account is created yet. */
@@ -54,7 +86,7 @@ public class AuthController {
     @PostMapping("/customer/verify")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse verifyCustomerSignup(@Valid @RequestBody VerifySignupRequest request) {
-        return authService.verifyCustomerSignup(request);
+        return authService.verifySignup(request);
     }
 
     /** Emails a reset code if the account exists. Always 202, so it reveals nothing. */

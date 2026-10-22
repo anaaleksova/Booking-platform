@@ -68,6 +68,10 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected MockMvc mockMvc;
 
+    protected static final String SESSION_COOKIE = "booking_session";
+
+    private String lastSessionToken;
+
     /** Customer accounts created in the current test, by email. */
     private final Map<String, String> customerTokens = new ConcurrentHashMap<>();
 
@@ -130,13 +134,20 @@ public abstract class AbstractIntegrationTest {
                 """);
     }
 
-    /** Registers an owner plus their business and returns the access token. */
+    /**
+     * Registers an owner plus their business (confirming the emailed code)
+     * and returns the access token.
+     */
     protected String registerAndLogin(String email, String businessName) throws Exception {
-        JsonNode response = send(post("/api/auth/register"), null, """
+        send(post("/api/auth/register"), null, """
                 {"fullName":"Test Owner","email":"%s","password":"password123",
                  "businessName":"%s","timezone":"Europe/Skopje"}
-                """.formatted(email, businessName), 201);
-        return response.get("accessToken").asText();
+                """.formatted(email, businessName), 202);
+        String normalized = email.toLowerCase(java.util.Locale.ROOT);
+        send(post("/api/auth/register/verify"), null, """
+                {"email":"%s","code":"%s"}
+                """.formatted(normalized, sentCodes.get(normalized)), 201);
+        return lastSessionToken();
     }
 
     /**
@@ -153,10 +164,10 @@ public abstract class AbstractIntegrationTest {
         send(post("/api/auth/customer/register"), null, """
                 {"fullName":"Test Customer","email":"%s","password":"password123"}
                 """.formatted(email), 202);
-        JsonNode response = send(post("/api/auth/customer/verify"), null, """
+        send(post("/api/auth/customer/verify"), null, """
                 {"email":"%s","code":"%s"}
                 """.formatted(email, sentCodes.get(email)), 201);
-        String token = response.get("accessToken").asText();
+        String token = lastSessionToken();
         customerTokens.put(email, token);
         return token;
     }
@@ -199,8 +210,23 @@ public abstract class AbstractIntegrationTest {
             request.contentType("application/json").content(body);
         }
         MvcResult result = mockMvc.perform(request).andExpect(status().is(expectedStatus)).andReturn();
+        for (String cookie : result.getResponse().getHeaders(HttpHeaders.SET_COOKIE)) {
+            if (cookie.startsWith(SESSION_COOKIE + "=")) {
+                String value = cookie.substring(SESSION_COOKIE.length() + 1, cookie.indexOf(';'));
+                lastSessionToken = value.isEmpty() ? null : value;
+            }
+        }
         String content = result.getResponse().getContentAsString();
         return content.isBlank() ? null : objectMapper.readTree(content);
+    }
+
+    /**
+     * The token of the session the last request started (from its session
+     * cookie). Sessions are never in response bodies; tests then send the
+     * token as a Bearer header, which the API accepts as well.
+     */
+    protected String lastSessionToken() {
+        return lastSessionToken;
     }
 
     protected JsonNode json(String payload) throws Exception {

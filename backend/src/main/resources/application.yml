@@ -78,11 +78,19 @@ server:
     include-stacktrace: never
     include-message: never
   shutdown: graceful
+  # Behind nginx: take the client address from X-Forwarded-For. Tomcat only
+  # trusts the header from private-network proxies, so a client cannot fake it
+  # by sending the header itself. Rate limits are keyed by this address.
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:native}
 
 springdoc:
+  # Off unless asked for (the dev profile turns it on): the full API map is
+  # not something to publish from production.
   api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
     path: /v3/api-docs
   swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
     path: /swagger-ui.html
     operations-sorter: alpha
     tags-sorter: alpha
@@ -103,10 +111,18 @@ management:
 
 app:
   jwt:
-    # Overridden in every real environment. Minimum 32 characters.
-    secret: ${JWT_SECRET:local-development-only-secret-please-change-me}
+    # Required: no default, so a deployment that forgets JWT_SECRET does not
+    # start. Minimum 32 characters; the dev profile supplies a local value, and
+    # JwtService refuses the well-known placeholders outside dev and test.
+    secret: ${JWT_SECRET:}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:720}
     issuer: booking-platform
+  session:
+    cookie-name: booking_session
+    # true wherever the site is served over HTTPS (every real deployment).
+    secure-cookie: ${SESSION_COOKIE_SECURE:false}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
   cors:
     allowed-origins: ${FRONTEND_URL:http://localhost:5173}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}

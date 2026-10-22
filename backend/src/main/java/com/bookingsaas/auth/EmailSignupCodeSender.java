@@ -20,7 +20,7 @@ public class EmailSignupCodeSender implements SignupCodeSender {
         CodeEmail.send(mailSender, properties, email, fullName,
                 "Your verification code: " + code,
                 "Confirm your email",
-                "Enter this code on the booking page to finish creating your account.",
+                "Enter this code to finish creating your account.",
                 code);
     }
 }

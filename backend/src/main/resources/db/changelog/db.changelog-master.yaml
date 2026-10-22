@@ -79,3 +79,5 @@ databaseChangeLog:
       file: db/changelog/changes/022-staff-invitations.sql
   - include:
       file: db/changelog/changes/023-staff-notifications.sql
+  - include:
+      file: db/changelog/changes/024-hardening.sql

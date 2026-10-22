@@ -12,6 +12,7 @@ import com.bookingsaas.business.Business;
 import com.bookingsaas.business.BusinessService;
 import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
+import com.bookingsaas.common.ratelimit.RateLimiter;
 import com.bookingsaas.common.security.AuthenticatedUser;
 import com.bookingsaas.common.security.BusinessMembership;
 import org.slf4j.Logger;
@@ -43,6 +44,12 @@ public class AuthService {
     private static final Duration CODE_LIFETIME = Duration.ofMinutes(15);
     private static final Duration RESEND_COOLDOWN = Duration.ofSeconds(60);
     private static final int MAX_CODE_ATTEMPTS = 5;
+    /** With five guesses per code, at most 25 guesses an hour at any one account's code. */
+    private static final int MAX_CODES_PER_HOUR = 5;
+    private static final int MAX_LOGIN_FAILURES = 10;
+    private static final Duration LOGIN_FAILURE_WINDOW = Duration.ofMinutes(15);
+    private static final String CODES_SENT = "codes-sent:";
+    private static final String LOGIN_FAILURES = "login-failures:";
 
     private final UserRepository userRepository;
     private final BusinessService businessService;
@@ -54,7 +61,10 @@ public class AuthService {
     private final PasswordResetRepository passwordResets;
     private final PasswordResetCodeSender passwordResetCodeSender;
     private final Clock clock;
+    private final RateLimiter rateLimiter;
     private final SecureRandom random = new SecureRandom();
+    /** Checked against when the email is unknown, so that case costs the same BCrypt work. */
+    private final String dummyPasswordHash;
 
     public AuthService(UserRepository userRepository,
                        BusinessService businessService,
@@ -65,7 +75,10 @@ public class AuthService {
                        SignupCodeSender signupCodeSender,
                        PasswordResetRepository passwordResets,
                        PasswordResetCodeSender passwordResetCodeSender,
-                       Clock clock) {
+                       Clock clock,
+                       RateLimiter rateLimiter) {
+        this.rateLimiter = rateLimiter;
+        this.dummyPasswordHash = passwordEncoder.encode("no-such-account-" + random.nextLong());
         this.pendingSignups = pendingSignups;
         this.signupCodeSender = signupCodeSender;
         this.passwordResets = passwordResets;
@@ -78,30 +91,31 @@ public class AuthService {
         this.principalLoader = principalLoader;
     }
 
+    /**
+     * Step one of a business owner's sign-up. Like a customer's, it only
+     * emails a code: the account and the business are created by
+     * {@link #verifySignup} once the code proves the address is theirs. The
+     * owner's address receives customer details and calendar invitations, so
+     * it has to be real.
+     */
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
-        String email = normalizeEmail(request.email());
-        if (userRepository.existsByEmail(email)) {
-            throw ApiException.of(ErrorCode.EMAIL_ALREADY_REGISTERED,
-                    "An account with this email already exists.");
-        }
-
-        User user = userRepository.save(
-                new User(email, passwordEncoder.encode(request.password()), request.fullName().trim()));
-        Business business = businessService.createBusiness(user.getId(), request.businessName(), request.timezone());
-
-        log.info("Registered user id={} with business id={}", user.getId(), business.getId());
-        return issueToken(principalLoader.loadByUserId(user.getId(), business.getId()));
+    public void startOwnerSignup(RegisterRequest request) {
+        startSignup(request.email(), request.fullName(), request.password(),
+                request.businessName().trim(), request.timezone());
     }
 
     /**
      * Step one of a customer sign-up: remember the details and email a code.
-     * No account exists until {@link #verifyCustomerSignup} proves the email is
+     * No account exists until {@link #verifySignup} proves the email is
      * real and theirs. Asking again replaces the pending sign-up and its code.
      */
     @Transactional
     public void startCustomerSignup(CustomerRegisterRequest request) {
-        String email = normalizeEmail(request.email());
+        startSignup(request.email(), request.fullName(), request.password(), null, null);
+    }
+
+    private void startSignup(String rawEmail, String fullName, String password, String businessName, String timezone) {
+        String email = normalizeEmail(rawEmail);
         if (userRepository.existsByEmail(email)) {
             throw ApiException.of(ErrorCode.EMAIL_ALREADY_REGISTERED,
                     "An account with this email already exists. Sign in instead.");
@@ -112,15 +126,21 @@ public class AuthService {
             throw ApiException.of(ErrorCode.TOO_MANY_REQUESTS,
                     "A code was just sent. Please wait a minute before asking for another.");
         }
+        if (!rateLimiter.tryAcquire(CODES_SENT + email, MAX_CODES_PER_HOUR, Duration.ofHours(1))) {
+            throw ApiException.of(ErrorCode.TOO_MANY_REQUESTS,
+                    "Too many codes were sent to this address. Please try again in an hour.");
+        }
 
         String code = "%06d".formatted(random.nextInt(1_000_000));
         pending.setEmail(email);
-        pending.setFullName(request.fullName().trim());
-        pending.setPasswordHash(passwordEncoder.encode(request.password()));
+        pending.setFullName(fullName.trim());
+        pending.setPasswordHash(passwordEncoder.encode(password));
         pending.setCodeHash(sha256(code));
         pending.setAttempts(0);
         pending.setSentAt(now);
         pending.setExpiresAt(now.plus(CODE_LIFETIME));
+        pending.setBusinessName(businessName);
+        pending.setTimezone(timezone);
         pendingSignups.save(pending);
 
         try {
@@ -133,11 +153,12 @@ public class AuthService {
     }
 
     /**
-     * Step two: the right code creates the booking account (no business, so it
-     * can book but never reach the admin API) and signs the person in.
+     * Step two: the right code creates the account and signs the person in.
+     * A customer gets a booking account (no business, so it can book but never
+     * reach the admin API); an owner gets the account plus their business.
      */
     @Transactional(noRollbackFor = ApiException.class)   // a wrong guess must still count
-    public AuthResponse verifyCustomerSignup(VerifySignupRequest request) {
+    public AuthResponse verifySignup(VerifySignupRequest request) {
         String email = normalizeEmail(request.email());
         PendingSignup pending = pendingSignups.findById(email)
                 .filter(candidate -> candidate.getExpiresAt().isAfter(clock.instant()))
@@ -164,8 +185,14 @@ public class AuthService {
         }
         User user = userRepository.save(new User(email, pending.getPasswordHash(), pending.getFullName()));
         pendingSignups.delete(pending);
-        log.info("Registered customer account id={} (email verified)", user.getId());
-        return issueToken(principalLoader.loadByUserId(user.getId(), null));
+        if (pending.getBusinessName() == null) {
+            log.info("Registered customer account id={} (email verified)", user.getId());
+            return issueToken(principalLoader.loadByUserId(user.getId(), null));
+        }
+        Business business = businessService.createBusiness(user.getId(), pending.getBusinessName(),
+                pending.getTimezone());
+        log.info("Registered user id={} with business id={} (email verified)", user.getId(), business.getId());
+        return issueToken(principalLoader.loadByUserId(user.getId(), business.getId()));
     }
 
     /**
@@ -185,6 +212,11 @@ public class AuthService {
         Instant now = clock.instant();
         PasswordReset reset = passwordResets.findById(user.getId()).orElseGet(PasswordReset::new);
         if (reset.getSentAt() != null && reset.getSentAt().plus(RESEND_COOLDOWN).isAfter(now)) {
+            return;
+        }
+        // Each code allows a few guesses; capping codes per hour caps the guesses.
+        if (!rateLimiter.tryAcquire(CODES_SENT + email, MAX_CODES_PER_HOUR, Duration.ofHours(1))) {
+            log.info("Password reset code not sent for user id={}: hourly limit reached", user.getId());
             return;
         }
         String code = "%06d".formatted(random.nextInt(1_000_000));
@@ -240,11 +272,22 @@ public class AuthService {
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
         String email = normalizeEmail(request.email());
-        // Identical response for unknown email and wrong password, so the
-        // endpoint cannot be used to enumerate registered accounts.
-        User user = userRepository.findByEmail(email)
-                .filter(candidate -> passwordEncoder.matches(request.password(), candidate.getPasswordHash()))
-                .orElseThrow(() -> ApiException.of(ErrorCode.INVALID_CREDENTIALS, "Incorrect email or password."));
+        String failuresKey = LOGIN_FAILURES + email;
+        if (rateLimiter.isExhausted(failuresKey, MAX_LOGIN_FAILURES, LOGIN_FAILURE_WINDOW)) {
+            throw ApiException.of(ErrorCode.TOO_MANY_REQUESTS,
+                    "Too many failed sign-ins. Please wait 15 minutes or reset your password.");
+        }
+        // Identical response, and the same BCrypt work, for an unknown email
+        // and a wrong password: neither the message nor the timing tells
+        // which accounts exist.
+        User user = userRepository.findByEmail(email).orElse(null);
+        boolean matches = passwordEncoder.matches(request.password(),
+                user == null ? dummyPasswordHash : user.getPasswordHash());
+        if (user == null || !matches) {
+            rateLimiter.hit(failuresKey, LOGIN_FAILURE_WINDOW);
+            throw ApiException.of(ErrorCode.INVALID_CREDENTIALS, "Incorrect email or password.");
+        }
+        rateLimiter.reset(failuresKey);
 
         if (!user.isActive()) {
             throw ApiException.of(ErrorCode.ACCESS_DENIED, "This account has been deactivated.");

@@ -1,32 +1,22 @@
 import axios, { AxiosError } from 'axios';
 import type { ApiError } from '@/types/api';
 
-const TOKEN_KEY = 'booking.accessToken';
-
 /**
  * The one Axios instance in the application.
  *
- * <p>Base URL, the bearer header and error normalisation live here so no
- * component ever configures HTTP for itself.
+ * <p>Base URL, credentials and error normalisation live here so no component
+ * ever configures HTTP for itself.
+ *
+ * <p>The session is an httpOnly cookie the server sets on sign-in: no script,
+ * ours or an injected one, can read it. `withCredentials` sends it, and
+ * `X-Requested-With` is what the server requires before it accepts a write
+ * made with that cookie, a header no cross-site form can add.
  */
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+  withCredentials: true,
   timeout: 20000,
-});
-
-export const tokenStorage = {
-  get: (): string | null => localStorage.getItem(TOKEN_KEY),
-  set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
-};
-
-apiClient.interceptors.request.use((config) => {
-  const token = tokenStorage.get();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
 });
 
 /** Called when the server says the session is over. Set by the auth provider. */
@@ -42,18 +32,10 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
     const code = error.response?.data?.error;
 
-    // An expired or invalid token ends the session everywhere at once.
+    // An expired or invalid session ends it everywhere at once. The server has
+    // already cleared the cookie, and public pages keep working without it.
     if (status === 401 && (code === 'TOKEN_EXPIRED' || code === 'UNAUTHENTICATED')) {
-      const hadToken = Boolean(tokenStorage.get());
-      tokenStorage.clear();
       onSessionExpired?.();
-      // A signed-in customer's stale token must not break browsing: public
-      // reads work without one, so retry them once anonymously.
-      const config = error.config;
-      if (hadToken && config && config.url?.startsWith('/api/public/') && config.method === 'get') {
-        delete config.headers.Authorization;
-        return apiClient.request(config);
-      }
     }
     return Promise.reject(error);
   },

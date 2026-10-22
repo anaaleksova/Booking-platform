@@ -25,9 +25,8 @@ export interface CurrentUser {
   businesses: Membership[];
 }
 
+/** A new session. The token itself is only ever in the httpOnly session cookie. */
 export interface AuthResponse {
-  accessToken: string;
-  tokenType: string;
   expiresAt: string;
   user: CurrentUser;
 }

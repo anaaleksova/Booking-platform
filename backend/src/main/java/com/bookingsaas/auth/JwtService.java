@@ -5,6 +5,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -15,6 +17,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HexFormat;
+import java.util.Set;
 
 /**
  * Issues and verifies the stateless access token.
@@ -31,12 +34,25 @@ public class JwtService {
     /** Fingerprint of the password the token was issued under; see {@link #passwordFingerprint}. */
     static final String CLAIM_PASSWORD_VERSION = "pwv";
 
+    /** Example secrets that appear in this repository (application-dev.yml, .env.example, docker-compose.yml). */
+    static final Set<String> PLACEHOLDER_SECRETS = Set.of(
+            "local-development-only-secret-please-change-me",
+            "change-me-to-a-long-random-value-at-least-32-chars",
+            "local-development-secret-change-me-please-32");
+
     private final SecretKey key;
     private final String issuer;
     private final Duration expiration;
 
-    public JwtService(AppProperties properties) {
-        this.key = Keys.hmacShaKeyFor(properties.jwt().secret().getBytes(StandardCharsets.UTF_8));
+    public JwtService(AppProperties properties, Environment environment) {
+        String secret = properties.jwt().secret();
+        if (PLACEHOLDER_SECRETS.contains(secret) && !environment.acceptsProfiles(Profiles.of("dev", "test"))) {
+            // Anyone who has read the repository knows these, and could sign a
+            // token for any user. Refuse to start rather than run insecurely.
+            throw new IllegalStateException("JWT_SECRET is set to a published example value. "
+                    + "Generate a real one, e.g. openssl rand -base64 48");
+        }
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.issuer = properties.jwt().issuer();
         this.expiration = Duration.ofMinutes(properties.jwt().expirationMinutes());
     }

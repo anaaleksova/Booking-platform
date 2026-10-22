@@ -173,7 +173,8 @@ class AnalyticsIT extends AbstractIntegrationTest {
                 """, Long.class, email, passwordEncoder.encode("password123"));
         jdbcTemplate.update("INSERT INTO business_user (business_id, user_id, role) VALUES (?, ?, 'STAFF')",
                 businessId, userId);
-        return send(post("/api/auth/login"), null, """
-                {"email":"%s","password":"password123"}""".formatted(email), 200).get("accessToken").asText();
+        send(post("/api/auth/login"), null, """
+                {"email":"%s","password":"password123"}""".formatted(email), 200);
+        return lastSessionToken();
     }
 }

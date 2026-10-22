@@ -206,8 +206,9 @@ class StaffAccessIT extends AbstractSpaIntegrationTest {
 
     private String acceptAsNew() throws Exception {
         send(post("/api/admin/employees/" + elenaId + "/invite"), owner, null, 200);
-        return send(post("/api/auth/invitations/" + token(ELENA) + "/accept-new"), null, """
-                {"fullName":"Elena Petrova","password":"password123"}""", 200).get("accessToken").asText();
+        send(post("/api/auth/invitations/" + token(ELENA) + "/accept-new"), null, """
+                {"fullName":"Elena Petrova","password":"password123"}""", 200);
+        return lastSessionToken();
     }
 
     private String token(String email) {

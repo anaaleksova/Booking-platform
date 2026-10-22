@@ -18,8 +18,21 @@ public record AppProperties(
         Jwt jwt,
         Cors cors,
         @NotBlank String frontendUrl,
-        Notifications notifications
+        Notifications notifications,
+        RateLimit rateLimit,
+        Session session
 ) {
+
+    /** Switched off only in tests that make many requests from one address. */
+    public record RateLimit(boolean enabled) {
+    }
+
+    /**
+     * The session cookie. {@code secure} must be on wherever the site is served
+     * over HTTPS; it is off by default only so plain-http local setups work.
+     */
+    public record Session(@NotBlank String cookieName, boolean secureCookie) {
+    }
 
     public record Jwt(
             /* HS256 requires >= 256 bits of key material. */

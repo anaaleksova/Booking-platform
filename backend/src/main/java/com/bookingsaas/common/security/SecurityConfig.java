@@ -5,6 +5,8 @@ import com.bookingsaas.common.config.AppProperties;
 import com.bookingsaas.integration.auth.IntegrationAuthenticationFilter;
 import com.bookingsaas.integration.auth.IntegrationTokenService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -78,11 +80,18 @@ public class SecurityConfig {
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(entryPoint))
+                // API responses: no sniffing, no framing, no referrer leaking a booking reference.
+                .headers(headers -> headers
+                        .contentTypeOptions(Customizer.withDefaults())
+                        .frameOptions(frame -> frame.deny())
+                        .referrerPolicy(referrer -> referrer.policy(
+                                ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/register", "/api/auth/customer/register", "/api/auth/customer/verify",
+                        .requestMatchers("/api/auth/register", "/api/auth/register/verify",
+                                "/api/auth/customer/register", "/api/auth/customer/verify",
                                 "/api/auth/password/forgot", "/api/auth/password/reset",
-                                "/api/auth/login").permitAll()
+                                "/api/auth/login", "/api/auth/logout", "/api/auth/session").permitAll()
                         // An invitation link is its own credential; accepting as an existing account needs a sign-in.
                         .requestMatchers(HttpMethod.GET, "/api/auth/invitations/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/invitations/*/accept-new").permitAll()
@@ -111,7 +120,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Location"));
+        configuration.setExposedHeaders(List.of("Location", "Retry-After"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

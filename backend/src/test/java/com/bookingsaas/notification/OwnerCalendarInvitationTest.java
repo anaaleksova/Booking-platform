@@ -32,7 +32,7 @@ class OwnerCalendarInvitationTest {
 
     private static final Instant NOW = Instant.parse("2026-10-17T09:00:00Z");
     private static final AppProperties PROPERTIES = new AppProperties(null, null, "https://book.example.com",
-            new AppProperties.Notifications("bookings@example.com", true, 5000, 60000));
+            new AppProperties.Notifications("bookings@example.com", true, 5000, 60000), null, null);
 
     private final NotificationComposer composer = new NotificationComposer(PROPERTIES);
 

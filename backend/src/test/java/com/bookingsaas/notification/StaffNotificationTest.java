@@ -26,7 +26,7 @@ class StaffNotificationTest {
 
     private static final Instant NOW = Instant.parse("2026-10-17T09:00:00Z");
     private static final AppProperties PROPERTIES = new AppProperties(null, null, "https://book.example.com",
-            new AppProperties.Notifications("bookings@example.com", true, 5000, 60000));
+            new AppProperties.Notifications("bookings@example.com", true, 5000, 60000), null, null);
     private static final StaffMember ELENA = new StaffMember(11L, "Elena", "elena@spa.test");
     private static final StaffMember ANNA = new StaffMember(12L, "Anna", "anna@spa.test");
 

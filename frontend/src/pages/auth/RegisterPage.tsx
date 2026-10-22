@@ -14,6 +14,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { errorMessage } from '@/api/client';
 import { AuthShell } from '@/pages/auth/LoginPage';
 import { PasswordField } from '@/components/PasswordField';
+import { VerificationCodeForm } from '@/features/auth/VerificationCodeForm';
 
 /** A short list plus the browser's own zone, which covers most sign-ups. */
 const COMMON_TIMEZONES = [
@@ -37,10 +38,16 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+/**
+ * Business sign-up in two steps: the details, then the code emailed to the
+ * owner. Nothing is created until the code proves the address is theirs.
+ */
 export function RegisterPage() {
-  const { register: signUp, isAuthenticated, initialising } = useAuth();
+  const { register: signUp, verifyRegistration, isAuthenticated, initialising } = useAuth();
   const navigate = useNavigate();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  /** The details sent, while waiting for the code; null while filling them in. */
+  const [pending, setPending] = useState<FormValues | null>(null);
 
   const detectedZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const timezones = COMMON_TIMEZONES.includes(detectedZone)
@@ -62,13 +69,31 @@ export function RegisterPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
+    const details = { ...values, email: values.email.trim() };
     try {
-      await signUp(values);
-      navigate('/admin', { replace: true });
+      await signUp(details);
+      setPending(details);
     } catch (error) {
       setSubmitError(errorMessage(error, 'Could not create the account.'));
     }
   });
+
+  if (pending) {
+    return (
+      <AuthShell title="Confirm your email" subtitle="One last step before your dashboard.">
+        <VerificationCodeForm
+          email={pending.email}
+          purpose="create your business account"
+          onVerify={async (code) => {
+            await verifyRegistration(pending.email, code);
+            navigate('/admin', { replace: true });
+          }}
+          onResend={() => signUp(pending)}
+          onBack={() => setPending(null)}
+        />
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell
@@ -99,7 +124,7 @@ export function RegisterPage() {
             autoComplete="email"
             fullWidth
             error={Boolean(errors.email)}
-            helperText={errors.email?.message}
+            helperText={errors.email?.message ?? 'We will send a code to confirm it.'}
             {...register('email')}
           />
           <PasswordField
@@ -126,7 +151,7 @@ export function RegisterPage() {
             ))}
           </TextField>
           <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create account'}
+            {isSubmitting ? 'Sending code…' : 'Create account'}
           </Button>
           <Typography variant="body2" color="text.secondary" textAlign="center">
             Already have an account?{' '}
