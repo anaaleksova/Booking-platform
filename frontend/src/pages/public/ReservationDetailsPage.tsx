@@ -14,6 +14,7 @@ import { StatusChip } from '@/components/StatusChip';
 import { ErrorState, LoadingState } from '@/components/states';
 import { useToast } from '@/components/ToastProvider';
 import { cancelPublicReservation, usePublicBusiness, usePublicReservation } from '@/features/public/api';
+import { AddToCalendar } from '@/features/public/AddToCalendar';
 import { BusinessShell } from '@/features/public/BusinessShell';
 import { queryKeys } from '@/features/queryKeys';
 import Container from '@mui/material/Container';
@@ -111,6 +112,11 @@ export function ReservationDetailsPage() {
           <Alert severity="info" sx={{ mt: 3 }}>
             This reservation has been cancelled.
           </Alert>
+        ) : new Date(data.endTime) > new Date() ? (
+          <>
+            <Divider sx={{ my: 3 }} />
+            <AddToCalendar reservation={data} />
+          </>
         ) : null}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 3 }}>

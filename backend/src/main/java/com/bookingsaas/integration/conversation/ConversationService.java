@@ -12,6 +12,7 @@ import com.bookingsaas.integration.ChannelProvider;
 import com.bookingsaas.integration.api.IntegrationCatalogService;
 import com.bookingsaas.integration.api.IntegrationDtos.CreateReservationRequest;
 import com.bookingsaas.integration.api.IntegrationDtos.CustomerRequest;
+import com.bookingsaas.integration.api.IntegrationDtos.NamedResource;
 import com.bookingsaas.integration.api.IntegrationDtos.Quote;
 import com.bookingsaas.integration.api.IntegrationDtos.ReservationInfo;
 import com.bookingsaas.integration.api.IntegrationDtos.ResourceChoice;
@@ -55,6 +56,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
@@ -153,12 +155,14 @@ public class ConversationService {
         ZoneId zone = business.zoneId();
         Optional<Customer> linked = identities.linkedCustomer(businessId, provider, externalUserId);
         Optional<Conversation> conversation = active(businessId, provider, externalUserId);
-        List<String> serviceNames = catalog.services(businessId).stream().map(ServiceInfo::name).toList();
+        List<ServiceInfo> services = catalog.services(businessId);
+        List<String> serviceNames = services.stream().map(ServiceInfo::name).toList();
         LocalDateTime now = LocalDateTime.now(clock.withZone(zone));
 
         if (conversation.isEmpty()) {
             return new ConversationContext(null, null, null, null, List.of(), null, customerFacts(linked),
-                    now.toLocalDate(), now.withNano(0), business.getTimezone(), serviceNames);
+                    now.toLocalDate(), now.withNano(0), business.getTimezone(), serviceNames,
+                    resourceNames(services, null));
         }
         Conversation c = conversation.get();
         ConversationData d = read(c);
@@ -166,7 +170,8 @@ public class ConversationService {
                 options(d), new Collected(d.getServiceName(), d.getParticipants(), d.getDate(),
                         d.getTime() == null ? null : d.getTime().format(HH_MM), d.getTimePreference(),
                         d.getFirstName(), d.getPhone(), d.getDiscountCode()),
-                customerFacts(linked), now.toLocalDate(), now.withNano(0), business.getTimezone(), serviceNames);
+                customerFacts(linked), now.toLocalDate(), now.withNano(0), business.getTimezone(), serviceNames,
+                resourceNames(services, d.getServiceId()));
     }
 
     // --- one message ---------------------------------------------------------
@@ -226,6 +231,12 @@ public class ConversationService {
                 : cancellationStep(turn, conversation, ex);
     }
 
+    /** The chat channel a conversation takes place in. */
+    @Transactional(readOnly = true)
+    public ChannelProvider providerOf(Long businessId, Long conversationId) {
+        return require(businessId, conversationId).getProvider();
+    }
+
     // --- results reported by the workflow ----------------------------------
 
     /** Called in the reservation's own transaction: the chat ends with the booking. */
@@ -281,8 +292,7 @@ public class ConversationService {
             throw ApiException.of(ErrorCode.INVALID_RESERVATION_STATE, "This conversation has already ended.");
         }
 
-        ConversationData d = read(conversation);
-        LocalTime near = null;
+        ConversationData d = read(conversation);        LocalTime near = null;
         if (code == null) {
             turn.problems().add(new Problem("TEMPORARY_ERROR",
                     "The booking could not be completed just now; the customer can confirm again in a moment."));
@@ -342,6 +352,9 @@ public class ConversationService {
                     case TIME -> changed |= setTime(d, LocalTime.parse(value));
                     case RESOURCE -> {
                         d.getResourceSelections().put(d.getAskedRequirementId(), ids(value));
+                        // Remembered by name, so a later change of time keeps the same choice.
+                        d.setPreferredResource(offer.get().label());
+                        d.setAnyResource(false);
                         changed = true;
                     }
                     default -> {
@@ -403,6 +416,19 @@ public class ConversationService {
             d.getResourceSelections().put(d.getAskedRequirementId(), List.of());
             changed = true;
         }
+        // Who or what was asked for by name before the question came up ("14:00 with Elena"),
+        // or "anyone is fine" said up front: both spare the customer the resource question.
+        if (hasText(ex.resource()) && !ex.resource().trim().equalsIgnoreCase(
+                Objects.toString(d.getPreferredResource(), ""))) {
+            d.setPreferredResource(ex.resource().trim());
+            d.setAnyResource(false);
+            d.setResourceSelections(new LinkedHashMap<>());
+            changed = true;
+        } else if (Boolean.TRUE.equals(ex.noPreference()) && d.getAsked() != Ask.RESOURCE && !d.isAnyResource()) {
+            d.setAnyResource(true);
+            d.setPreferredResource(null);
+            changed = true;
+        }
         changed |= setText(ex.firstName(), d.getFirstName(), d::setFirstName);
         changed |= setText(ex.lastName(), d.getLastName(), d::setLastName);
         changed |= setText(ex.phone(), d.getPhone(), d::setPhone);
@@ -426,7 +452,6 @@ public class ConversationService {
         Long businessId = turn.businessId();
         ZoneId zone = turn.business().zoneId();
         List<Problem> problems = turn.problems();
-
         // 1. service
         ServiceInfo service = d.getServiceId() == null ? null : find(services, d.getServiceId());
         if (d.getServiceId() != null && service == null) {
@@ -512,6 +537,20 @@ public class ConversationService {
                     pool = preferred;
                 }
             }
+            // Asked for someone by name: offer only the times they are free.
+            if (hasText(d.getPreferredResource()) && mentions(resourceNames(services, service.id()),
+                    d.getPreferredResource())) {
+                List<Slot> withPreferred = pool.stream()
+                        .filter(slot -> slot.resourceOptions().stream()
+                                .anyMatch(options -> matchChoice(options.choices(), d.getPreferredResource()) != null))
+                        .toList();
+                if (withPreferred.isEmpty()) {
+                    problems.add(new Problem("RESOURCE_NOT_AVAILABLE",
+                            d.getPreferredResource() + " has no free times that day."));
+                } else {
+                    pool = withPreferred;
+                }
+            }
             List<Offer> offers = numbered(spread(pool, MAX_TIME_OPTIONS).stream()
                     .map(slot -> new Offer(0, slot.start() + "–" + slot.end(), slot.start())).toList());
             return ask(turn, c, d, State.WAITING_FOR_TIME, Ask.TIME, offers, List.of(),
@@ -529,6 +568,24 @@ public class ConversationService {
                                 + " is not available at this time."));
                 d.getResourceSelections().remove(requirement.requirementId());
                 selected = null;
+            }
+            boolean preferredTaken = false;
+            if (selected == null && hasText(d.getPreferredResource())) {
+                ResourceChoice match = matchChoice(requirement.choices(), d.getPreferredResource());
+                if (match != null) {
+                    selected = idsOf(match);
+                    d.getResourceSelections().put(requirement.requirementId(), selected);
+                } else if (mentions(requirementResourceNames(service, requirement.requirementId()),
+                        d.getPreferredResource())) {
+                    // Named, but not free at this time: say so and let them pick.
+                    problems.add(new Problem("RESOURCE_NOT_AVAILABLE",
+                            d.getPreferredResource() + " is not available at this time."));
+                    preferredTaken = true;
+                }
+            }
+            if (selected == null && d.isAnyResource() && !preferredTaken) {
+                selected = List.of();
+                d.getResourceSelections().put(requirement.requirementId(), selected);
             }
             if (selected == null) {
                 List<Offer> offers = numbered(requirement.choices().stream()
@@ -553,7 +610,8 @@ public class ConversationService {
                     d.setPhone(ExternalIdentityService.normalizePhone(d.getPhone(),
                             ExternalIdentityService.regionOf(turn.business().getPhone())));
                 } catch (ApiException invalid) {
-                    problems.add(new Problem("INVALID_PHONE", invalid.getMessage()));
+                    // The number is quoted back, so a typo is easy to spot.
+                    problems.add(new Problem("INVALID_PHONE", d.getPhone().trim() + ": " + invalid.getMessage()));
                     d.setPhone(null);
                 }
             }
@@ -563,8 +621,7 @@ public class ConversationService {
             if (!missing.isEmpty()) {
                 return ask(turn, c, d, State.WAITING_FOR_CUSTOMER_INFO, Ask.CUSTOMER_INFO, List.of(), missing,
                         summary(d, service, chosen, null, zone));
-            }
-        }
+            }        }
 
         // 7. price, then the explicit confirmation
         Quote quote;
@@ -778,7 +835,9 @@ public class ConversationService {
         return new TurnResponse(c == null ? null : c.getId(), c == null ? null : c.getFlow().name(),
                 c == null ? null : c.getState().name(), next, ask, d == null ? List.of() : options(d),
                 List.copyOf(turn.problems()), missing, summary, reservation, reservationList, outcome, action,
-                customerFacts(turn.linked()), businessFacts(turn.business()));
+                customerFacts(turn.linked()), businessFacts(turn.business()),
+                d == null || d.getServiceId() == null ? List.of()
+                        : resourceNames(catalog.services(turn.businessId()), d.getServiceId()));
     }
 
     private TurnResponse ended(Turn turn, Conversation c, Outcome outcome, ReservationInfo reservation) {
@@ -982,6 +1041,57 @@ public class ConversationService {
         String price = service.price() == null ? "" : " · " + service.price().stripTrailingZeros().toPlainString()
                 + " " + service.currency() + (service.pricePerParticipant() ? " per person" : "");
         return service.name() + " · " + service.durationMinutes() + " min" + price;
+    }
+
+    /** What a customer may ask for by name: for one service, or for every service while none is chosen. */
+    private static List<String> resourceNames(List<ServiceInfo> services, Long serviceId) {
+        return services.stream()
+                .filter(service -> serviceId == null || service.id().equals(serviceId))
+                .flatMap(service -> service.resourceSelection().stream())
+                .flatMap(requirement -> requirement.resources().stream())
+                .map(NamedResource::name)
+                .distinct()
+                .toList();
+    }
+
+    private static List<String> requirementResourceNames(ServiceInfo service, Long requirementId) {
+        return service.resourceSelection().stream()
+                .filter(requirement -> requirement.requirementId().equals(requirementId))
+                .flatMap(requirement -> requirement.resources().stream())
+                .map(NamedResource::name)
+                .toList();
+    }
+
+    /** The offered choice holding the resource the customer named; an exact name wins over a partial one. */
+    static ResourceChoice matchChoice(List<ResourceChoice> choices, String wanted) {
+        String name = normalizeName(wanted);
+        if (name.isEmpty()) {
+            return null;
+        }
+        return choices.stream()
+                .filter(choice -> choice.resources().stream().anyMatch(r -> normalizeName(r.name()).equals(name)))
+                .findFirst()
+                .or(() -> choices.stream()
+                        .filter(choice -> choice.resources().stream()
+                                .anyMatch(r -> partialName(normalizeName(r.name()), name)))
+                        .findFirst())
+                .orElse(null);
+    }
+
+    private static boolean mentions(List<String> names, String wanted) {
+        String name = normalizeName(wanted);
+        return names.stream().map(ConversationService::normalizeName)
+                .anyMatch(candidate -> candidate.equals(name) || partialName(candidate, name));
+    }
+
+    private static boolean partialName(String candidate, String wanted) {
+        return candidate.length() >= 3 && wanted.length() >= 3
+                && (candidate.contains(wanted) || wanted.contains(candidate));
+    }
+
+    private static String normalizeName(String value) {
+        return Normalizer.normalize(Objects.toString(value, ""), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT).trim();
     }
 
     private static String choiceLabel(ResourceChoice choice) {

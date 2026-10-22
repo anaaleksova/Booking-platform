@@ -41,7 +41,7 @@ public class AnalyticsRepository {
     }
 
     public record ReservationDayRow(LocalDate day, long pending, long confirmed, long completed, long cancelled,
-                                    long participants) {
+                                    long noShows, long participants) {
     }
 
     public record ServiceRow(long serviceId, long reservations, long participants, BigDecimal revenue) {
@@ -96,7 +96,8 @@ public class AnalyticsRepository {
                        count(*) filter (where status = 'CONFIRMED')                   as confirmed,
                        count(*) filter (where status = 'COMPLETED')                   as completed,
                        count(*) filter (where status = 'CANCELLED')                   as cancelled,
-                       coalesce(sum(number_of_participants) filter (where status <> 'CANCELLED'), 0) as participants
+                       count(*) filter (where status = 'NO_SHOW')                     as no_shows,
+                       coalesce(sum(number_of_participants) filter (where status not in ('CANCELLED', 'NO_SHOW')), 0) as participants
                 from reservation
                 where business_id = :businessId and start_time >= :from and start_time < :to
                 group by 1
@@ -104,14 +105,14 @@ public class AnalyticsRepository {
                 """, window(businessId, from, to).addValue("zone", zone),
                 (rs, i) -> new ReservationDayRow(rs.getObject("day", LocalDate.class), rs.getLong("pending"),
                         rs.getLong("confirmed"), rs.getLong("completed"), rs.getLong("cancelled"),
-                        rs.getLong("participants")));
+                        rs.getLong("no_shows"), rs.getLong("participants")));
     }
 
     public List<ServiceRow> byService(Long businessId, Instant from, Instant to) {
         return jdbc.query("""
                 select service_id,
-                       count(*) filter (where status <> 'CANCELLED')                              as reservations,
-                       coalesce(sum(number_of_participants) filter (where status <> 'CANCELLED'), 0) as participants,
+                       count(*) filter (where status not in ('CANCELLED', 'NO_SHOW'))                              as reservations,
+                       coalesce(sum(number_of_participants) filter (where status not in ('CANCELLED', 'NO_SHOW')), 0) as participants,
                        coalesce(sum(final_price) filter (where status in """ + REVENUE_STATUSES + """
                        ), 0) as revenue
                 from reservation
@@ -129,7 +130,7 @@ public class AnalyticsRepository {
     public List<SourceRow> bySource(Long businessId, Instant from, Instant to) {
         return jdbc.query("""
                 select source,
-                       count(*) filter (where status <> 'CANCELLED') as reservations,
+                       count(*) filter (where status not in ('CANCELLED', 'NO_SHOW')) as reservations,
                        coalesce(sum(final_price) filter (where status in """ + REVENUE_STATUSES + """
                        ), 0) as revenue
                 from reservation
@@ -140,7 +141,7 @@ public class AnalyticsRepository {
                         rs.getBigDecimal("revenue")));
     }
 
-    /** Minutes each resource is held by non-cancelled reservations, clipped to the window. */
+    /** Minutes each resource is held by reservations that were kept, clipped to the window. */
     public List<ResourceUsageRow> resourceUsage(Long businessId, Instant from, Instant to) {
         return jdbc.query("""
                 select rr.resource_id,
@@ -150,7 +151,7 @@ public class AnalyticsRepository {
                 from reservation_resource rr
                 join reservation r on r.id = rr.reservation_id
                 where rr.business_id = :businessId
-                  and r.status <> 'CANCELLED'
+                  and r.status not in ('CANCELLED', 'NO_SHOW')
                   and r.start_time < :to and r.end_time > :from
                 group by rr.resource_id
                 """, window(businessId, from, to),
@@ -167,12 +168,12 @@ public class AnalyticsRepository {
                 with firsts as (
                     select customer_id, min(start_time) as first_at
                     from reservation
-                    where business_id = :businessId and status <> 'CANCELLED'
+                    where business_id = :businessId and status not in ('CANCELLED', 'NO_SHOW')
                     group by customer_id
                 ), active as (
                     select distinct customer_id
                     from reservation
-                    where business_id = :businessId and status <> 'CANCELLED'
+                    where business_id = :businessId and status not in ('CANCELLED', 'NO_SHOW')
                       and start_time >= :from and start_time < :to
                 )
                 select count(*)                                     as active,
@@ -202,7 +203,7 @@ public class AnalyticsRepository {
     public long countReservations(Long businessId, Instant from, Instant to) {
         Long count = jdbc.queryForObject("""
                 select count(*) from reservation
-                where business_id = :businessId and status <> 'CANCELLED'
+                where business_id = :businessId and status not in ('CANCELLED', 'NO_SHOW')
                   and start_time >= :from and start_time < :to
                 """, window(businessId, from, to), Long.class);
         return count == null ? 0 : count;

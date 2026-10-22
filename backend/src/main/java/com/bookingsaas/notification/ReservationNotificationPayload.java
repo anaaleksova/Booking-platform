@@ -2,6 +2,7 @@ package com.bookingsaas.notification;
 
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
 
 /**
  * Everything a message needs about a reservation, flattened.
@@ -21,6 +22,9 @@ public record ReservationNotificationPayload(
         String businessTimezone,
         String customerName,
         String customerEmail,
+        String customerPhone,
+        /** The channel it came through, e.g. "INSTAGRAM" — shown to the business. */
+        String source,
         String serviceName,
         int participants,
         /** Assigned resources, e.g. "Room 2, Anna, Maria". */
@@ -29,8 +33,14 @@ public record ReservationNotificationPayload(
         Instant end,
         String publicReference,
         /** Free text: a cancellation reason, or the previous time on a reschedule. */
-        String detail
+        String detail,
+        /** The assigned employees who can log in; each gets their own email. */
+        List<StaffMember> staff
 ) {
+
+    public ReservationNotificationPayload {
+        staff = staff == null ? List.of() : List.copyOf(staff);
+    }
 
     public ZoneId zone() {
         return businessTimezone == null ? ZoneId.of("UTC") : ZoneId.of(businessTimezone);

@@ -10,7 +10,8 @@ public record BusinessSettingsResponse(
         int cancellationDeadlineHours,
         boolean emailNotificationsEnabled,
         boolean reminderNotificationsEnabled,
-        int reminderLeadHours
+        int reminderLeadHours,
+        String notificationEmail
 ) {
 
     public static BusinessSettingsResponse from(BusinessSettings settings) {
@@ -22,6 +23,7 @@ public record BusinessSettingsResponse(
                 settings.getCancellationDeadlineHours(),
                 settings.isEmailNotificationsEnabled(),
                 settings.isReminderNotificationsEnabled(),
-                settings.getReminderLeadHours());
+                settings.getReminderLeadHours(),
+                settings.getNotificationEmail());
     }
 }

@@ -20,6 +20,8 @@ interface AuthContextValue {
   /** Step 2: the code sets the new password and signs in. */
   resetPassword: (email: string, code: string, newPassword: string) => Promise<CurrentUser>;
   logout: () => void;
+  /** Signs in with a session another endpoint issued (e.g. accepting a staff invitation). */
+  adoptSession: (data: AuthResponse) => void;
 }
 
 export interface RegisterInput {
@@ -131,8 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestPasswordReset,
       resetPassword,
       logout,
+      adoptSession: applySession,
     }),
-    [user, initialising, login, register, startCustomerSignup, verifyCustomerSignup, requestPasswordReset, resetPassword, logout],
+    [user, initialising, login, register, startCustomerSignup, verifyCustomerSignup, requestPasswordReset, resetPassword, logout, applySession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

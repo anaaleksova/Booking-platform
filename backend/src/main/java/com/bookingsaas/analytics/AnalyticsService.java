@@ -92,17 +92,24 @@ public class AnalyticsService {
         List<ReservationPoint> series = new ArrayList<>();
         long total = 0;
         long cancelled = 0;
+        long completed = 0;
+        long noShows = 0;
         for (LocalDate day = scope.period().from(); !day.isAfter(scope.period().to()); day = day.plusDays(1)) {
             ReservationDayRow row = rows.get(day);
             ReservationPoint point = row == null
-                    ? new ReservationPoint(day, 0, 0, 0, 0, 0, 0)
+                    ? new ReservationPoint(day, 0, 0, 0, 0, 0, 0, 0)
                     : new ReservationPoint(day, row.pending() + row.confirmed() + row.completed(), row.pending(),
-                            row.confirmed(), row.completed(), row.cancelled(), row.participants());
+                            row.confirmed(), row.completed(), row.cancelled(), row.noShows(), row.participants());
             total += point.total();
             cancelled += point.cancelled();
+            completed += point.completed();
+            noShows += point.noShows();
             series.add(point);
         }
-        return new ReservationReport(scope.period().from(), scope.period().to(), total, cancelled, series);
+        // Of the visits that are settled one way or the other; null when there are none yet.
+        Double noShowRate = completed + noShows == 0 ? null : (double) noShows / (completed + noShows);
+        return new ReservationReport(scope.period().from(), scope.period().to(), total, cancelled, noShows,
+                noShowRate, series);
     }
 
     /**

@@ -86,9 +86,11 @@ public class ReservationController {
         return queryService.resourceOptions(id);
     }
 
-    /** Everything this business has booked for one customer. */
+    /** Everything this business has booked for one customer: totals, and the reservations page by page. */
     @GetMapping("/customers/{id}/reservations")
-    public CustomerHistoryResponse customerHistory(@PathVariable Long id) {
-        return queryService.customerHistory(id);
+    public CustomerHistoryResponse customerHistory(@PathVariable Long id,
+                                                   @RequestParam(defaultValue = "0") int page,
+                                                   @RequestParam(defaultValue = "10") int size) {
+        return queryService.customerHistory(id, page, size);
     }
 }

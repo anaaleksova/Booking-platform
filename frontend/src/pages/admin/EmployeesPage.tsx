@@ -35,6 +35,8 @@ import {
   useSetEmployeeActive,
 } from '@/features/catalog/api';
 import { mediaUrl } from '@/features/media/api';
+import { useStaffAccess } from '@/features/staff/api';
+import { StaffAccessControl } from '@/features/staff/StaffAccessControl';
 import type { DayInterval, Employee } from '@/types/api';
 import { dayName, formatInterval } from '@/utils/format';
 
@@ -60,6 +62,7 @@ export function EmployeesPage() {
   const toast = useToast();
   const { data: employees, isLoading, isError, error, refetch } = useEmployees();
   const { data: services } = useServices();
+  const { data: staff } = useStaffAccess();
   const save = useSaveEmployee();
   const setActive = useSetEmployeeActive();
   const remove = useDeleteEmployee();
@@ -177,6 +180,7 @@ export function EmployeesPage() {
                     ? 'Whenever the business is open'
                     : summarize(employee.workingHours)}
                 </Typography>
+                <StaffAccessControl employee={employee} access={staff?.find((access) => access.employeeId === employee.id)} />
                 <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1 }}>
                   <Tooltip title="Edit">
                     <IconButton onClick={() => open(employee)}>

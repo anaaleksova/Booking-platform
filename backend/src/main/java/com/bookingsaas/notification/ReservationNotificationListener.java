@@ -38,8 +38,9 @@ public class ReservationNotificationListener {
                 }
                 case RESCHEDULED -> {
                     notificationService.cancelPendingReminders(event.payload().reservationId());
-                    notificationService.reservationRescheduled(event.payload());
+                    notificationService.reservationRescheduled(event.payload(), event.previousStaff());
                 }
+                case STAFF_CHANGED -> notificationService.staffChanged(event.payload(), event.previousStaff());
             }
         } catch (RuntimeException ex) {
             // A notification failure must never surface as a reservation failure.

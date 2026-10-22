@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -16,7 +16,31 @@ import type { ResourceSelection, Slot } from '@/types/api';
 import { formatLocalDate } from '@/utils/format';
 import { slotFitsPicks } from './useWizardState';
 
-const DAYS_SHOWN = 14;
+/** Days shown before the strip has been measured. */
+const DEFAULT_DAYS = 7;
+const DAY_WIDTH = 60;
+const DAY_GAP = 8;
+
+/**
+ * How many day buttons fit in the strip. The strip shows exactly that many and
+ * the arrows move by the same amount, so no day is hidden off-screen and skipped.
+ */
+function useDaysThatFit() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [days, setDays] = useState(DEFAULT_DAYS);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return;
+    }
+    const measure = () => setDays(Math.max(1, Math.floor((element.clientWidth + DAY_GAP) / (DAY_WIDTH + DAY_GAP))));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return { ref, days };
+}
 
 /**
  * Step 3: a day, then a time. Only times the server reports as free — and,
@@ -43,10 +67,12 @@ export function TimeStep({
   onDate: (date: string) => void;
 }) {
   const today = dayjs().startOf('day');
-  const initialStart = date && dayjs(date).isAfter(today.add(DAYS_SHOWN - 1, 'day')) ? dayjs(date).startOf('day') : today;
+  const strip = useDaysThatFit();
+  const daysShown = strip.days;
+  const initialStart = date && dayjs(date).isAfter(today.add(DEFAULT_DAYS - 1, 'day')) ? dayjs(date).startOf('day') : today;
   const [windowStart, setWindowStart] = useState(initialStart);
   const from = windowStart.format('YYYY-MM-DD');
-  const to = windowStart.add(DAYS_SHOWN - 1, 'day').format('YYYY-MM-DD');
+  const to = windowStart.add(daysShown - 1, 'day').format('YYYY-MM-DD');
   const availability = usePublicAvailability(slug, serviceId, from, to, people);
 
   const slotsByDay = useMemo(() => {
@@ -55,16 +81,21 @@ export function TimeStep({
     return map;
   }, [availability.data, selections]);
 
-  // Default to the first day that has something free.
+  // While another range loads, the query still holds the previous one's data.
+  const loading = availability.isLoading || availability.isPlaceholderData;
+  const visibleDays = useMemo(
+    () => Array.from({ length: daysShown }, (_, index) => windowStart.add(index, 'day').format('YYYY-MM-DD')),
+    [windowStart, daysShown],
+  );
+
+  // Whenever the selected day is not among the visible ones (first load, arrows,
+  // a resize), select the first visible day with free times, or else the first one.
   useEffect(() => {
-    if (!availability.data || (date && slotsByDay.has(date))) {
+    if (loading || !availability.data || (date && visibleDays.includes(date))) {
       return;
     }
-    const first = availability.data.find((day) => (slotsByDay.get(day.date) ?? []).length > 0);
-    if (first && !date) {
-      onDate(first.date);
-    }
-  }, [availability.data, date, slotsByDay, onDate]);
+    onDate(visibleDays.find((day) => (slotsByDay.get(day) ?? []).length > 0) ?? visibleDays[0]);
+  }, [loading, availability.data, date, visibleDays, slotsByDay, onDate]);
 
   const slots = date ? slotsByDay.get(date) : undefined;
   const pickedSomeone = selections.length > 0;
@@ -76,18 +107,17 @@ export function TimeStep({
           aria-label="Earlier dates"
           disabled={!windowStart.isAfter(today)}
           onClick={() => {
-            const earlier = windowStart.subtract(DAYS_SHOWN, 'day');
+            const earlier = windowStart.subtract(daysShown, 'day');
             setWindowStart(earlier.isBefore(today) ? today : earlier);
           }}
         >
           <ChevronLeftRoundedIcon />
         </IconButton>
-        <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', py: 0.5, flex: 1, scrollbarWidth: 'none' }}>
-          {Array.from({ length: DAYS_SHOWN }, (_, index) => windowStart.add(index, 'day')).map((value) => {
-            const key = value.format('YYYY-MM-DD');
+        <Box ref={strip.ref} sx={{ display: 'flex', gap: `${DAY_GAP}px`, py: 0.5, flex: 1, minWidth: 0 }}>
+          {visibleDays.map((key) => {
+            const value = dayjs(key);
             const count = slotsByDay.get(key)?.length ?? 0;
             const selected = key === date;
-            const loading = availability.isLoading;
             return (
               <ButtonBase
                 key={key}
@@ -95,7 +125,8 @@ export function TimeStep({
                 onClick={() => onDate(key)}
                 sx={{
                   flexDirection: 'column',
-                  minWidth: 60,
+                  flex: `1 1 ${DAY_WIDTH}px`,
+                  minWidth: DAY_WIDTH,
                   py: 1.25,
                   borderRadius: 3,
                   border: 2,
@@ -115,7 +146,7 @@ export function TimeStep({
             );
           })}
         </Box>
-        <IconButton aria-label="Later dates" onClick={() => setWindowStart(windowStart.add(DAYS_SHOWN, 'day'))}>
+        <IconButton aria-label="Later dates" onClick={() => setWindowStart(windowStart.add(daysShown, 'day'))}>
           <ChevronRightRoundedIcon />
         </IconButton>
       </Stack>
@@ -126,7 +157,7 @@ export function TimeStep({
         <Typography variant="h6" fontWeight={800} sx={{ mb: 1.5 }}>
           {date ? formatLocalDate(date) : 'Choose a day'}
         </Typography>
-        {availability.isLoading ? (
+        {loading ? (
           <Stack direction="row" spacing={1}>
             {Array.from({ length: 6 }, (_, index) => (
               <Skeleton key={index} variant="rounded" width={84} height={44} />
@@ -154,7 +185,7 @@ export function TimeStep({
             {pickedSomeone ? ' or go back and choose “No preference”' : ''}.
           </Typography>
         ) : (
-          <Typography color="text.secondary">No free times in these two weeks. Try later dates.</Typography>
+          <Typography color="text.secondary">No free times on these days. Try later dates.</Typography>
         )}
       </div>
     </Stack>

@@ -15,6 +15,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * The module's front door: queue a message, do not send one.
@@ -45,24 +47,67 @@ public class NotificationService {
         this.clock = clock;
     }
 
-    /** Reservation confirmed: one message to the customer, one to the business. */
+    /**
+     * Reservation confirmed: one message to the customer, one to the business —
+     * whatever the channel it came through (website, admin panel, Instagram...).
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void reservationConfirmed(ReservationNotificationPayload payload) {
         enqueue(NotificationType.RESERVATION_CONFIRMED_CUSTOMER, payload, payload.customerEmail(), null);
-        enqueue(NotificationType.RESERVATION_CONFIRMED_BUSINESS, payload, payload.businessEmail(), null);
+        enqueue(NotificationType.RESERVATION_CONFIRMED_BUSINESS, payload,
+                businessService.notificationEmailOf(payload.businessId()), null);
+        payload.staff().forEach(member -> enqueueForStaff(NotificationType.RESERVATION_CONFIRMED_STAFF, payload, member));
         scheduleReminder(payload);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void reservationCancelled(ReservationNotificationPayload payload) {
         enqueue(NotificationType.RESERVATION_CANCELLED_CUSTOMER, payload, payload.customerEmail(), null);
-        enqueue(NotificationType.RESERVATION_CANCELLED_BUSINESS, payload, payload.businessEmail(), null);
+        enqueue(NotificationType.RESERVATION_CANCELLED_BUSINESS, payload,
+                businessService.notificationEmailOf(payload.businessId()), null);
+        payload.staff().forEach(member -> enqueueForStaff(NotificationType.RESERVATION_CANCELLED_STAFF, payload, member));
     }
 
+    /**
+     * Moved. Staff still on it hear it moved; staff newly on it get it as a new
+     * appointment; staff taken off it hear it is no longer theirs.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void reservationRescheduled(ReservationNotificationPayload payload) {
+    public void reservationRescheduled(ReservationNotificationPayload payload, List<StaffMember> previousStaff) {
         enqueue(NotificationType.RESERVATION_RESCHEDULED_CUSTOMER, payload, payload.customerEmail(), null);
+        // The owner hears too: the invitation in it moves the event in their calendar.
+        enqueue(NotificationType.RESERVATION_RESCHEDULED_BUSINESS, payload,
+                businessService.notificationEmailOf(payload.businessId()), null);
+        Set<Long> before = employeeIds(previousStaff);
+        for (StaffMember member : payload.staff()) {
+            enqueueForStaff(before.contains(member.employeeId()) ? NotificationType.RESERVATION_RESCHEDULED_STAFF
+                    : NotificationType.RESERVATION_CONFIRMED_STAFF, payload, member);
+        }
+        unassigned(payload, previousStaff);
         scheduleReminder(payload);
+    }
+
+    /** Same time, another employee: only the staff concerned hear about it. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void staffChanged(ReservationNotificationPayload payload, List<StaffMember> previousStaff) {
+        Set<Long> before = employeeIds(previousStaff);
+        payload.staff().stream().filter(member -> !before.contains(member.employeeId()))
+                .forEach(member -> enqueueForStaff(NotificationType.RESERVATION_CONFIRMED_STAFF, payload, member));
+        unassigned(payload, previousStaff);
+    }
+
+    private void unassigned(ReservationNotificationPayload payload, List<StaffMember> previousStaff) {
+        Set<Long> now = employeeIds(payload.staff());
+        previousStaff.stream().filter(member -> !now.contains(member.employeeId()))
+                .forEach(member -> enqueueForStaff(NotificationType.RESERVATION_UNASSIGNED_STAFF, payload, member));
+    }
+
+    private static Set<Long> employeeIds(List<StaffMember> staff) {
+        return staff.stream().map(StaffMember::employeeId).collect(Collectors.toSet());
+    }
+
+    private void enqueueForStaff(NotificationType type, ReservationNotificationPayload payload, StaffMember member) {
+        enqueue(type, payload, member.email(), null, member);
     }
 
     /**
@@ -98,6 +143,12 @@ public class NotificationService {
     }
 
     private void enqueue(NotificationType type, ReservationNotificationPayload payload, String recipient, Instant dueAt) {
+        enqueue(type, payload, recipient, dueAt, null);
+    }
+
+    /** @param staff the employee the message is for, when it is for one */
+    private void enqueue(NotificationType type, ReservationNotificationPayload payload, String recipient, Instant dueAt,
+                         StaffMember staff) {
         if (!properties.notifications().enabled()) {
             return;
         }
@@ -116,10 +167,11 @@ public class NotificationService {
         notification.setType(type);
         notification.setRecipient(recipient);
         notification.setSubject(composer.subject(type, payload));
-        notification.setBody(composer.body(type, payload));
+        notification.setBody(composer.body(type, payload, staff));
         Business business = businessService.requireById(payload.businessId());
         notification.setHtmlBody(composer.html(type, payload,
-                new NotificationComposer.Branding(business.getAccentColor(), business.isDarkTheme())));
+                new NotificationComposer.Branding(business.getAccentColor(), business.isDarkTheme()), staff));
+        notification.setCalendarIcs(composer.calendarFile(type, payload, recipient, clock.instant(), staff));
         notification.setSenderName(payload.businessName());
         notification.setReplyTo(payload.businessEmail());
         notification.setScheduledAt(dueAt == null ? clock.instant() : dueAt);

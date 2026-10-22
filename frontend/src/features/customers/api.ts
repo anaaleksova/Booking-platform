@@ -29,10 +29,12 @@ export function useCustomer(id: number) {
   });
 }
 
-export function useCustomerHistory(id: number) {
+export function useCustomerHistory(id: number, page: number, size = 10) {
   return useQuery({
-    queryKey: queryKeys.customerHistory(id),
-    queryFn: async () => (await apiClient.get<CustomerHistory>(`/api/admin/customers/${id}/reservations`)).data,
+    queryKey: queryKeys.customerHistory(id, page, size),
+    queryFn: async () =>
+      (await apiClient.get<CustomerHistory>(`/api/admin/customers/${id}/reservations`, { params: { page, size } })).data,
+    placeholderData: keepPreviousData,
   });
 }
 

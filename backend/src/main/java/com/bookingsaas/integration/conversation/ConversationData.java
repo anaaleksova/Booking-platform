@@ -36,6 +36,10 @@ public class ConversationData {
     private TimeOfDay timePreference;
     /** requirement id → chosen resource ids; an empty list means "no preference". */
     private Map<Long, List<Long>> resourceSelections = new LinkedHashMap<>();
+    /** Who or what the customer asked for by name, before being asked; matched once the time is known. */
+    private String preferredResource;
+    /** The customer said up front that anyone/anything is fine: the resource question is skipped. */
+    private boolean anyResource;
     private String firstName;
     private String lastName;
     private String phone;

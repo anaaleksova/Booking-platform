@@ -40,9 +40,10 @@ public class ReservationCustomerActivityProvider implements CustomerActivityProv
         Map<Long, CustomerActivity> result = new HashMap<>();
         jdbc.query("""
                 select customer_id,
-                       count(*) filter (where status <> 'CANCELLED')                          as reservations,
+                       count(*) filter (where status not in ('CANCELLED', 'NO_SHOW'))         as reservations,
                        coalesce(sum(final_price) filter (where status in ('CONFIRMED', 'COMPLETED')), 0) as spent,
-                       max(start_time) filter (where status <> 'CANCELLED' and start_time <= :now) as last_at
+                       max(start_time) filter (where status not in ('CANCELLED', 'NO_SHOW') and start_time <= :now)
+                           as last_at
                 from reservation
                 where business_id = :businessId and customer_id in (:customerIds)
                 group by customer_id

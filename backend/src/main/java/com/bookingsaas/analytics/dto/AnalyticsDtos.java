@@ -49,11 +49,12 @@ public final class AnalyticsDtos {
     }
 
     public record ReservationPoint(LocalDate date, long total, long pending, long confirmed, long completed,
-                                   long cancelled, long participants) {
+                                   long cancelled, long noShows, long participants) {
     }
 
-    public record ReservationReport(LocalDate from, LocalDate to, long total, long cancelled,
-                                    List<ReservationPoint> series) {
+    /** @param noShowRate no-shows / (completed + no-shows), 0..1; null when neither happened in the range */
+    public record ReservationReport(LocalDate from, LocalDate to, long total, long cancelled, long noShows,
+                                    Double noShowRate, List<ReservationPoint> series) {
     }
 
     /** @param reservations non-cancelled reservations; revenue follows the revenue definition */

@@ -6,12 +6,12 @@ import com.bookingsaas.availability.dto.DaySlotsResponse;
 import com.bookingsaas.business.Business;
 import com.bookingsaas.business.BusinessService;
 import com.bookingsaas.business.GalleryService;
-import com.bookingsaas.business.OpeningHoursService;
-import com.bookingsaas.pricing.PricingService;
+import com.bookingsaas.business.OpeningHoursService;import com.bookingsaas.pricing.PricingService;
 import com.bookingsaas.publicapi.dto.PublicBusinessResponse;
 import com.bookingsaas.publicapi.dto.PublicServiceResponse;
 import com.bookingsaas.pricing.dto.QuoteRequest;
 import com.bookingsaas.pricing.dto.QuoteResponse;
+import com.bookingsaas.reservation.ReservationCalendarService;
 import com.bookingsaas.reservation.ReservationQueryService;
 import com.bookingsaas.reservation.ReservationService;
 import com.bookingsaas.reservation.dto.CancelRequest;
@@ -23,7 +23,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -64,6 +68,7 @@ public class PublicReservationController {
     private final ReservationQueryService reservationQueryService;
     private final BookingPageService bookingPageService;
     private final GalleryService galleryService;
+    private final ReservationCalendarService calendarService;
 
     public PublicReservationController(BusinessService businessService,
                                        OpeningHoursService openingHoursService,
@@ -73,7 +78,8 @@ public class PublicReservationController {
                                        ReservationService reservationService,
                                        ReservationQueryService reservationQueryService,
                                        BookingPageService bookingPageService,
-                                       GalleryService galleryService) {
+                                       GalleryService galleryService,
+                                       ReservationCalendarService calendarService) {
         this.businessService = businessService;
         this.openingHoursService = openingHoursService;
         this.serviceCatalog = serviceCatalog;
@@ -83,6 +89,7 @@ public class PublicReservationController {
         this.reservationQueryService = reservationQueryService;
         this.bookingPageService = bookingPageService;
         this.galleryService = galleryService;
+        this.calendarService = calendarService;
     }
 
     @GetMapping("/businesses/{slug}")
@@ -129,6 +136,15 @@ public class PublicReservationController {
     public PublicReservationResponse reserve(@PathVariable String slug,
                                              @Valid @RequestBody PublicReservationRequest request) {
         return reservationService.createFromCustomer(slug, request);
+    }
+
+    /** The customer's reservation as an .ics file, for "Add to calendar" → Apple / other. */
+    @GetMapping("/reservations/{reference}/calendar.ics")
+    public ResponseEntity<String> calendarFile(@PathVariable UUID reference) {
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "calendar", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"reservation.ics\"")
+                .body(calendarService.customerEvent(reservationQueryService.getByReference(reference)));
     }
 
     /** The reservation details page. The reference is the only credential needed. */

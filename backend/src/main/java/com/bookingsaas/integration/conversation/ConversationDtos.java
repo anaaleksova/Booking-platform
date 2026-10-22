@@ -58,8 +58,11 @@ public final class ConversationDtos {
      * @param date          resolved to an ISO date, e.g. "tomorrow" → 2026-10-07
      * @param time          "HH:mm", 24-hour
      * @param optionNumber  the number of an offered option the customer chose
-     * @param noPreference  "any is fine" — for a resource question
+     * @param noPreference  "any is fine" — for a resource question, or given up front
+     *                      so that question is skipped
      * @param abort         the customer wants to stop the current conversation
+     * @param resource      a person or thing the customer asked for by name
+     *                      ("with Elena"), at any point; applied when the time is known
      */
     public record Extraction(
             Intent intent,
@@ -77,11 +80,12 @@ public final class ConversationDtos {
             @Size(max = 80) String lastName,
             @Size(max = 40) String phone,
             @Size(max = 320) String email,
-            @Size(max = 40) String discountCode
+            @Size(max = 40) String discountCode,
+            @Size(max = 120) String resource
     ) {
         public static Extraction empty() {
             return new Extraction(null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                    null, null);
+                    null, null, null);
         }
     }
 
@@ -94,6 +98,9 @@ public final class ConversationDtos {
      * @param summary     the booking as it would be made, with the server's price
      * @param outcome     set when the conversation ended
      * @param action      for CREATE_RESERVATION / CANCEL_RESERVATION: exactly what to send
+     * @param resourceNames who or what the customer may pick for the chosen service
+     *                    (empty when the business assigns everything), so a reply can
+     *                    invite the choice early
      */
     public record TurnResponse(
             Long conversationId,
@@ -110,7 +117,8 @@ public final class ConversationDtos {
             Outcome outcome,
             Action action,
             CustomerFacts customer,
-            BusinessFacts business
+            BusinessFacts business,
+            List<String> resourceNames
     ) {
     }
 
@@ -152,7 +160,12 @@ public final class ConversationDtos {
                               boolean pricePerParticipant, int maxParticipants, String currency) {
     }
 
-    /** Where a conversation stands, for interpreting the next message. */
+    /**
+     * Where a conversation stands, for interpreting the next message.
+     *
+     * @param resourceNames who or what can be asked for by name: for the chosen
+     *                      service, or for any service while none is chosen
+     */
     public record ConversationContext(
             Long conversationId,
             String flow,
@@ -164,7 +177,8 @@ public final class ConversationDtos {
             LocalDate today,
             LocalDateTime now,
             String timezone,
-            List<String> serviceNames
+            List<String> serviceNames,
+            List<String> resourceNames
     ) {
     }
 

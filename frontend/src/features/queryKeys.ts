@@ -22,7 +22,7 @@ export const queryKeys = {
 
   customers: (query: string, page: number) => ['customers', { query, page }] as const,
   customer: (id: number) => ['customers', id] as const,
-  customerHistory: (id: number) => ['customers', id, 'history'] as const,
+  customerHistory: (id: number, page: number, size: number) => ['customers', id, 'history', page, size] as const,
 
   reservations: (filters: object) => ['reservations', filters] as const,
   reservation: (id: number) => ['reservations', id] as const,

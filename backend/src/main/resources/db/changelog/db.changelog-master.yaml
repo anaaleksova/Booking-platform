@@ -64,3 +64,18 @@ databaseChangeLog:
   # After the seed on purpose: the seed writes the old 'PUBLIC' source.
   - include:
       file: db/changelog/changes/017-reservation-sources.sql
+  - include:
+      file: db/changelog/changes/018-notification-email.sql
+  - include:
+      file: db/changelog/changes/019-no-shows.sql
+  # After 019 on purpose: it writes the NO_SHOW status.
+  - include:
+      file: db/changelog/seed/109-demo-no-shows.sql
+  - include:
+      file: db/changelog/changes/020-calendar.sql
+  - include:
+      file: db/changelog/changes/021-owner-calendar-invitations.sql
+  - include:
+      file: db/changelog/changes/022-staff-invitations.sql
+  - include:
+      file: db/changelog/changes/023-staff-notifications.sql

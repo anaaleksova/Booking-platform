@@ -56,7 +56,7 @@ const NAV_SECTIONS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { to: '/admin', label: 'Dashboard', icon: <BarChartRoundedIcon />, end: true, ownerOnly: true },
       { to: '/admin/reservations', label: 'Reservations', icon: <EventNoteRoundedIcon /> },
-      { to: '/admin/customers', label: 'Customers', icon: <PeopleAltRoundedIcon /> },
+      { to: '/admin/customers', label: 'Customers', icon: <PeopleAltRoundedIcon />, ownerOnly: true },
     ],
   },
   {

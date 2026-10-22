@@ -58,6 +58,10 @@ public class BusinessSettings extends Auditable {
     @Column(name = "reminder_lead_hours", nullable = false)
     private int reminderLeadHours = 24;
 
+    /** Where the business is told about new and cancelled reservations; null means the owner's login email. */
+    @Column(name = "notification_email", length = 320)
+    private String notificationEmail;
+
     public BusinessSettings(Long businessId) {
         this.businessId = businessId;
     }

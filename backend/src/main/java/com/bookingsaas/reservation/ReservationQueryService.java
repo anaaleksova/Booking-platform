@@ -16,6 +16,8 @@ import com.bookingsaas.service.ServiceCatalogService;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -144,8 +146,12 @@ public class ReservationQueryService {
         return assembler.toPublic(business, reservation, reservationService.isCancellableByCustomer(business, reservation));
     }
 
+    /**
+     * The totals cover the whole history; only the requested page of
+     * reservations is turned into responses (resources, prices...).
+     */
     @Transactional(readOnly = true)
-    public CustomerHistoryResponse customerHistory(Long customerId) {
+    public CustomerHistoryResponse customerHistory(Long customerId, int page, int size) {
         Long businessId = currentTenant.businessId();
         Business business = businessService.requireById(businessId);
         Customer customer = customerService.requireForBusiness(businessId, customerId);
@@ -154,7 +160,7 @@ public class ReservationQueryService {
         Instant now = clock.instant();
 
         List<Reservation> kept = reservations.stream()
-                .filter(reservation -> reservation.getStatus() != ReservationStatus.CANCELLED)
+                .filter(reservation -> reservation.getStatus().wasKept())
                 .toList();
         List<Reservation> paid = reservations.stream()
                 .filter(reservation -> reservation.getStatus().countsTowardRevenue())
@@ -174,6 +180,7 @@ public class ReservationQueryService {
                 kept.size(),
                 reservations.stream().filter(r -> r.getStatus() == ReservationStatus.COMPLETED).count(),
                 reservations.stream().filter(r -> r.getStatus() == ReservationStatus.CANCELLED).count(),
+                reservations.stream().filter(r -> r.getStatus() == ReservationStatus.NO_SHOW).count(),
                 kept.stream().filter(r -> r.getStatus().isActive() && r.getStartTime().isAfter(now)).count(),
                 kept.stream().map(Reservation::getStartTime).filter(start -> !start.isAfter(now))
                         .max(Comparator.naturalOrder()).orElse(null),
@@ -183,7 +190,15 @@ public class ReservationQueryService {
                 paid.isEmpty() ? BigDecimal.ZERO
                         : totalSpent.divide(BigDecimal.valueOf(paid.size()), 2, RoundingMode.HALF_UP),
                 favourite,
-                assembler.toResponses(business, reservations));
+                page(business, reservations, page, size));
+    }
+
+    private Page<ReservationResponse> page(Business business, List<Reservation> reservations, int page, int size) {
+        PageRequest request = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
+        int from = (int) Math.min(request.getOffset(), reservations.size());
+        int to = Math.min(from + request.getPageSize(), reservations.size());
+        return new PageImpl<>(assembler.toResponses(business, reservations.subList(from, to)), request,
+                reservations.size());
     }
 
     private Reservation require(Long businessId, Long id) {

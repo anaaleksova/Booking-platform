@@ -12,6 +12,8 @@ import com.bookingsaas.common.security.CurrentTenant;
 import com.bookingsaas.customer.Customer;
 import com.bookingsaas.customer.CustomerService;
 import com.bookingsaas.discount.DiscountService;
+import com.bookingsaas.employee.EmployeeService;
+import com.bookingsaas.notification.StaffMember;
 import com.bookingsaas.notification.ReservationNotificationEvent;
 import com.bookingsaas.notification.ReservationNotificationPayload;
 import com.bookingsaas.pricing.PriceQuote;
@@ -77,6 +79,7 @@ public class ReservationService {
     private final BusinessService businessService;
     private final ServiceCatalogService serviceCatalog;
     private final CustomerService customerService;
+    private final EmployeeService employeeService;
     private final ApplicationEventPublisher events;
     private final CurrentTenant currentTenant;
     private final Clock clock;
@@ -90,6 +93,7 @@ public class ReservationService {
                               BusinessService businessService,
                               ServiceCatalogService serviceCatalog,
                               CustomerService customerService,
+                              EmployeeService employeeService,
                               ApplicationEventPublisher events,
                               CurrentTenant currentTenant,
                               Clock clock) {
@@ -102,6 +106,7 @@ public class ReservationService {
         this.businessService = businessService;
         this.serviceCatalog = serviceCatalog;
         this.customerService = customerService;
+        this.employeeService = employeeService;
         this.events = events;
         this.currentTenant = currentTenant;
         this.clock = clock;
@@ -279,14 +284,23 @@ public class ReservationService {
         }
 
         if (target == ReservationStatus.CANCELLED) {
+            currentTenant.requireOwner();   // staff mark their visits done; cancelling stays with the owner
             // The business may always cancel — the deadline protects the
             // business from late customer cancellations, not the reverse.
             applyCancellation(reservation, reason);
             log.info("Reservation cancelled id={} business={} by user={}", id, businessId, currentTenant.userId());
             events.publishEvent(ReservationNotificationEvent.cancelled(payloadFor(business, reservation, reason)));
         } else {
+            if (target == ReservationStatus.NO_SHOW && reservation.getStartTime().isAfter(clock.instant())) {
+                throw ApiException.of(ErrorCode.INVALID_RESERVATION_STATE,
+                        "A reservation can only be marked as a no-show once it has started.");
+            }
             reservation.changeStatus(target);
-            repository.save(reservation);
+            // Flushed here: undoing a no-show takes the resources back, and
+            // someone else may have been given them in the meantime.
+            saveAndFlush(reservation);
+            log.info("Reservation id={} business={} marked {} by user={}", id, businessId, target,
+                    currentTenant.userId());
         }
         return assembler.toResponse(business, reservation);
     }
@@ -311,6 +325,8 @@ public class ReservationService {
         Instant newStart = toInstant(request.startTime(), business.zoneId());
         LocalDateTime previousLocal = LocalDateTime.ofInstant(reservation.getStartTime(), business.zoneId());
         boolean moved = !newStart.equals(reservation.getStartTime());
+        // Who was on it before the change: someone taken off it hears that it is no longer theirs.
+        List<StaffMember> previousStaff = staffOf(businessId, reservation.resourceIds());
 
         ResourceAllocation allocation = request.resourceSelections() != null
                 ? availabilityService.allocate(businessId, service, newStart, reservation.getNumberOfParticipants(),
@@ -330,7 +346,14 @@ public class ReservationService {
         log.info("Reservation changed id={} business={} resources={}", id, businessId, saved.resourceIds());
         if (moved) {
             events.publishEvent(ReservationNotificationEvent.rescheduled(payloadFor(business, saved,
-                    "Previously: " + previousLocal.toLocalDate() + " at " + previousLocal.toLocalTime())));
+                    "Previously: " + previousLocal.toLocalDate() + " at " + previousLocal.toLocalTime()),
+                    previousStaff));
+        } else {
+            ReservationNotificationPayload payload = payloadFor(business, saved, null);
+            if (!payload.staff().equals(previousStaff)) {
+                // Same time, another employee: the customer and owner hear nothing, the staff concerned do.
+                events.publishEvent(ReservationNotificationEvent.staffChanged(payload, previousStaff));
+            }
         }
         return assembler.toResponse(business, saved);
     }
@@ -446,10 +469,18 @@ public class ReservationService {
         return new ReservationNotificationPayload(
                 business.getId(), reservation.getId(), business.getName(), business.getEmail(), business.getPhone(),
                 business.getAddress(), business.getTimezone(), customer.fullName(), customer.getEmail(),
+                customer.getPhone(), reservation.getSource() == null ? null : reservation.getSource().name(),
                 service.getName(), reservation.getNumberOfParticipants(),
                 assembler.resourceSummary(business.getId(), reservation),
                 reservation.getStartTime(), reservation.getEndTime(),
-                reservation.getPublicReference().toString(), detail);
+                reservation.getPublicReference().toString(), detail, staffOf(business.getId(), reservation.resourceIds()));
+    }
+
+    /** The assigned employees who can log in, as message recipients. */
+    private List<StaffMember> staffOf(Long businessId, List<Long> resourceIds) {
+        return employeeService.staffWithEmail(businessId, resourceIds).stream()
+                .map(employee -> new StaffMember(employee.getId(), employee.getName(), employee.getEmail().trim()))
+                .toList();
     }
 
     static Map<Long, List<Long>> selections(List<ResourceSelection> selections) {

@@ -8,10 +8,12 @@ import com.bookingsaas.employee.dto.EmployeeRequest;
 import com.bookingsaas.employee.dto.EmployeeResponse;
 import com.bookingsaas.resource.Resource;
 import com.bookingsaas.resource.ResourceService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -29,13 +31,16 @@ public class EmployeeService {
     private final EmployeeRepository repository;
     private final ResourceService resourceService;
     private final CurrentTenant currentTenant;
+    private final ApplicationEventPublisher events;
 
     public EmployeeService(EmployeeRepository repository,
                            ResourceService resourceService,
-                           CurrentTenant currentTenant) {
+                           CurrentTenant currentTenant,
+                           ApplicationEventPublisher events) {
         this.repository = repository;
         this.resourceService = resourceService;
         this.currentTenant = currentTenant;
+        this.events = events;
     }
 
     // --- cross-module lookups ---------------------------------------------
@@ -50,6 +55,42 @@ public class EmployeeService {
     @Transactional(readOnly = true)
     public Optional<Employee> employeeOf(Long businessId, Long userId) {
         return repository.findByBusinessIdAndUserId(businessId, userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Employee> employeesOf(Long businessId) {
+        return repository.findByBusinessIdOrderByNameAsc(businessId);
+    }
+
+    /**
+     * The employees behind these resources who can log in and have an email:
+     * the people told about a reservation they are assigned to.
+     */
+    @Transactional(readOnly = true)
+    public List<Employee> staffWithEmail(Long businessId, Collection<Long> resourceIds) {
+        if (resourceIds.isEmpty()) {
+            return List.of();
+        }
+        return repository.findByBusinessIdAndResourceIdIn(businessId, resourceIds).stream()
+                .filter(employee -> employee.getUserId() != null)
+                .filter(employee -> employee.getEmail() != null && !employee.getEmail().isBlank())
+                .sorted(Comparator.comparing(Employee::getId))
+                .toList();
+    }
+
+    /** Ties a login account to the employee: what makes "my reservations" mean theirs. */
+    @Transactional
+    public void linkUser(Long businessId, Long employeeId, Long userId) {
+        Employee employee = requireForBusiness(businessId, employeeId);
+        employee.setUserId(userId);
+        repository.save(employee);
+    }
+
+    @Transactional
+    public void unlinkUser(Long businessId, Long employeeId) {
+        Employee employee = requireForBusiness(businessId, employeeId);
+        employee.setUserId(null);
+        repository.save(employee);
     }
 
     // --- admin API ---------------------------------------------------------
@@ -143,6 +184,8 @@ public class EmployeeService {
         currentTenant.requireOwner();
         Long businessId = currentTenant.businessId();
         Employee employee = requireForBusiness(businessId, id);
+        // Their login goes with them; published first, while the employee still exists.
+        events.publishEvent(new EmployeeDeletedEvent(businessId, employee.getId(), employee.getUserId()));
         try {
             repository.delete(employee);
             repository.flush();

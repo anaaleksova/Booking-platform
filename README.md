@@ -106,16 +106,17 @@ schema on start-up.
 | `/b/:slug/book`                   | customer | Booking wizard, one view per decision: service → guests & preferences (e.g. choose your therapist) → date & time → choose your table on the map (when there is a floor plan) → details → review & confirm |
 | `/booking/:reference`             | customer | Reservation details, self-cancellation           |
 | `/admin`                          | owner    | Dashboard: KPIs, revenue and reservation charts, popular services, utilization, upcoming |
-| `/admin/reservations`             | admin    | List and week calendar; confirm, complete, cancel, move, change resources; new reservation |
+| `/admin/reservations`             | owner, staff | List and week calendar; confirm, complete, mark a no-show, cancel, move, change resources; new reservation. Staff see only theirs and can confirm, complete or mark a no-show |
 | `/admin/services`, `/new`, `/:id` | owner    | Services with category, photo and resource requirements |
 | `/admin/resources`                | owner    | Resources with photo, capacity, own hours, service restrictions |
 | `/admin/resource-types`           | owner    | Business-defined resource types, each with an optional floor plan |
-| `/admin/employees`                | owner    | Employees with photo, the services they perform, working hours |
+| `/admin/employees`                | owner    | Employees with photo, the services they perform, working hours, and their login (invite, remove access) |
+| `/invite/:token`                  | employee | Accepting an invitation: set a password, or sign in with an existing account |
 | `/admin/customers`, `/:id`        | admin    | Customers with visits, spend and history         |
 | `/admin/discounts`                | owner    | Promo codes                                      |
 | `/admin/revenue`                  | owner    | Today, this week and this month, plus a custom range with gross, discounts, net and average |
 | `/admin/analytics`                | owner    | Revenue, reservations, services, resource utilization, new vs returning customers |
-| `/admin/settings`                 | owner    | Profile, **booking page** (logo, cover photo, gallery, tagline, colour, social links, map), opening hours, booking rules, closures |
+| `/admin/settings`                 | owner    | Profile, **booking page** (logo, cover photo, gallery, tagline, colour, social links, map), opening hours, booking rules, closures, how bookings reach your calendar |
 
 Each business is reachable only through its own link. Nothing on its pages
 leads to another business, and there is no public list of businesses.
@@ -307,6 +308,80 @@ Table 3: exactly one gets in, and nothing is half-written.
   reservations, attributed to the day they take place. Pending and cancelled
   reservations never count. "Gross" is the same set over `original_price`.
 
+## Roles
+
+- **Owner:** everything, for their business.
+- **Staff:** an employee who logs in. They see only the reservations they are
+  assigned to and can confirm them, complete them or mark a no-show.
+  Cancelling, moving and creating reservations, customers, analytics and
+  settings stay with the owner.
+- **Customer:** a booking account. Customers book and manage their own
+  reservations, and never reach the admin panel.
+
+Roles are per business: the same person can own one business and be staff at
+another.
+
+**Inviting staff.** Employees → *Invite to log in* emails the employee a link
+that works for 7 days. Inviting again replaces the link, and *Withdraw* cancels
+it. The link proves the address, so accepting it either creates an account
+(name and password, no code) or, if the address already has one, asks for
+that account's password. The person becomes staff, linked to that employee.
+*Remove access*, or deleting the employee, takes the login away on their next
+request.
+
+**Staff hear about their appointments.** When a reservation is assigned to an
+employee who can log in, they get an email at their employee address, and it
+is also a calendar invitation:
+- **New:** "New appointment: …". The event appears in their calendar.
+- **Moved:** "Appointment moved: …". The event moves.
+- **Cancelled:** "Appointment cancelled: …". The event is removed.
+- **Given to someone else:** the old employee gets "Removed from your
+  schedule", and the new one gets it as a new appointment. If only the employee
+  changed, the customer and the owner get no email.
+
+Employees without a login get no email. It needs email confirmations
+switched on, like every other message.
+
+**Where it is enforced.** `AdminAccessInterceptor` keeps a short list of the
+admin endpoints staff may call. Everything else under `/api/admin` is
+owner-only, so a new endpoint is closed to staff unless it is added to that
+list on purpose. `ReservationAccess` then limits staff to their own rows.
+
+## No-shows
+
+Once a reservation has started, the business can mark it as a **no-show**
+(the customer did not come).
+- Its resources are released, so a walk-in can take the rest of the slot.
+- It earns nothing and is not a visit. It still appears in the customer's
+  history and in analytics (count and rate).
+- Pressing the wrong button is easy to fix: a no-show and a completed
+  reservation can be swapped either way.
+
+It is an admin-only record. Customers see nothing different and are never
+stopped from booking.
+
+## Calendars
+
+**The owner's calendar.** The emails the business already gets about new,
+moved and cancelled reservations are calendar invitations (`METHOD:REQUEST`,
+or `METHOD:CANCEL` for a cancellation).
+- Gmail and Outlook put each reservation in the calendar of the address the
+  emails go to, with the customer's name, phone and what was booked. A moved
+  reservation moves its event, and a cancelled one removes it.
+- The owner is listed as having already accepted, so there is nothing to
+  answer. In Google Calendar, Settings → Event settings → *Add invitations to
+  my calendar* must be *From everyone* for this to happen without a click.
+- There is nothing to connect, subscribe to or keep secret, and it works the
+  same locally as deployed. It needs email confirmations switched on.
+- Settings → Calendar explains this to the owner.
+
+**Customers.** Nothing goes into a customer's calendar unless they add it:
+- The confirmation, reminder and "moved" emails have **Add to calendar**
+  buttons: Google, Outlook, and Apple / other (an `.ics` file).
+- The confirmation and "moved" emails also attach the event as
+  `reservation.ics`, so mail apps can offer to add it.
+- The reservation page has the same buttons.
+
 ## Errors
 
 Every error has one shape:
@@ -468,6 +543,7 @@ Admin → Integrations shows recent deliveries.
    | BOOKING - Send Message | Sends through the Graph API (`/me/messages`); TEST messages are only logged |
    | BOOKING - Reservation Events | Verifies the signature, drops duplicate deliveries, routes the event |
    | BOOKING - Confirmation / Reminder / Cancellation Notice | Message the customer on their chat channel. A booking or cancellation the customer made in that chat is not announced twice. |
+   | BOOKING - Instagram Inbox Poller / Messenger Inbox Poller | For when Meta does not deliver the `messages` webhook: every 20 seconds each reads the Page's Instagram or Messenger conversations and answers new messages through **BOOKING - Instagram Reply** (despite its name, it replies on either channel). Publish only the pollers whose channel has no working webhook, or customers get two replies. Messenger needs the `pages_messaging` permission on the Page token. |
 
    Both Claude calls use `claude-opus-5-5` at low effort, with
    `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`). If a model
@@ -543,10 +619,8 @@ cd backend
 The platform does not yet have:
 - online payments or deposits
 - SMS notifications
-- customer accounts
 - loyalty programmes
 - recurring reservations
-- resource combinations (for example two tables joined for one party)
 - dynamic pricing
 - multiple locations
 - forecasting

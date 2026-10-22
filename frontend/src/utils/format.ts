@@ -83,6 +83,7 @@ export const STATUS_LABELS: Record<ReservationStatus, string> = {
   CONFIRMED: 'Confirmed',
   CANCELLED: 'Cancelled',
   COMPLETED: 'Completed',
+  NO_SHOW: 'No-show',
 };
 
 export const STATUS_COLORS: Record<ReservationStatus, 'default' | 'primary' | 'success' | 'error' | 'warning'> = {
@@ -90,6 +91,7 @@ export const STATUS_COLORS: Record<ReservationStatus, 'default' | 'primary' | 's
   CONFIRMED: 'primary',
   CANCELLED: 'error',
   COMPLETED: 'success',
+  NO_SHOW: 'default',
 };
 
 export const SOURCE_LABELS: Record<ReservationSource, string> = {

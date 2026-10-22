@@ -8,7 +8,19 @@ public enum NotificationType {
     RESERVATION_CANCELLED_CUSTOMER,
     RESERVATION_CANCELLED_BUSINESS,
     RESERVATION_RESCHEDULED_CUSTOMER,
-    RESERVATION_REMINDER_CUSTOMER;
+    RESERVATION_RESCHEDULED_BUSINESS,
+    RESERVATION_REMINDER_CUSTOMER,
+    /** To an assigned employee who can log in. */
+    RESERVATION_CONFIRMED_STAFF,
+    RESERVATION_RESCHEDULED_STAFF,
+    RESERVATION_CANCELLED_STAFF,
+    /** The reservation was given to someone else. */
+    RESERVATION_UNASSIGNED_STAFF;
+
+    public boolean isForStaff() {
+        return this == RESERVATION_CONFIRMED_STAFF || this == RESERVATION_RESCHEDULED_STAFF
+                || this == RESERVATION_CANCELLED_STAFF || this == RESERVATION_UNASSIGNED_STAFF;
+    }
 
     public boolean isReminder() {
         return this == RESERVATION_REMINDER_CUSTOMER;

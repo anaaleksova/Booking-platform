@@ -144,8 +144,12 @@ public class IntegrationReservationService {
         }
 
         Customer customer = resolveCustomer(businessId, request);
+        // The channel: from the new customer's details, or — for a customer already known,
+        // who comes as a customer id — from the chat the booking was made in.
         ReservationSource source = request.externalCustomer() != null
                 ? request.externalCustomer().provider().reservationSource()
+                : request.conversationId() != null
+                ? conversations.providerOf(businessId, request.conversationId()).reservationSource()
                 : ReservationSource.API;
         Reservation reservation = reservationService.createFromIntegration(businessId, customer,
                 new IntegrationReservationCommand(request.serviceId(), request.numberOfParticipants(),

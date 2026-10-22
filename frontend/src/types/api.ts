@@ -69,6 +69,8 @@ export interface BusinessSettings {
   emailNotificationsEnabled: boolean;
   reminderNotificationsEnabled: boolean;
   reminderLeadHours: number;
+  /** Where new and cancelled reservations are announced; null for the owner's login email. */
+  notificationEmail?: string | null;
 }
 
 /** A recurring wall-clock interval; `dayOfWeek` is 1 = Monday … 7 = Sunday. */
@@ -261,7 +263,7 @@ export interface Page<T> {
 
 // --- availability & reservations -------------------------------------------
 
-export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
 
 export interface ResourceOption {
   id: number;
@@ -357,13 +359,15 @@ export interface CustomerHistory {
   totalReservations: number;
   completedReservations: number;
   cancelledReservations: number;
+  noShowReservations: number;
   upcomingReservations: number;
   lastVisitAt?: string | null;
   nextReservationAt?: string | null;
   totalSpent: number;
   averageReservationValue: number;
   favouriteServiceName?: string | null;
-  reservations: Reservation[];
+  /** One page of the history, newest first; the totals above cover all of it. */
+  reservations: Page<Reservation>;
 }
 
 export interface PriceQuote {
@@ -441,6 +445,7 @@ export interface ReservationPoint {
   confirmed: number;
   completed: number;
   cancelled: number;
+  noShows: number;
   participants: number;
 }
 
@@ -449,6 +454,9 @@ export interface ReservationReport {
   to: string;
   total: number;
   cancelled: number;
+  noShows: number;
+  /** No-shows / (completed + no-shows), 0..1; null when neither happened in the range. */
+  noShowRate: number | null;
   series: ReservationPoint[];
 }
 

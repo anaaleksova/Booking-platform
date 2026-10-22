@@ -25,6 +25,7 @@ import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import EventNoteRoundedIcon from '@mui/icons-material/EventNoteRounded';
 import ViewListRoundedIcon from '@mui/icons-material/ViewListRounded';
 import { PageHeader } from '@/components/PageHeader';
+import { useAuth } from '@/features/auth/AuthContext';
 import { StatusChip } from '@/components/StatusChip';
 import { EmptyState, ErrorState, TableLoadingRows } from '@/components/states';
 import { useServices } from '@/features/catalog/api';
@@ -54,6 +55,7 @@ export function ReservationsPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
 
+  const { isOwner } = useAuth();
   const { data: services } = useServices();
   const filters =
     view === 'list'
@@ -67,16 +69,18 @@ export function ReservationsPage() {
   const { data, isLoading, isError, error, refetch } = useReservations(filters);
 
   const visible = useMemo(() => {
+    // Cancelled bookings hold no time and only crowd the view: shown only when asked for.
+    const shown = (data ?? []).filter((reservation) => status === 'CANCELLED' || reservation.status !== 'CANCELLED');
     const term = search.trim().toLowerCase();
     if (!term) {
-      return data ?? [];
+      return shown;
     }
-    return (data ?? []).filter((reservation) =>
+    return shown.filter((reservation) =>
       [reservation.customerName, reservation.customerEmail, reservation.serviceName, ...reservation.resources.map((r) => r.name)]
         .filter(Boolean)
         .some((value) => value!.toLowerCase().includes(term)),
     );
-  }, [data, search]);
+  }, [data, search, status]);
 
   // A different filter means a different list, so start again from the first page.
   useEffect(() => {
@@ -90,12 +94,18 @@ export function ReservationsPage() {
   return (
     <>
       <PageHeader
-        title="Reservations"
-        description="Every reservation with its assigned resources, price and status."
+        title={isOwner ? 'Reservations' : 'My reservations'}
+        description={
+          isOwner
+            ? 'Every reservation with its assigned resources, price and status.'
+            : 'The reservations assigned to you. Mark them completed, or as a no-show if the customer did not come.'
+        }
         action={
-          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreating(true)}>
-            New reservation
-          </Button>
+          isOwner ? (
+            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreating(true)}>
+              New reservation
+            </Button>
+          ) : undefined
         }
       />
 
@@ -133,7 +143,7 @@ export function ReservationsPage() {
           )}
 
           <TextField select label="Status" value={status} onChange={(e) => setStatus(e.target.value as ReservationStatus | '')} sx={{ minWidth: 150 }}>
-            <MenuItem value="">All statuses</MenuItem>
+            <MenuItem value="">All but cancelled</MenuItem>
             {(Object.keys(STATUS_LABELS) as ReservationStatus[]).map((value) => (
               <MenuItem key={value} value={value}>
                 {STATUS_LABELS[value]}
@@ -168,11 +178,15 @@ export function ReservationsPage() {
         <EmptyState
           icon={<EventNoteRoundedIcon />}
           title="No reservations in this range"
-          description="Try another date range or filter, or add a reservation taken by phone."
+          description={
+            isOwner ? 'Try another date range or filter, or add a reservation taken by phone.' : 'Try another date range or filter.'
+          }
           action={
-            <Button variant="outlined" onClick={() => setCreating(true)}>
-              New reservation
-            </Button>
+            isOwner ? (
+              <Button variant="outlined" onClick={() => setCreating(true)}>
+                New reservation
+              </Button>
+            ) : undefined
           }
         />
       ) : (

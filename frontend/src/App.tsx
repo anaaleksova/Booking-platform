@@ -1,5 +1,6 @@
 import { Suspense, lazy, type ComponentType } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { OwnerRoute } from '@/routes/OwnerRoute';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { LoadingState } from '@/components/states';
 
@@ -21,6 +22,7 @@ function page<T, K extends keyof T>(loader: () => Promise<T>, name: K) {
 const LoginPage = page(() => import('@/pages/auth/LoginPage'), 'LoginPage');
 const ForgotPasswordPage = page(() => import('@/pages/auth/ForgotPasswordPage'), 'ForgotPasswordPage');
 const RegisterPage = page(() => import('@/pages/auth/RegisterPage'), 'RegisterPage');
+const InvitePage = page(() => import('@/pages/auth/InvitePage'), 'InvitePage');
 const NotFoundPage = page(() => import('@/pages/NotFoundPage'), 'NotFoundPage');
 
 const HomePage = page(() => import('@/pages/public/HomePage'), 'HomePage');
@@ -56,6 +58,7 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/invite/:token" element={<InvitePage />} />
 
         <Route path="/" element={<HomePage />} />
         <Route path="/b/:slug" element={<BusinessPage />} />
@@ -73,21 +76,21 @@ export function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<DashboardPage />} />
+          <Route index element={<OwnerRoute><DashboardPage /></OwnerRoute>} />
           <Route path="reservations" element={<ReservationsPage />} />
-          <Route path="services" element={<ServicesPage />} />
-          <Route path="services/new" element={<ServiceEditorPage />} />
-          <Route path="services/:id" element={<ServiceEditorPage />} />
-          <Route path="resources" element={<ResourcesPage />} />
-          <Route path="resource-types" element={<ResourceTypesPage />} />
-          <Route path="employees" element={<EmployeesPage />} />
-          <Route path="customers" element={<CustomersPage />} />
-          <Route path="customers/:id" element={<CustomerDetailPage />} />
-          <Route path="discounts" element={<DiscountsPage />} />
-          <Route path="revenue" element={<RevenuePage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
-          <Route path="integrations" element={<IntegrationsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route path="services" element={<OwnerRoute><ServicesPage /></OwnerRoute>} />
+          <Route path="services/new" element={<OwnerRoute><ServiceEditorPage /></OwnerRoute>} />
+          <Route path="services/:id" element={<OwnerRoute><ServiceEditorPage /></OwnerRoute>} />
+          <Route path="resources" element={<OwnerRoute><ResourcesPage /></OwnerRoute>} />
+          <Route path="resource-types" element={<OwnerRoute><ResourceTypesPage /></OwnerRoute>} />
+          <Route path="employees" element={<OwnerRoute><EmployeesPage /></OwnerRoute>} />
+          <Route path="customers" element={<OwnerRoute><CustomersPage /></OwnerRoute>} />
+          <Route path="customers/:id" element={<OwnerRoute><CustomerDetailPage /></OwnerRoute>} />
+          <Route path="discounts" element={<OwnerRoute><DiscountsPage /></OwnerRoute>} />
+          <Route path="revenue" element={<OwnerRoute><RevenuePage /></OwnerRoute>} />
+          <Route path="analytics" element={<OwnerRoute><AnalyticsPage /></OwnerRoute>} />
+          <Route path="integrations" element={<OwnerRoute><IntegrationsPage /></OwnerRoute>} />
+          <Route path="settings" element={<OwnerRoute><SettingsPage /></OwnerRoute>} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

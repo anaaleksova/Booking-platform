@@ -2,6 +2,7 @@ package com.bookingsaas.support;
 
 import com.bookingsaas.auth.PasswordResetCodeSender;
 import com.bookingsaas.auth.SignupCodeSender;
+import com.bookingsaas.staff.StaffInviteSender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,6 +84,12 @@ public abstract class AbstractIntegrationTest {
     /** The last password-reset code "sent" to each email in the current test. */
     protected final Map<String, String> resetCodes = new ConcurrentHashMap<>();
 
+    @MockBean
+    protected StaffInviteSender staffInviteSender;
+
+    /** The last staff invitation link "sent" to each email in the current test. */
+    protected final Map<String, String> inviteLinks = new ConcurrentHashMap<>();
+
     @Autowired
     protected ObjectMapper objectMapper;
 
@@ -110,8 +117,11 @@ public abstract class AbstractIntegrationTest {
         resetCodes.clear();
         doAnswer(invocation -> resetCodes.put(invocation.getArgument(0), invocation.getArgument(2)))
                 .when(passwordResetCodeSender).send(anyString(), anyString(), anyString());
+        inviteLinks.clear();
+        doAnswer(invocation -> inviteLinks.put(invocation.getArgument(0), invocation.getArgument(3)))
+                .when(staffInviteSender).send(anyString(), anyString(), anyString(), anyString());
         jdbcTemplate.execute("""
-                TRUNCATE integration_event, integration_idempotency, integration_conversation, customer_external_identity,
+                TRUNCATE staff_invitation, integration_event, integration_idempotency, integration_conversation, customer_external_identity,
                          integration_token, integration, password_reset, pending_signup, notification, floor_plan_decor, floor_plan_item, floor_plan, gallery_image, media, reservation_resource, reservation, discount_service, discount,
                          blocked_time, resource_service, service_resource_requirement, service,
                          employee, resource_hours, resource, resource_type, customer, business_hours,

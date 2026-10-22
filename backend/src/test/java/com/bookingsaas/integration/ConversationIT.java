@@ -85,6 +85,122 @@ class ConversationIT extends AbstractSpaIntegrationTest {
     }
 
     @Test
+    void time_person_name_and_phone_in_one_message_go_straight_to_the_summary() throws Exception {
+        choosableStaffService();
+
+        JsonNode reply = turn("""
+                {"intent":"BOOK","service":"deep tissue","date":"%s"}""".formatted(day));
+        assertThat(reply.get("ask").asText()).isEqualTo("TIME");
+        assertThat(texts(reply.get("resourceNames"))).containsExactlyInAnyOrder("Anna", "Elena");
+
+        // Everything else in one answer: no separate questions for the person or the details.
+        reply = turn("""
+                {"time":"10:00","resource":"elena","firstName":"Ana","phone":"+389 70 555 666"}""");
+        assertThat(reply.get("ask").asText()).isEqualTo("CONFIRMATION");
+        assertThat(texts(reply.get("summary").get("resources"))).containsExactly("Elena");
+        assertThat(reply.get("summary").get("start").asText()).isEqualTo("10:00");
+    }
+
+    @Test
+    void a_returning_customers_chat_booking_is_still_counted_for_the_chat_channel() throws Exception {
+        book("14:00");
+
+        // Known now: the second booking goes out with a customer id instead of Instagram details.
+        turn("""
+                {"intent":"BOOK","service":"classic massage","date":"%s","time":"09:00"}""".formatted(day));
+        JsonNode action = turn("""
+                {"confirmation":"YES"}""").get("action");
+        assertThat(action.get("reservation").get("customerId").isNumber()).isTrue();
+        assertThat(action.get("reservation").hasNonNull("externalCustomer")).isFalse();
+
+        JsonNode reservation = integration(post(api("/reservations"))
+                        .header("Idempotency-Key", action.get("idempotencyKey").asText()),
+                token, action.get("reservation").toString(), 201);
+        assertThat(reservation.get("source").asText()).isEqualTo("INSTAGRAM");
+    }
+
+    @Test
+    void the_same_person_on_another_channel_is_followed_up_where_they_booked() throws Exception {
+        book("14:00");   // on Instagram, which links the customer
+
+        // Messenger gives the same person a different id: nothing tells us who they are yet.
+        turn("FACEBOOK", "fb-chat-1", """
+                {"intent":"BOOK","service":"classic massage","date":"%s","time":"09:00"}""".formatted(day));
+        JsonNode reply = turn("FACEBOOK", "fb-chat-1", """
+                {"firstName":"Ana","phone":"074596263"}""");
+        assertThat(reply.get("ask").asText()).isEqualTo("CUSTOMER_INFO");
+        assertThat(texts(reply.get("missingFields"))).containsExactly("phone");
+        // The typed number is quoted back, so the reply can point at the typo.
+        assertThat(texts(reply.get("problems"), "message")).singleElement()
+                .satisfies(message -> assertThat(message).startsWith("074596263: "));
+
+        // Their real number is the Instagram customer's: booked under that record.
+        turn("FACEBOOK", "fb-chat-1", """
+                {"phone":"+38970555666"}""");
+        JsonNode action = turn("FACEBOOK", "fb-chat-1", """
+                {"confirmation":"YES"}""").get("action");
+        JsonNode reservation = integration(post(api("/reservations"))
+                        .header("Idempotency-Key", action.get("idempotencyKey").asText()),
+                token, action.get("reservation").toString(), 201);
+        assertThat(reservation.get("source").asText()).isEqualTo("FACEBOOK");
+        assertThat(count("select count(*) from customer where phone = '+38970555666'")).isEqualTo(1);
+
+        // Confirmations and reminders go to the first channel: Messenger, not Instagram.
+        JsonNode channels = reservation.get("channels");
+        assertThat(channels.get(0).get("provider").asText()).isEqualTo("FACEBOOK");
+        assertThat(channels.get(0).get("externalUserId").asText()).isEqualTo("fb-chat-1");
+        assertThat(channels.get(1).get("provider").asText()).isEqualTo("INSTAGRAM");
+    }
+
+    @Test
+    void naming_nobody_up_front_means_no_preference_and_a_taken_person_is_asked_about() throws Exception {
+        choosableStaffService();
+        turn("""
+                {"intent":"BOOK","service":"deep tissue","date":"%s"}""".formatted(day));
+
+        JsonNode reply = turn("""
+                {"time":"11:00","noPreference":true,"firstName":"Ana","phone":"+38970555666"}""");
+        assertThat(reply.get("ask").asText()).isEqualTo("CONFIRMATION");
+        assertThat(reply.get("summary").get("resources").size()).isZero();
+
+        // Asking for someone who is booked at that time: told so, and offered who is free.
+        String elenaBusy = """
+                {"serviceId":%d,"numberOfParticipants":1,"startTime":"%sT15:00:00",
+                 "externalCustomer":{"provider":"INSTAGRAM","externalUserId":"ig-other","firstName":"Mia",
+                                     "phone":"+38970111222"},
+                 "resourceSelections":[{"requirementId":%d,"resourceIds":[%d]}]}""";
+        JsonNode service = integration(get(api("/services/" + deepTissueId)), token, null, 200);
+        JsonNode requirement = service.get("resourceSelection").get(0);
+        long elenaId = 0;
+        for (JsonNode resource : requirement.get("resources")) {
+            if (resource.get("name").asText().equals("Elena")) {
+                elenaId = resource.get("id").asLong();
+            }
+        }
+        integration(post(api("/reservations")).header("Idempotency-Key", "elena-busy"), token,
+                elenaBusy.formatted(deepTissueId, day, requirement.get("requirementId").asLong(), elenaId), 201);
+
+        reply = turn("""
+                {"time":"15:00","resource":"Elena"}""");
+        assertThat(reply.get("ask").asText()).isEqualTo("RESOURCE");
+        assertThat(codes(reply)).containsExactly("RESOURCE_NOT_AVAILABLE");
+        assertThat(texts(reply.get("options"), "label")).containsExactly("Anna");
+    }
+
+    private long deepTissueId;
+
+    /** A service where the customer picks the therapist: Anna or Elena. */
+    private void choosableStaffService() throws Exception {
+        send(post("/api/admin/employees"), owner, """
+                {"name":"Elena","active":true,"capacity":1}""", 201);
+        deepTissueId = send(post("/api/admin/services"), owner, """
+                {"name":"Deep Tissue","durationMinutes":60,"price":60,"pricePerParticipant":false,"maxParticipants":1,
+                 "bufferBeforeMinutes":0,"bufferAfterMinutes":0,"allowCustomerResourceSelection":true,"active":true,
+                 "requirements":[{"resourceTypeId":%d,"quantity":1,"required":true,"customerCanChoose":true}]}
+                """.formatted(employeeTypeId(owner)), 201).get("id").asLong();
+    }
+
+    @Test
     void mentioning_a_time_never_books_without_a_confirmed_summary() throws Exception {
         // Everything in one message, including a "yes" — but no summary was shown yet.
         JsonNode reply = turn("""
@@ -212,9 +328,13 @@ class ConversationIT extends AbstractSpaIntegrationTest {
     }
 
     private JsonNode turn(String extracted) throws Exception {
+        return turn("INSTAGRAM", USER, extracted);
+    }
+
+    private JsonNode turn(String provider, String user, String extracted) throws Exception {
         return integration(post(api("/conversations/turn")), token, """
-                {"provider":"INSTAGRAM","externalUserId":"%s","displayName":"ana.p","message":"...",
-                 "extracted":%s,"executionId":"test-1"}""".formatted(USER, extracted), 200);
+                {"provider":"%s","externalUserId":"%s","displayName":"ana.p","message":"...",
+                 "extracted":%s,"executionId":"test-1"}""".formatted(provider, user, extracted), 200);
     }
 
     private static List<String> codes(JsonNode reply) {
@@ -241,6 +361,12 @@ class ConversationIT extends AbstractSpaIntegrationTest {
     private static List<String> texts(JsonNode array) {
         List<String> values = new ArrayList<>();
         array.forEach(node -> values.add(node.asText()));
+        return values;
+    }
+
+    private static List<String> texts(JsonNode array, String field) {
+        List<String> values = new ArrayList<>();
+        array.forEach(node -> values.add(node.get(field).asText()));
         return values;
     }
 }

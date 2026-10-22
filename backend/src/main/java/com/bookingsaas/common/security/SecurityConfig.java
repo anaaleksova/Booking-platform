@@ -83,6 +83,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/register", "/api/auth/customer/register", "/api/auth/customer/verify",
                                 "/api/auth/password/forgot", "/api/auth/password/reset",
                                 "/api/auth/login").permitAll()
+                        // An invitation link is its own credential; accepting as an existing account needs a sign-in.
+                        .requestMatchers(HttpMethod.GET, "/api/auth/invitations/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/invitations/*/accept-new").permitAll()
                         // Browsing is open; booking needs an account.
                         .requestMatchers(HttpMethod.POST, "/api/public/businesses/*/reservations").authenticated()
                         .requestMatchers("/api/public/**").permitAll()

@@ -36,6 +36,7 @@ import {
   type BusinessInput,
 } from '@/features/business/api';
 import { BookingPageTab } from '@/features/business/BookingPageTab';
+import { CalendarTab } from '@/features/business/CalendarTab';
 import { useResources } from '@/features/catalog/api';
 import type { BusinessSettings, DayInterval } from '@/types/api';
 import { formatLocalDate, formatLocalTime } from '@/utils/format';
@@ -53,12 +54,14 @@ export function SettingsPage() {
         <Tab label="Opening hours" />
         <Tab label="Booking rules" />
         <Tab label="Closures & time off" />
+        <Tab label="Calendar" />
       </Tabs>
       {tab === 0 ? <BusinessTab /> : null}
       {tab === 1 ? <BookingPageTab /> : null}
       {tab === 2 ? <OpeningHoursTab /> : null}
       {tab === 3 ? <RulesTab /> : null}
       {tab === 4 ? <BlockedTimeTab /> : null}
+      {tab === 5 ? <CalendarTab /> : null}
     </>
   );
 }
@@ -210,6 +213,18 @@ function RulesTab() {
         <Grid item xs={12} sm={6}>{toggle('emailNotificationsEnabled', 'Email confirmations')}</Grid>
         <Grid item xs={12} sm={6}>{toggle('reminderNotificationsEnabled', 'Email reminders')}</Grid>
         <Grid item xs={12} sm={6}>{number('reminderLeadHours', 'Send reminders', 'hours before')}</Grid>
+        <Grid item xs={12}>
+          <TextField
+            fullWidth
+            type="email"
+            label="Send new reservations to"
+            placeholder="Your login email"
+            value={form.notificationEmail ?? ''}
+            onChange={(e) => setForm({ ...form, notificationEmail: e.target.value })}
+            disabled={!form.emailNotificationsEnabled}
+            helperText="Every new, moved or cancelled reservation — from the website, Instagram or the admin panel — is emailed here as a calendar invitation, so it also lands in your calendar. Leave empty to use your login email."
+          />
+        </Grid>
       </Grid>
       <Button
         variant="contained"
@@ -217,7 +232,7 @@ function RulesTab() {
         disabled={update.isPending}
         onClick={() =>
           update
-            .mutateAsync(form)
+            .mutateAsync({ ...form, notificationEmail: form.notificationEmail?.trim() || null })
             .then(() => toast.success('Booking rules saved'))
             .catch((err) => toast.error(errorMessage(err)))
         }

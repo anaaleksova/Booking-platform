@@ -263,6 +263,34 @@ public class AuthService {
         return issueToken(current.withActiveMembership(membership));
     }
 
+    /** Whether a login account exists for this email. */
+    @Transactional(readOnly = true)
+    public boolean accountExists(String email) {
+        return userRepository.existsByEmail(normalizeEmail(email));
+    }
+
+    /**
+     * An account whose email is already proven — by the invitation link that
+     * reached it — so no code is needed. Returns the new user's id.
+     */
+    @Transactional
+    public Long createVerifiedAccount(String email, String fullName, String password) {
+        String normalized = normalizeEmail(email);
+        if (userRepository.existsByEmail(normalized)) {
+            throw ApiException.of(ErrorCode.EMAIL_ALREADY_REGISTERED,
+                    "An account with this email already exists. Sign in instead.");
+        }
+        User user = userRepository.save(new User(normalized, passwordEncoder.encode(password), fullName.trim()));
+        log.info("Created account id={} from an invitation", user.getId());
+        return user.getId();
+    }
+
+    /** A session for the user, with this business active. */
+    @Transactional(readOnly = true)
+    public AuthResponse sessionFor(Long userId, Long businessId) {
+        return issueToken(principalLoader.loadByUserId(userId, businessId));
+    }
+
     private AuthResponse issueToken(AuthenticatedUser principal) {
         Long businessId = principal.activeMembership().map(BusinessMembership::businessId).orElse(null);
         String token = jwtService.issue(principal.userId(), principal.email(), businessId, principal.getPassword());

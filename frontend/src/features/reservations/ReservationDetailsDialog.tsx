@@ -18,6 +18,7 @@ import { useTheme } from '@mui/material/styles';
 import { Link as RouterLink } from 'react-router-dom';
 import { errorMessage } from '@/api/client';
 import { StatusChip } from '@/components/StatusChip';
+import { useAuth } from '@/features/auth/AuthContext';
 import { ResourcePicker, completeSelections } from '@/components/ResourcePicker';
 import { LoadingState } from '@/components/states';
 import { useToast } from '@/components/ToastProvider';
@@ -50,6 +51,8 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
   const { data: reservation, isLoading } = useReservation(id);
   const changeStatus = useChangeReservationStatus();
   const reschedule = useRescheduleReservation();
+  // Staff mark visits done; cancelling, moving and the customer's record stay with the owner.
+  const { isOwner } = useAuth();
 
   const [editing, setEditing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -115,6 +118,7 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
   };
 
   const busy = changeStatus.isPending || reschedule.isPending;
+  const started = reservation ? !dayjs(reservation.startTime).isAfter(dayjs()) : false;
 
   return (
     <Dialog open={id !== null} onClose={busy ? undefined : onClose} maxWidth="md" fullWidth fullScreen={fullScreen}>
@@ -145,7 +149,11 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
                   </Typography>
                 </Detail>
                 <Detail label="Customer">
-                  <Box component={RouterLink} to={`/admin/customers/${reservation.customerId}`} sx={{ color: 'primary.main' }}>
+                  <Box
+                    component={isOwner ? RouterLink : 'span'}
+                    to={isOwner ? `/admin/customers/${reservation.customerId}` : undefined}
+                    sx={{ color: isOwner ? 'primary.main' : 'inherit' }}
+                  >
                     {reservation.customerName}
                   </Box>
                   <Typography variant="body2" color="text.secondary">
@@ -293,7 +301,7 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
               </>
             ) : (
               <>
-                {reservation.status === 'PENDING' || reservation.status === 'CONFIRMED' ? (
+                {isOwner && (reservation.status === 'PENDING' || reservation.status === 'CONFIRMED') ? (
                   <>
                     <Button color="error" onClick={() => setCancelling(true)} disabled={busy}>
                       Cancel
@@ -316,7 +324,19 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
                     Confirm
                   </Button>
                 ) : null}
-                {reservation.status === 'CONFIRMED' ? (
+                {/* Only once it has started: until then the customer may still come. */}
+                {started && (reservation.status === 'PENDING' || reservation.status === 'CONFIRMED' || reservation.status === 'COMPLETED') ? (
+                  <Button
+                    color="inherit"
+                    disabled={busy}
+                    onClick={() =>
+                      run(() => changeStatus.mutateAsync({ id: reservation.id, status: 'NO_SHOW' }), 'Marked as a no-show')
+                    }
+                  >
+                    {reservation.status === 'COMPLETED' ? 'Change to no-show' : 'No-show'}
+                  </Button>
+                ) : null}
+                {reservation.status === 'CONFIRMED' || reservation.status === 'NO_SHOW' ? (
                   <Button
                     variant="contained"
                     color="success"
@@ -328,7 +348,7 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
                       )
                     }
                   >
-                    Mark completed
+                    {reservation.status === 'NO_SHOW' ? 'They came after all' : 'Mark completed'}
                   </Button>
                 ) : null}
               </>

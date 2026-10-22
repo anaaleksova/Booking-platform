@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * @param reservationCount reservations that were not cancelled
+ * @param reservationCount reservations that were neither cancelled nor no-shows
  * @param totalSpent       sum of final prices of CONFIRMED and COMPLETED
  *                         reservations — the same definition revenue uses
  * @param lastReservationAt start of the most recent non-cancelled reservation

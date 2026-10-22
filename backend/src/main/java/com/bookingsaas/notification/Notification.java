@@ -62,6 +62,10 @@ public class Notification extends Auditable {
     @Column(name = "html_body", columnDefinition = "text")
     private String htmlBody;
 
+    /** The reservation as an .ics attachment, so the mail app can offer "Add to calendar"; null for none. */
+    @Column(name = "calendar_ics", columnDefinition = "text")
+    private String calendarIcs;
+
     /** Display name the email appears to come from (the business). */
     @Column(name = "sender_name", length = 160)
     private String senderName;

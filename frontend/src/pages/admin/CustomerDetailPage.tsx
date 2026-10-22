@@ -10,6 +10,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
+import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
@@ -20,13 +21,17 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { useBusiness } from '@/features/business/api';
 import { useCustomer, useCustomerHistory } from '@/features/customers/api';
 import { ReservationDetailsDialog } from '@/features/reservations/ReservationDetailsDialog';
-import { formatDaysAgo, formatLocalDate, formatMoney, formatWindow } from '@/utils/format';
+import { formatDaysAgo, formatLocalDate, formatMoney, formatWindow, pluralize } from '@/utils/format';
+
+const PAGE_SIZES = [10, 25, 50];
 
 export function CustomerDetailPage() {
   const id = Number(useParams().id);
   const { data: business } = useBusiness();
   const customer = useCustomer(id);
-  const history = useCustomerHistory(id);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+  const history = useCustomerHistory(id, page, pageSize);
   const [selected, setSelected] = useState<number | null>(null);
 
   if (customer.isLoading || history.isLoading) {
@@ -64,7 +69,11 @@ export function CustomerDetailPage() {
           />
         </Grid>
         <Grid item xs={6} md={3}>
-          <KpiCard label="Favourite service" value={stats.favouriteServiceName ?? '—'} note={`${stats.cancelledReservations} cancelled`} />
+          <KpiCard
+            label="Favourite service"
+            value={stats.favouriteServiceName ?? '—'}
+            note={`${stats.cancelledReservations} cancelled · ${pluralize(stats.noShowReservations, 'no-show')}`}
+          />
         </Grid>
       </Grid>
 
@@ -80,7 +89,7 @@ export function CustomerDetailPage() {
       <Typography variant="h6" sx={{ mb: 1.5 }}>
         Reservation history
       </Typography>
-      {stats.reservations.length === 0 ? (
+      {stats.reservations.totalElements === 0 ? (
         <EmptyState title="No reservations yet" />
       ) : (
         <TableContainer component={Paper} variant="outlined">
@@ -96,7 +105,7 @@ export function CustomerDetailPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {stats.reservations.map((reservation) => (
+              {stats.reservations.content.map((reservation) => (
                 <TableRow key={reservation.id} hover sx={{ cursor: 'pointer' }} onClick={() => setSelected(reservation.id)}>
                   <TableCell>
                     <Stack>
@@ -119,6 +128,18 @@ export function CustomerDetailPage() {
               ))}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={stats.reservations.totalElements}
+            page={page}
+            rowsPerPage={pageSize}
+            rowsPerPageOptions={PAGE_SIZES}
+            onPageChange={(_, next) => setPage(next)}
+            onRowsPerPageChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(0);
+            }}
+          />
         </TableContainer>
       )}
       <ReservationDetailsDialog id={selected} onClose={() => setSelected(null)} />

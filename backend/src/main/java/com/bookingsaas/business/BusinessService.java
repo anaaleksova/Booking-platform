@@ -111,6 +111,21 @@ public class BusinessService {
         return requireById(businessId).zoneId();
     }
 
+    /**
+     * Where the business itself is told about reservations: the notification
+     * email from the settings, else the owner's login email, else the public
+     * contact email. Null when there is none of these.
+     */
+    @Transactional(readOnly = true)
+    public String notificationEmailOf(Long businessId) {
+        String configured = settingsOf(businessId).getNotificationEmail();
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
+        return businessUserRepository.findOwnerEmails(businessId).stream().findFirst()
+                .orElseGet(() -> requireById(businessId).getEmail());
+    }
+
 
     // --- dashboard API -----------------------------------------------------
 
@@ -172,6 +187,33 @@ public class BusinessService {
         return BusinessSettingsResponse.from(settingsOf(currentTenant.businessId()));
     }
 
+    // --- staff memberships ---------------------------------------------------
+
+    public boolean isMember(Long businessId, Long userId) {
+        return businessUserRepository.findByUserIdAndBusinessId(userId, businessId).isPresent();
+    }
+
+    /** Makes the account STAFF of the business. */
+    @Transactional
+    public void addStaff(Long businessId, Long userId) {
+        if (isMember(businessId, userId)) {
+            throw ApiException.of(ErrorCode.CONFLICT, "This account already belongs to the business.");
+        }
+        businessUserRepository.save(new BusinessUser(businessId, userId, BusinessRole.STAFF));
+        log.info("User id={} joined business id={} as staff", userId, businessId);
+    }
+
+    /** Takes a STAFF member's access away. An owner's membership is never touched here. */
+    @Transactional
+    public void removeStaff(Long businessId, Long userId) {
+        businessUserRepository.findByUserIdAndBusinessId(userId, businessId)
+                .filter(membership -> membership.getRole() == BusinessRole.STAFF)
+                .ifPresent(membership -> {
+                    businessUserRepository.delete(membership);
+                    log.info("User id={} removed from business id={} (staff)", userId, businessId);
+                });
+    }
+
     @Transactional
     public BusinessSettingsResponse updateCurrentSettings(UpdateBusinessSettingsRequest request) {
         currentTenant.requireOwner();
@@ -187,6 +229,8 @@ public class BusinessService {
         settings.setEmailNotificationsEnabled(request.emailNotificationsEnabled());
         settings.setReminderNotificationsEnabled(request.reminderNotificationsEnabled());
         settings.setReminderLeadHours(request.reminderLeadHours());
+        settings.setNotificationEmail(request.notificationEmail() == null || request.notificationEmail().isBlank()
+                ? null : request.notificationEmail().trim().toLowerCase(Locale.ROOT));
 
         return BusinessSettingsResponse.from(settingsRepository.save(settings));
     }

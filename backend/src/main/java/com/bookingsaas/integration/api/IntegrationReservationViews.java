@@ -79,18 +79,20 @@ public class IntegrationReservationViews {
     }
 
     /**
-     * Where the customer can be messaged: their linked social identities, plus
-     * the chat the reservation was made in (which may not be linked when the
-     * details matched an existing customer).
+     * Where the customer can be messaged, best first: the chat the reservation
+     * was made in (which may not be linked when the details matched an existing
+     * customer), then their linked social identities. The workflows message the
+     * first, so a booking made on Messenger is followed up on Messenger even when
+     * the same customer also wrote on Instagram before.
      */
     private List<CustomerChannel> channelsOf(Long businessId, Reservation reservation) {
         Set<CustomerChannel> channels = new LinkedHashSet<>();
-        identities.findByBusinessIdAndCustomerId(businessId, reservation.getCustomerId())
-                .forEach(identity -> channels.add(new CustomerChannel(identity.getProvider(),
-                        identity.getExternalUserId())));
         conversations.findByBusinessIdAndReservationId(businessId, reservation.getId())
                 .forEach(conversation -> channels.add(new CustomerChannel(conversation.getProvider(),
                         conversation.getExternalUserId())));
+        identities.findByBusinessIdAndCustomerId(businessId, reservation.getCustomerId())
+                .forEach(identity -> channels.add(new CustomerChannel(identity.getProvider(),
+                        identity.getExternalUserId())));
         return List.copyOf(channels);
     }
 }

@@ -67,7 +67,13 @@ export function AnalyticsPage() {
           <KpiCard
             label="Reservations"
             value={reservations.data ? formatNumber(reservations.data.total) : '—'}
-            note={reservations.data ? `${reservations.data.cancelled} cancelled` : undefined}
+            note={
+              reservations.data
+                ? `${reservations.data.cancelled} cancelled · ${reservations.data.noShows} no-show${reservations.data.noShows === 1 ? '' : 's'}${
+                    reservations.data.noShowRate != null ? ` (${Math.round(reservations.data.noShowRate * 100)}%)` : ''
+                  }`
+                : undefined
+            }
             loading={reservations.isLoading}
           />
         </Grid>

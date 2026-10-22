@@ -2,16 +2,23 @@ import { useMemo } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import type { Reservation } from '@/types/api';
-import { formatWindow } from '@/utils/format';
+import { STATUS_LABELS, formatWindow } from '@/utils/format';
 
-const HOUR_HEIGHT = 56;
+/** Tall enough that a one-hour reservation shows all three of its lines. */
+const HOUR_HEIGHT = 72;
+/** One line of a block: 12px text at a 1.3 line height. */
+const LINE_HEIGHT = 15.6;
+/** The block's top and bottom padding together. */
+const BLOCK_PADDING = 8;
 const STATUS_STYLE: Record<Reservation['status'], { bg: string; border: string }> = {
   PENDING: { bg: '#fff6e5', border: '#e8a33d' },
   CONFIRMED: { bg: '#eaf0fe', border: '#2f5bea' },
   COMPLETED: { bg: '#e7f6ee', border: '#0f9d58' },
   CANCELLED: { bg: '#f4f5f7', border: '#b0b6c3' },
+  NO_SHOW: { bg: '#fdecea', border: '#c62828' },
 };
 
 interface Placed {
@@ -108,45 +115,67 @@ export function WeekCalendar({
               }}
             >
               {(placedByDay.get(day.format('YYYY-MM-DD')) ?? []).map((placed) => {
-                const style = STATUS_STYLE[placed.reservation.status];
+                const reservation = placed.reservation;
+                const style = STATUS_STYLE[reservation.status];
+                const height = Math.max(placed.height - 2, LINE_HEIGHT + BLOCK_PADDING);
+                const resources = reservation.resources.map((resource) => resource.name).join(', ');
+                // Only the lines that fit whole: a short reservation shows its first line, not half of the third.
+                const lines = [
+                  { text: `${formatWindow(reservation).split(' – ')[0]} ${reservation.serviceName}`, strong: true },
+                  { text: reservation.customerName, strong: false },
+                  { text: resources, strong: false },
+                ]
+                  .filter((line) => line.text)
+                  .slice(0, Math.max(1, Math.floor((height - BLOCK_PADDING) / LINE_HEIGHT)));
                 return (
-                  <Box
-                    key={placed.reservation.id}
-                    component="button"
-                    type="button"
-                    onClick={() => onSelect(placed.reservation)}
-                    title={`${placed.reservation.serviceName} — ${placed.reservation.customerName}`}
-                    sx={{
-                      position: 'absolute',
-                      top: placed.top,
-                      height: Math.max(placed.height - 2, 20),
-                      left: `calc(${(placed.column / placed.columns) * 100}% + 2px)`,
-                      width: `calc(${100 / placed.columns}% - 4px)`,
-                      bgcolor: style.bg,
-                      borderRadius: 1,
-                      p: 0.5,
-                      textAlign: 'left',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      border: 0,
-                      borderLeftWidth: 3,
-                      borderLeftStyle: 'solid',
-                      borderLeftColor: style.border,
-                      font: 'inherit',
-                      textDecoration: placed.reservation.status === 'CANCELLED' ? 'line-through' : 'none',
-                      '&:hover': { filter: 'brightness(0.97)' },
-                    }}
+                  <Tooltip
+                    key={reservation.id}
+                    placement="right"
+                    arrow
+                    title={<ReservationSummary reservation={reservation} resources={resources} />}
                   >
-                    <Typography variant="caption" fontWeight={700} display="block" noWrap>
-                      {formatWindow(placed.reservation).split(' – ')[0]} {placed.reservation.serviceName}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" display="block" noWrap>
-                      {placed.reservation.customerName}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" display="block" noWrap>
-                      {placed.reservation.resources.map((resource) => resource.name).join(', ')}
-                    </Typography>
-                  </Box>
+                    <Box
+                      component="button"
+                      type="button"
+                      onClick={() => onSelect(reservation)}
+                      aria-label={`${formatWindow(reservation)} ${reservation.serviceName}, ${reservation.customerName}`}
+                      sx={{
+                        position: 'absolute',
+                        top: placed.top,
+                        height,
+                        left: `calc(${(placed.column / placed.columns) * 100}% + 2px)`,
+                        width: `calc(${100 / placed.columns}% - 4px)`,
+                        bgcolor: style.bg,
+                        borderRadius: 1,
+                        px: 0.75,
+                        py: `${BLOCK_PADDING / 2}px`,
+                        textAlign: 'left',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        border: 0,
+                        borderLeftWidth: 3,
+                        borderLeftStyle: 'solid',
+                        borderLeftColor: style.border,
+                        font: 'inherit',
+                        textDecoration: reservation.status === 'CANCELLED' ? 'line-through' : 'none',
+                        '&:hover': { filter: 'brightness(0.97)' },
+                      }}
+                    >
+                      {lines.map((line) => (
+                        <Typography
+                          key={line.text}
+                          variant="caption"
+                          display="block"
+                          noWrap
+                          fontWeight={line.strong ? 700 : 400}
+                          color={line.strong ? 'text.primary' : 'text.secondary'}
+                          sx={{ lineHeight: `${LINE_HEIGHT}px` }}
+                        >
+                          {line.text}
+                        </Typography>
+                      ))}
+                    </Box>
+                  </Tooltip>
                 );
               })}
             </Box>
@@ -154,6 +183,34 @@ export function WeekCalendar({
         </Box>
       </Box>
     </Paper>
+  );
+}
+
+/** Everything about a reservation, for the hover card: nothing is lost to a narrow column. */
+function ReservationSummary({ reservation, resources }: { reservation: Reservation; resources: string }) {
+  return (
+    <Box sx={{ py: 0.25 }}>
+      <Typography variant="body2" fontWeight={700}>
+        {reservation.serviceName}
+      </Typography>
+      <Typography variant="caption" display="block">
+        {formatWindow(reservation)} · {STATUS_LABELS[reservation.status]}
+      </Typography>
+      <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+        {reservation.customerName}
+        {reservation.numberOfParticipants > 1 ? ` · ${reservation.numberOfParticipants} people` : ''}
+      </Typography>
+      {reservation.customerPhone ? (
+        <Typography variant="caption" display="block">
+          {reservation.customerPhone}
+        </Typography>
+      ) : null}
+      {resources ? (
+        <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+          {resources}
+        </Typography>
+      ) : null}
+    </Box>
   );
 }
 
