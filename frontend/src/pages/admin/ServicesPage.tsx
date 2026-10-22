@@ -43,7 +43,11 @@ export function ServicesPage() {
     }
     try {
       const outcome = await remove.mutateAsync(deleting.id);
-      outcome.deleted ? toast.success(outcome.message) : toast.notify(outcome.message, 'info');
+      if (outcome.deleted) {
+        toast.success(outcome.message);
+      } else {
+        toast.notify(outcome.message, 'info');
+      }
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {

@@ -84,6 +84,8 @@ server:
   forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:native}
 
 springdoc:
+  # Sorted output, so the generated frontend types do not change between runs.
+  writer-with-order-by-keys: true
   # Off unless asked for (the dev profile turns it on): the full API map is
   # not something to publish from production.
   api-docs:

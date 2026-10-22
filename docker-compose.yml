@@ -20,7 +20,7 @@ services:
 
   # Local SMTP sink so notification emails can be inspected in a browser.
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.30.7
     container_name: booking-mailpit
     ports:
       - "1025:1025"   # SMTP
@@ -34,7 +34,7 @@ services:
   # /api/integrations with a token created in Admin → Integrations.
   n8n:
     profiles: ["n8n", "full"]
-    image: docker.n8n.io/n8nio/n8n:latest
+    image: docker.n8n.io/n8nio/n8n:2.42.4
     container_name: booking-n8n
     ports:
       - "5678:5678"
@@ -79,7 +79,7 @@ services:
   # Pull a model once:  docker exec booking-ollama ollama pull qwen2.5:7b-instruct
   ollama:
     profiles: ["ollama"]
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.0
     container_name: booking-ollama
     ports:
       - "11434:11434"

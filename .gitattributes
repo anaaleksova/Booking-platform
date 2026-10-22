@@ -1,0 +1,15 @@
+# Text files are stored and checked out with LF, whatever the local
+# core.autocrlf says, so diffs stay clean across Windows, macOS and Linux.
+* text=auto eol=lf
+
+# Windows scripts need CRLF to run.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.jar binary
