@@ -7,6 +7,8 @@ import com.bookingsaas.customer.dto.CustomerRequest;
 import com.bookingsaas.customer.dto.CustomerResponse;
 import com.bookingsaas.customer.spi.CustomerActivity;
 import com.bookingsaas.customer.spi.CustomerActivityProvider;
+import com.google.i18n.phonenumbers.NumberParseException;
+import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -22,6 +24,8 @@ import java.util.Optional;
 /** Customer records, always within one tenant. */
 @Service
 public class CustomerService {
+
+    private static final PhoneNumberUtil PHONES = PhoneNumberUtil.getInstance();
 
     private final CustomerRepository repository;
     private final CustomerActivityProvider activityProvider;
@@ -52,44 +56,11 @@ public class CustomerService {
     @Transactional(readOnly = true)
     public Optional<Customer> findByContact(Long businessId, String email, String phone) {
         String cleanEmail = normalize(email);
-        String cleanPhone = normalize(phone);
+        String cleanPhone = normalizePhone(phone);
         return Optional.<Customer>empty()
                 .or(() -> cleanEmail == null ? Optional.empty() : repository.findByEmail(businessId, cleanEmail))
                 .or(() -> cleanPhone == null ? Optional.empty()
                         : repository.findByBusinessIdAndPhone(businessId, cleanPhone));
-    }
-
-    /**
-     * The customer record of a signed-in account, found by the account's
-     * verified email and nothing else.
-     *
-     * <p>Not by phone: a phone number is typed, not proven, and matching on it
-     * would attach this booking to whoever else gave that number — their
-     * history would show it and the confirmation would go to their address.
-     * When another customer already has the number, the new record is created
-     * without it.
-     */
-    @Transactional
-    public Customer findOrCreateForAccount(Long businessId, String firstName, String lastName, String verifiedEmail,
-                                           String phone) {
-        String email = normalize(verifiedEmail);
-        String cleanPhone = normalize(phone);
-        Optional<Customer> existing = repository.findByEmail(businessId, email);
-        boolean phoneFree = cleanPhone != null && repository.findByBusinessIdAndPhone(businessId, cleanPhone).isEmpty();
-        if (existing.isPresent()) {
-            Customer customer = existing.get();
-            if (customer.getPhone() == null && phoneFree) {
-                customer.setPhone(cleanPhone);
-            }
-            return repository.save(customer);
-        }
-        Customer customer = new Customer();
-        customer.setBusinessId(businessId);
-        customer.setFirstName(firstName.trim());
-        customer.setLastName(lastName == null ? "" : lastName.trim());
-        customer.setEmail(email);
-        customer.setPhone(phoneFree ? cleanPhone : null);
-        return repository.save(customer);
     }
 
     /**
@@ -102,7 +73,7 @@ public class CustomerService {
     @Transactional
     public Customer findOrCreate(Long businessId, String firstName, String lastName, String email, String phone) {
         String cleanEmail = normalize(email);
-        String cleanPhone = normalize(phone);
+        String cleanPhone = normalizePhone(phone);
         if (cleanEmail == null && cleanPhone == null) {
             throw ApiException.validation("A phone number or an email address is required.");
         }
@@ -208,7 +179,7 @@ public class CustomerService {
 
     private static void apply(Customer customer, CustomerRequest request) {
         String email = normalize(request.email());
-        String phone = normalize(request.phone());
+        String phone = normalizePhone(request.phone());
         if (email == null && phone == null) {
             throw ApiException.validation("A phone number or an email address is required.");
         }
@@ -217,6 +188,25 @@ public class CustomerService {
         customer.setEmail(email);
         customer.setPhone(phone);
         customer.setNotes(normalize(request.notes()));
+    }
+
+    /**
+     * One form for every phone number, whatever the channel: "+389 70 555 444",
+     * "+389-70-555-444" and "+38970555444" are the same customer. Numbers with
+     * a country code are stored as E.164 (as chat bookings already are), so a
+     * customer who booked through Instagram is recognised when they book on
+     * the website. A number without a country code is kept as typed.
+     */
+    static String normalizePhone(String value) {
+        String trimmed = normalize(value);
+        if (trimmed == null) {
+            return null;
+        }
+        try {
+            return PHONES.format(PHONES.parse(trimmed, null), PhoneNumberUtil.PhoneNumberFormat.E164);
+        } catch (NumberParseException ex) {
+            return trimmed;
+        }
     }
 
     private static String normalize(String value) {

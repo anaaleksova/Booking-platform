@@ -287,26 +287,23 @@ class ReservationIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void a_phone_number_someone_else_gave_does_not_hand_them_the_booking() throws Exception {
-        String sharedPhone = "+389 70 555 444";
-        send(post("/api/public/businesses/" + slug + "/reservations"), customerToken("first@example.com"), """
-                {"serviceId":%d,"participants":1,"startTime":"%sT10:00:00",
-                 "customer":{"firstName":"First","lastName":"Person","phone":"%s"}}
-                """.formatted(serviceId, day, sharedPhone), 201);
+    void a_customer_known_by_phone_is_the_same_customer_when_they_book_online() throws Exception {
+        // Known only by phone, as a customer who first booked through Instagram is.
+        jdbcTemplate.update("""
+                insert into customer (business_id, first_name, last_name, phone)
+                select id, 'Walk', 'In', '+38970555444' from business""");
 
-        // Another account types the same number.
-        send(post("/api/public/businesses/" + slug + "/reservations"), customerToken("second@example.com"), """
+        // Later the same person books online with their account and the same number.
+        send(post("/api/public/businesses/" + slug + "/reservations"), customerToken("walk.in@example.com"), """
                 {"serviceId":%d,"participants":1,"startTime":"%sT12:00:00",
-                 "customer":{"firstName":"Second","lastName":"Person","phone":"%s"}}
-                """.formatted(serviceId, day, sharedPhone), 201);
+                 "customer":{"firstName":"Walk","lastName":"In","phone":"+389 70 555 444"}}
+                """.formatted(serviceId, day), 201);
 
-        List<String> bookedBy = jdbcTemplate.queryForList("""
-                select c.email from reservation r join customer c on c.id = r.customer_id order by r.start_time""",
-                String.class);
-        assertThat(bookedBy).containsExactly("first@example.com", "second@example.com");
-        // The number stays with the customer who gave it first.
-        assertThat(jdbcTemplate.queryForList("select email from customer where phone is not null", String.class))
-                .containsExactly("first@example.com");
+        // One customer, with the booking, and the email is now on record.
+        JsonNode customers = send(get("/api/admin/customers"), token, null, 200).get("content");
+        assertThat(customers).hasSize(1);
+        assertThat(customers.get(0).get("reservationCount").asLong()).isEqualTo(1);
+        assertThat(customers.get(0).get("email").asText()).isEqualTo("walk.in@example.com");
     }
 
     @Test
