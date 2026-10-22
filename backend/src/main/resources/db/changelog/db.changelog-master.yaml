@@ -81,5 +81,11 @@ databaseChangeLog:
       file: db/changelog/changes/023-staff-notifications.sql
   - include:
       file: db/changelog/changes/024-hardening.sql
-  - include:
-      file: db/changelog/changes/025-customer-phone-e164.sql
+  # One phone number is one person: numbers into E.164 (local ones read in the
+  # business's country), and customers sharing a number merged into one.
+  - changeSet:
+      id: 025-merge-customers-by-phone
+      author: booking-platform
+      changes:
+        - customChange:
+            class: com.bookingsaas.customer.migration.MergeCustomersByPhone

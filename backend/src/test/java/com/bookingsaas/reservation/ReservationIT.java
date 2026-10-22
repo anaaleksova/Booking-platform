@@ -307,6 +307,25 @@ class ReservationIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void a_local_number_typed_in_the_admin_finds_the_same_customer() throws Exception {
+        // A Macedonian business: "070 555 444" means +389 70 555 444.
+        jdbcTemplate.update("update business set phone = '+389 2 312 4567'");
+        jdbcTemplate.update("""
+                insert into customer (business_id, first_name, last_name, phone)
+                select id, 'Walk', 'In', '+38970555444' from business""");
+
+        send(post("/api/admin/reservations"), token, """
+                {"serviceId":%d,"participants":1,"startTime":"%sT09:00:00",
+                 "customer":{"firstName":"Walk","lastName":"In","email":"walk.in@example.com","phone":"070 555 444"}}
+                """.formatted(serviceId, day), 201);
+
+        JsonNode customers = send(get("/api/admin/customers"), token, null, 200).get("content");
+        assertThat(customers).hasSize(1);
+        assertThat(customers.get(0).get("phone").asText()).isEqualTo("+38970555444");
+        assertThat(customers.get(0).get("email").asText()).isEqualTo("walk.in@example.com");
+    }
+
+    @Test
     void times_outside_opening_hours_and_oversized_groups_are_rejected() throws Exception {
         assertThat(reserve("19:30", 1, null, "late@example.com", 422).get("error").asText())
                 .isEqualTo("OUTSIDE_BUSINESS_HOURS");

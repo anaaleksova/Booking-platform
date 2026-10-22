@@ -1,6 +1,7 @@
 package com.bookingsaas.integration.identity;
 
 import com.bookingsaas.common.error.ApiException;
+import com.bookingsaas.common.validation.Phones;
 import com.bookingsaas.customer.Customer;
 import com.bookingsaas.customer.CustomerService;
 import com.bookingsaas.integration.ChannelProvider;
@@ -132,15 +133,7 @@ public class ExternalIdentityService {
      * Null when the business has no internationally written number.
      */
     public static String regionOf(String businessPhone) {
-        if (isBlank(businessPhone)) {
-            return null;
-        }
-        try {
-            String region = PHONES.getRegionCodeForNumber(PHONES.parse(businessPhone.trim(), null));
-            return region == null || "ZZ".equals(region) ? null : region;
-        } catch (NumberParseException ex) {
-            return null;
-        }
+        return Phones.regionOf(businessPhone);
     }
 
     private static boolean isBlank(String value) {

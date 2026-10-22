@@ -148,6 +148,15 @@ business ─┬─ business_hours          opening hours (wall-clock, business t
                └─ reservation_resource   the concrete resources held
 ```
 
+**One phone number is one person.** A customer is recognised by email, then
+by phone, in every channel: the booking page, the admin and Instagram or
+Facebook chats. Numbers are stored in one form (`+38970555444`). A number typed
+without a country code is read in the business's own country, taken from the
+business's phone number, so `070 555 444` in a Macedonian business is the same
+customer. Migration 025 brought existing numbers into this form and merged
+customers who turned out to share a number into the oldest record (bookings,
+chat links and details moved over; a second email is kept in the notes).
+
 Every business-owned row carries `business_id`. The tenant always comes from
 the authenticated user, never from a URL, and every query is scoped by it.
 

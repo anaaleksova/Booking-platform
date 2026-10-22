@@ -1,14 +1,14 @@
 package com.bookingsaas.customer;
 
+import com.bookingsaas.business.BusinessService;
 import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
 import com.bookingsaas.common.security.CurrentTenant;
+import com.bookingsaas.common.validation.Phones;
 import com.bookingsaas.customer.dto.CustomerRequest;
 import com.bookingsaas.customer.dto.CustomerResponse;
 import com.bookingsaas.customer.spi.CustomerActivity;
 import com.bookingsaas.customer.spi.CustomerActivityProvider;
-import com.google.i18n.phonenumbers.NumberParseException;
-import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -25,15 +25,16 @@ import java.util.Optional;
 @Service
 public class CustomerService {
 
-    private static final PhoneNumberUtil PHONES = PhoneNumberUtil.getInstance();
-
     private final CustomerRepository repository;
     private final CustomerActivityProvider activityProvider;
     private final CurrentTenant currentTenant;
+    private final BusinessService businessService;
 
     public CustomerService(CustomerRepository repository,
                            CustomerActivityProvider activityProvider,
-                           CurrentTenant currentTenant) {
+                           CurrentTenant currentTenant,
+                           BusinessService businessService) {
+        this.businessService = businessService;
         this.repository = repository;
         this.activityProvider = activityProvider;
         this.currentTenant = currentTenant;
@@ -56,7 +57,7 @@ public class CustomerService {
     @Transactional(readOnly = true)
     public Optional<Customer> findByContact(Long businessId, String email, String phone) {
         String cleanEmail = normalize(email);
-        String cleanPhone = normalizePhone(phone);
+        String cleanPhone = normalizePhone(businessId, phone);
         return Optional.<Customer>empty()
                 .or(() -> cleanEmail == null ? Optional.empty() : repository.findByEmail(businessId, cleanEmail))
                 .or(() -> cleanPhone == null ? Optional.empty()
@@ -73,7 +74,7 @@ public class CustomerService {
     @Transactional
     public Customer findOrCreate(Long businessId, String firstName, String lastName, String email, String phone) {
         String cleanEmail = normalize(email);
-        String cleanPhone = normalizePhone(phone);
+        String cleanPhone = normalizePhone(businessId, phone);
         if (cleanEmail == null && cleanPhone == null) {
             throw ApiException.validation("A phone number or an email address is required.");
         }
@@ -135,7 +136,7 @@ public class CustomerService {
         Long businessId = currentTenant.businessId();
         Customer customer = new Customer();
         customer.setBusinessId(businessId);
-        apply(customer, request);
+        apply(customer, request, normalizePhone(businessId, request.phone()));
         return toResponse(businessId, save(customer));
     }
 
@@ -143,7 +144,7 @@ public class CustomerService {
     public CustomerResponse update(Long id, CustomerRequest request) {
         Long businessId = currentTenant.businessId();
         Customer customer = requireForBusiness(businessId, id);
-        apply(customer, request);
+        apply(customer, request, normalizePhone(businessId, request.phone()));
         return toResponse(businessId, save(customer));
     }
 
@@ -177,9 +178,8 @@ public class CustomerService {
         }
     }
 
-    private static void apply(Customer customer, CustomerRequest request) {
+    private static void apply(Customer customer, CustomerRequest request, String phone) {
         String email = normalize(request.email());
-        String phone = normalizePhone(request.phone());
         if (email == null && phone == null) {
             throw ApiException.validation("A phone number or an email address is required.");
         }
@@ -191,22 +191,13 @@ public class CustomerService {
     }
 
     /**
-     * One form for every phone number, whatever the channel: "+389 70 555 444",
-     * "+389-70-555-444" and "+38970555444" are the same customer. Numbers with
-     * a country code are stored as E.164 (as chat bookings already are), so a
-     * customer who booked through Instagram is recognised when they book on
-     * the website. A number without a country code is kept as typed.
+     * The number as every channel stores it (see {@link Phones}): local numbers
+     * read in the business's own country, so "070 555 444" typed in the admin
+     * and "+389 70 555 444" from the booking page are the same customer.
      */
-    static String normalizePhone(String value) {
-        String trimmed = normalize(value);
-        if (trimmed == null) {
-            return null;
-        }
-        try {
-            return PHONES.format(PHONES.parse(trimmed, null), PhoneNumberUtil.PhoneNumberFormat.E164);
-        } catch (NumberParseException ex) {
-            return trimmed;
-        }
+    private String normalizePhone(Long businessId, String phone) {
+        return phone == null || phone.isBlank() ? null
+                : Phones.normalize(phone, Phones.regionOf(businessService.requireById(businessId).getPhone()));
     }
 
     private static String normalize(String value) {
