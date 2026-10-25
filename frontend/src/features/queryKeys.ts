@@ -31,7 +31,14 @@ export const queryKeys = {
 
   discounts: ['discounts'] as const,
 
+  events: ['events'] as const,
+
   integrations: ['integrations'] as const,
+
+  platformOverview: ['platform', 'overview'] as const,
+  platformBusinesses: (query: string) => ['platform', 'businesses', query] as const,
+  platformAccounts: (query: string) => ['platform', 'accounts', query] as const,
+  platformActivity: ['platform', 'activity'] as const,
 
   dashboard: ['analytics', 'dashboard'] as const,
   revenuePeriods: ['analytics', 'revenue-periods'] as const,
@@ -44,6 +51,7 @@ export const queryKeys = {
 
   publicBusiness: (slug: string) => ['public', slug] as const,
   publicServices: (slug: string) => ['public', slug, 'services'] as const,
+  publicEvents: (slug: string) => ['public', slug, 'events'] as const,
   publicService: (slug: string, id: number) => ['public', slug, 'services', id] as const,
   publicAvailability: (slug: string, filters: object) => ['public', slug, 'availability', filters] as const,
   publicReservation: (reference: string) => ['public', 'reservations', reference] as const,

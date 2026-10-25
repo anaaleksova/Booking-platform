@@ -3,6 +3,7 @@ package com.bookingsaas.auth;
 import com.bookingsaas.common.security.AuthenticatedUser;
 import com.bookingsaas.common.security.BusinessMembership;
 import com.bookingsaas.common.security.MembershipProvider;
+import com.bookingsaas.common.security.PlatformAdmins;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,10 +23,13 @@ public class PrincipalLoader {
 
     private final UserRepository userRepository;
     private final MembershipProvider membershipProvider;
+    private final PlatformAdmins platformAdmins;
 
-    public PrincipalLoader(UserRepository userRepository, MembershipProvider membershipProvider) {
+    public PrincipalLoader(UserRepository userRepository, MembershipProvider membershipProvider,
+                           PlatformAdmins platformAdmins) {
         this.userRepository = userRepository;
         this.membershipProvider = membershipProvider;
+        this.platformAdmins = platformAdmins;
     }
 
     @Transactional(readOnly = true)
@@ -44,9 +48,15 @@ public class PrincipalLoader {
 
     private AuthenticatedUser build(User user, Long requestedBusinessId) {
         List<BusinessMembership> memberships = membershipProvider.membershipsOf(user.getId());
+        boolean platformAdmin = user.isActive() && platformAdmins.isPlatformAdmin(user.getEmail());
         BusinessMembership active = selectActive(memberships, requestedBusinessId);
+        // A platform administrator may act in any business, with owner rights, once they enter it.
+        if (platformAdmin && requestedBusinessId != null
+                && (active == null || !active.businessId().equals(requestedBusinessId))) {
+            active = membershipProvider.platformAccessTo(requestedBusinessId).orElse(active);
+        }
         return new AuthenticatedUser(user.getId(), user.getEmail(), user.getFullName(),
-                user.getPasswordHash(), user.isActive(), memberships, active);
+                user.getPasswordHash(), user.isActive(), memberships, active, platformAdmin);
     }
 
     /**

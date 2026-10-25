@@ -4,6 +4,7 @@ import com.bookingsaas.business.Business;
 import com.bookingsaas.business.OpeningHoursService;
 import com.bookingsaas.common.domain.DayInterval;
 import com.bookingsaas.customer.Customer;
+import com.bookingsaas.event.EventService;
 import com.bookingsaas.integration.api.IntegrationCatalogService;
 import com.bookingsaas.integration.api.IntegrationDtos.Quote;
 import com.bookingsaas.integration.api.IntegrationDtos.ReservationInfo;
@@ -14,6 +15,7 @@ import com.bookingsaas.integration.conversation.ConversationData.Offer;
 import com.bookingsaas.integration.conversation.ConversationDtos.Action;
 import com.bookingsaas.integration.conversation.ConversationDtos.BusinessFacts;
 import com.bookingsaas.integration.conversation.ConversationDtos.CustomerFacts;
+import com.bookingsaas.integration.conversation.ConversationDtos.EventFact;
 import com.bookingsaas.integration.conversation.ConversationDtos.ServiceFact;
 import com.bookingsaas.integration.conversation.ConversationDtos.Summary;
 import com.bookingsaas.integration.conversation.ConversationDtos.TurnResponse;
@@ -50,12 +52,14 @@ class ConversationReplies {
     private final ConversationStore store;
     private final IntegrationCatalogService catalog;
     private final OpeningHoursService openingHoursService;
+    private final EventService eventService;
 
     ConversationReplies(ConversationStore store, IntegrationCatalogService catalog,
-                        OpeningHoursService openingHoursService) {
+                        OpeningHoursService openingHoursService, EventService eventService) {
         this.store = store;
         this.catalog = catalog;
         this.openingHoursService = openingHoursService;
+        this.eventService = eventService;
     }
 
     /** Moves to {@code state}, remembers the question and the numbered offers, and asks it. */
@@ -135,7 +139,13 @@ class ConversationReplies {
                 .map(s -> new ServiceFact(s.name(), s.category(), s.durationMinutes(), s.price(),
                         s.pricePerParticipant(), s.maxParticipants(), s.currency()))
                 .toList();
+        List<EventFact> events = eventService.showing(business).stream()
+                .map(e -> new EventFact(e.title(), e.performer(), e.description(), e.date(),
+                        e.date().getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH),
+                        e.startTime().format(HH_MM), e.endTime() == null ? null : e.endTime().format(HH_MM),
+                        e.booking()))
+                .toList();
         return new BusinessFacts(business.getName(), business.getPhone(), business.getAddress(),
-                catalog.bookingPageUrl(business), hours.isEmpty() ? "Closed" : hours, services);
+                catalog.bookingPageUrl(business), hours.isEmpty() ? "Closed" : hours, services, events);
     }
 }

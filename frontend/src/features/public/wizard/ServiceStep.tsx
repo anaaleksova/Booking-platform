@@ -6,6 +6,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import { mediaUrl } from '@/features/media/api';
+import { isFree } from '@/features/public/freeBooking';
 import type { PublicService } from '@/types/api';
 import { formatDuration, formatMoney } from '@/utils/format';
 
@@ -77,14 +78,16 @@ export function ServiceStep({
                       {service.maxParticipants > 1 ? ` · up to ${service.maxParticipants} people` : ''}
                     </Typography>
                   </Box>
-                  <Stack alignItems="flex-end" sx={{ flexShrink: 0 }}>
-                    <Typography fontWeight={800}>{formatMoney(service.price, service.currency)}</Typography>
-                    {service.pricePerParticipant ? (
-                      <Typography variant="caption" color="text.secondary">
-                        per person
-                      </Typography>
-                    ) : null}
-                  </Stack>
+                  {isFree(service) ? null : (
+                    <Stack alignItems="flex-end" sx={{ flexShrink: 0 }}>
+                      <Typography fontWeight={800}>{formatMoney(service.price, service.currency)}</Typography>
+                      {service.pricePerParticipant ? (
+                        <Typography variant="caption" color="text.secondary">
+                          per person
+                        </Typography>
+                      ) : null}
+                    </Stack>
+                  )}
                   <ChevronRightRoundedIcon sx={{ color: 'text.disabled', alignSelf: 'center' }} />
                 </ButtonBase>
               );

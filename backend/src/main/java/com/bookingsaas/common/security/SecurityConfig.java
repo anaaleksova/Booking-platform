@@ -89,7 +89,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/register/verify",
-                                "/api/auth/customer/register", "/api/auth/customer/verify",
+                                "/api/auth/customer/register", "/api/auth/customer/verify", "/api/auth/signup/resend",
                                 "/api/auth/password/forgot", "/api/auth/password/reset",
                                 "/api/auth/login", "/api/auth/logout", "/api/auth/session").permitAll()
                         // An invitation link is its own credential; accepting as an existing account needs a sign-in.

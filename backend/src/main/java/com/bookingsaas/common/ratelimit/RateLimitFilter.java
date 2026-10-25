@@ -45,6 +45,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Rule("auth", HttpMethod.POST, "/api/auth/**", 20),
             // Availability runs the engine over up to a few weeks: the most expensive public read.
             new Rule("availability", HttpMethod.GET, "/api/public/businesses/*/services/*/availability", 120),
+            // Events run the same engine to tell whether they are fully booked.
+            new Rule("events", HttpMethod.GET, "/api/public/businesses/*/events", 60),
             // Quotes, bookings and cancellations.
             new Rule("public-write", HttpMethod.POST, "/api/public/**", 30));
 

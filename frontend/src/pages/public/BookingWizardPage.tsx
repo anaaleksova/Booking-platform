@@ -18,6 +18,7 @@ import { useToast } from '@/components/ToastProvider';
 import { mediaUrl } from '@/features/media/api';
 import { createPublicReservation, fetchQuote, usePublicBusiness, usePublicServices } from '@/features/public/api';
 import { BusinessShell } from '@/features/public/BusinessShell';
+import { isFree } from '@/features/public/freeBooking';
 import { queryKeys } from '@/features/queryKeys';
 import { guessCountry } from '@/components/PhoneField';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -47,6 +48,7 @@ import { formatDuration, formatLocalDate, formatMoney, toLocalDateTimeString } f
  * The booking flow as separate views — one decision per screen:
  * service → guests & preferences (when the service has any) → date & time →
  * spot on the map (when the business drew one) → details → review & confirm.
+ * With a single service the first step is skipped; a free one shows no price.
  */
 export function BookingWizardPage() {
   const slug = useParams().slug!;
@@ -82,8 +84,11 @@ export function BookingWizardPage() {
   const [quote, setQuote] = useState<PriceQuote | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const service = services.data?.find((item) => item.id === choices.serviceId);
-  const steps = stepsFor(service);
+  // A business with one service (a restaurant's "Table reservation") has nothing to choose: start after it.
+  const onlyService = services.data?.length === 1 ? services.data[0] : undefined;
+  const service = services.data?.find((item) => item.id === choices.serviceId) ?? onlyService;
+  const steps = stepsFor(service, Boolean(onlyService));
+  const free = Boolean(service && isFree(service));
   const step: StepKey = useMemo(() => {
     if (!service) {
       return 'service';
@@ -226,10 +231,15 @@ export function BookingWizardPage() {
   const spotNames = namesOf(mapped);
   const spotLabel = mapped.length === 1 ? mapped[0].resourceTypeName : 'Seating';
   const estimate = service ? (service.pricePerParticipant ? service.price * choices.people : service.price) : 0;
+  const price = quote && step === 'review' ? quote.finalPrice : estimate;
 
   const reviewLines: ReviewLine[] = service
     ? [
-        { label: 'Service', value: `${service.name} · ${formatDuration(service.durationMinutes)}`, step: 'service' },
+        {
+          label: free ? 'Booking' : 'Service',
+          value: `${service.name} · ${formatDuration(service.durationMinutes)}`,
+          step: onlyService ? undefined : 'service',
+        },
         ...(needsOptions(service)
           ? [
               {
@@ -362,6 +372,7 @@ export function BookingWizardPage() {
                   onApplyCode={() => setAppliedCode(codeInput.trim())}
                   codeError={codeError}
                   quote={quote}
+                  free={free}
                 />
               ) : null}
 
@@ -405,13 +416,15 @@ export function BookingWizardPage() {
                     </Typography>
                   ) : null}
                   {spotNames.length ? <Typography variant="body2">{spotNames.join(', ')}</Typography> : null}
-                  <Divider />
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography fontWeight={700}>Total</Typography>
-                    <Typography fontWeight={800}>
-                      {formatMoney(quote && step === 'review' ? quote.finalPrice : estimate, service.currency)}
-                    </Typography>
-                  </Stack>
+                  {free ? null : (
+                    <>
+                      <Divider />
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography fontWeight={700}>Total</Typography>
+                        <Typography fontWeight={800}>{formatMoney(price, service.currency)}</Typography>
+                      </Stack>
+                    </>
+                  )}
                 </Stack>
               ) : (
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -454,8 +467,12 @@ export function BookingWizardPage() {
               {service?.name}
             </Typography>
             <Typography variant="caption" color="text.secondary" noWrap display="block">
-              {choices.date && choices.time ? `${formatLocalDate(choices.date)} · ${choices.time} · ` : ''}
-              {service ? formatMoney(quote && step === 'review' ? quote.finalPrice : estimate, service.currency) : ''}
+              {[
+                choices.date && choices.time ? `${formatLocalDate(choices.date)} · ${choices.time}` : '',
+                service && !free ? formatMoney(price, service.currency) : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </Typography>
           </Box>
           <Button variant="contained" size="large" onClick={action.onClick} disabled={action.disabled} sx={{ borderRadius: 999, px: 3, flexShrink: 0 }}>

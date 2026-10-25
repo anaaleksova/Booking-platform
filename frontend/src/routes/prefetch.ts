@@ -14,6 +14,7 @@ const ADMIN_PAGES = [
   () => import('@/pages/admin/CustomersPage'),
   () => import('@/pages/admin/CustomerDetailPage'),
   () => import('@/pages/admin/DiscountsPage'),
+  () => import('@/pages/admin/EventsPage'),
   () => import('@/pages/admin/RevenuePage'),
   () => import('@/pages/admin/AnalyticsPage'),
   () => import('@/pages/admin/IntegrationsPage'),

@@ -14,6 +14,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { PasswordField } from '@/components/PasswordField';
 import { ForgotPasswordFlow } from '@/features/auth/ForgotPasswordFlow';
 import { VerificationCodeForm } from '@/features/auth/VerificationCodeForm';
+import { clearPendingSignup, loadPendingSignup, savePendingSignup } from '@/features/auth/pendingSignup';
 
 type Mode = 'signup' | 'signin' | 'code' | 'forgot';
 
@@ -27,10 +28,12 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * emails a 6-digit code and only the right code creates the account.
  */
 export function CustomerAuthPanel() {
-  const { login, startCustomerSignup, verifyCustomerSignup } = useAuth();
-  const [mode, setMode] = useState<Mode>('signup');
+  const { login, startCustomerSignup, verifyCustomerSignup, resendSignupCode } = useAuth();
+  // A sign-up waiting for its code survives a reload (often while the customer fetches the email).
+  const [waiting] = useState(() => loadPendingSignup('customer'));
+  const [mode, setMode] = useState<Mode>(waiting ? 'code' : 'signup');
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(waiting?.email ?? '');
   const [password, setPassword] = useState('');
   const [showErrors, setShowErrors] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -60,6 +63,7 @@ export function CustomerAuthPanel() {
     try {
       if (mode === 'signup') {
         await sendCode();
+        savePendingSignup('customer', { email: email.trim() });
         setMode('code');
         setShowErrors(false);
       } else {
@@ -95,9 +99,15 @@ export function CustomerAuthPanel() {
       <Box sx={{ maxWidth: 440, mx: 'auto' }}>
         <VerificationCodeForm
           email={email.trim()}
-          onVerify={(code) => verifyCustomerSignup(email.trim(), code)}
-          onResend={sendCode}
-          onBack={() => switchMode('signup')}
+          onVerify={async (code) => {
+            await verifyCustomerSignup(email.trim(), code);
+            clearPendingSignup('customer');
+          }}
+          onResend={() => resendSignupCode(email.trim())}
+          onBack={() => {
+            clearPendingSignup('customer');
+            switchMode('signup');
+          }}
           buttonSx={{ borderRadius: 999 }}
         />
       </Box>

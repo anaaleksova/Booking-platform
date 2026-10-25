@@ -153,7 +153,17 @@ public final class ConversationDtos {
 
     /** What the reply may say about the business, e.g. to answer a question. */
     public record BusinessFacts(String name, String phone, String address, String bookingPageUrl,
-                                String openingHours, List<ServiceFact> services) {
+                                String openingHours, List<ServiceFact> services, List<EventFact> events) {
+    }
+
+    /**
+     * An event on the booking page right now ("what's on this weekend?").
+     *
+     * @param end     null when the event has no set end
+     * @param booking OPEN, FULL (fully booked) or NONE (nothing to book in chat)
+     */
+    public record EventFact(String title, String performer, String description, LocalDate date, String dayOfWeek,
+                            String start, String end, String booking) {
     }
 
     public record ServiceFact(String name, String category, int durationMinutes, BigDecimal price,

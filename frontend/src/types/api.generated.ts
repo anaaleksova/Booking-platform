@@ -142,9 +142,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_10"];
+        get: operations["list_11"];
         put?: never;
-        post: operations["create_8"];
+        post: operations["create_9"];
         delete?: never;
         options?: never;
         head?: never;
@@ -161,7 +161,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete: operations["delete_7"];
+        delete: operations["delete_8"];
         options?: never;
         head?: never;
         patch?: never;
@@ -175,7 +175,7 @@ export interface paths {
             cookie?: never;
         };
         get: operations["current_1"];
-        put: operations["update_6"];
+        put: operations["update_7"];
         post?: never;
         delete?: never;
         options?: never;
@@ -208,7 +208,7 @@ export interface paths {
         };
         get: operations["search"];
         put?: never;
-        post: operations["create_7"];
+        post: operations["create_8"];
         delete?: never;
         options?: never;
         head?: never;
@@ -222,10 +222,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["get_5"];
-        put: operations["update_5"];
+        get: operations["get_6"];
+        put: operations["update_6"];
         post?: never;
-        delete: operations["delete_6"];
+        delete: operations["delete_7"];
         options?: never;
         head?: never;
         patch?: never;
@@ -270,9 +270,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_9"];
+        get: operations["list_10"];
         put?: never;
-        post: operations["create_6"];
+        post: operations["create_7"];
         delete?: never;
         options?: never;
         head?: never;
@@ -286,10 +286,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["get_4"];
-        put: operations["update_4"];
+        get: operations["get_5"];
+        put: operations["update_5"];
         post?: never;
-        delete: operations["delete_5"];
+        delete: operations["delete_6"];
         options?: never;
         head?: never;
         patch?: never;
@@ -302,9 +302,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_8"];
+        get: operations["list_9"];
         put?: never;
-        post: operations["create_5"];
+        post: operations["create_6"];
         delete?: never;
         options?: never;
         head?: never;
@@ -352,10 +352,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["get_3"];
-        put: operations["update_3"];
+        get: operations["get_4"];
+        put: operations["update_4"];
         post?: never;
-        delete: operations["delete_4"];
+        delete: operations["delete_5"];
         options?: never;
         head?: never;
         patch?: never;
@@ -388,6 +388,38 @@ export interface paths {
         put: operations["replaceWorkingHours"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_8"];
+        put?: never;
+        post: operations["create_5"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_3"];
+        put: operations["update_3"];
+        post?: never;
+        delete: operations["delete_4"];
         options?: never;
         head?: never;
         patch?: never;
@@ -450,7 +482,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["overview"];
+        get: operations["overview_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1060,6 +1092,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/signup/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resendSignupCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/switch-business/{businessId}": {
         parameters: {
             query?: never;
@@ -1311,6 +1359,136 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["accounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/accounts/{id}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setAccountActive"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/businesses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["businesses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/businesses/{id}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setBusinessActive"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/businesses/{id}/enter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open the business's admin with owner rights (logged) */
+        post: operations["enterBusiness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/exit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leave a business entered as platform administrator */
+        post: operations["exitBusiness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/businesses/{slug}": {
         parameters: {
             query?: never;
@@ -1319,6 +1497,23 @@ export interface paths {
             cookie?: never;
         };
         get: operations["business"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/businesses/{slug}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Events on the booking page today, soonest first, with whether they are fully booked */
+        get: operations["events"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1726,6 +1921,7 @@ export interface components {
         ConversationDtosBusinessFacts: {
             address?: string;
             bookingPageUrl?: string;
+            events?: components["schemas"]["ConversationDtosEventFact"][];
             name?: string;
             openingHours?: string;
             phone?: string;
@@ -1765,6 +1961,17 @@ export interface components {
         ConversationDtosCustomerFacts: {
             firstName?: string;
             known?: boolean;
+        };
+        ConversationDtosEventFact: {
+            booking?: string;
+            /** Format: date */
+            date?: string;
+            dayOfWeek?: string;
+            description?: string;
+            end?: string;
+            performer?: string;
+            start?: string;
+            title?: string;
         };
         ConversationDtosExtraction: {
             abort?: boolean;
@@ -1867,6 +2074,8 @@ export interface components {
             fullName?: string;
             /** Format: int64 */
             id?: number;
+            platformAdmin?: boolean;
+            platformView?: boolean;
         };
         CurrentUserResponseMembershipResponse: {
             /** Format: int64 */
@@ -2019,6 +2228,60 @@ export interface components {
             resourceId?: number;
             serviceIds?: number[];
             workingHours?: components["schemas"]["DayInterval"][];
+        };
+        EventRequest: {
+            /** Format: date */
+            date: string;
+            description?: string;
+            /**
+             * Format: time
+             * @example 09:00:00
+             */
+            endTime?: string;
+            /** Format: uuid */
+            imageMediaId?: string;
+            performer?: string;
+            /** Format: int64 */
+            serviceId?: number;
+            /** Format: date */
+            showFrom?: string;
+            /** Format: date */
+            showUntil?: string;
+            /**
+             * Format: time
+             * @example 09:00:00
+             */
+            startTime: string;
+            title: string;
+        };
+        EventResponse: {
+            /** Format: date */
+            date?: string;
+            description?: string;
+            /**
+             * Format: time
+             * @example 09:00:00
+             */
+            endTime?: string;
+            /** Format: int64 */
+            id?: number;
+            /** Format: uuid */
+            imageMediaId?: string;
+            imageUrl?: string;
+            performer?: string;
+            /** Format: int64 */
+            serviceId?: number;
+            /** Format: date */
+            showFrom?: string;
+            /** Format: date */
+            showUntil?: string;
+            /**
+             * Format: time
+             * @example 09:00:00
+             */
+            startTime?: string;
+            state?: string;
+            title?: string;
         };
         FloorPlanDtosDecor: {
             height: number;
@@ -2419,6 +2682,58 @@ export interface components {
             sort?: components["schemas"]["SortObject"][];
             unpaged?: boolean;
         };
+        PlatformDtosAccountRow: {
+            active?: boolean;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int64 */
+            customerAt?: number;
+            email?: string;
+            fullName?: string;
+            /** Format: int64 */
+            id?: number;
+            platformAdmin?: boolean;
+            roles?: string[];
+        };
+        PlatformDtosActiveRequest: {
+            active: boolean;
+        };
+        PlatformDtosActivityRow: {
+            action?: string;
+            actorEmail?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            targetId?: number;
+            targetName?: string;
+            targetType?: string;
+        };
+        PlatformDtosBusinessRow: {
+            active?: boolean;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int64 */
+            id?: number;
+            name?: string;
+            ownerEmails?: string[];
+            /** Format: int64 */
+            recentReservations?: number;
+            slug?: string;
+        };
+        PlatformDtosOverview: {
+            /** Format: int64 */
+            accounts?: number;
+            /** Format: int64 */
+            activeBusinesses?: number;
+            /** Format: int64 */
+            businesses?: number;
+            /** Format: int64 */
+            newBusinesses?: number;
+            /** Format: int64 */
+            reservationsThisMonth?: number;
+        };
         PublicBusinessResponse: {
             accentColor?: string;
             address?: string;
@@ -2443,6 +2758,29 @@ export interface components {
         PublicBusinessResponseGalleryPhoto: {
             caption?: string;
             url?: string;
+        };
+        PublicEventResponse: {
+            booking?: string;
+            /** Format: date */
+            date?: string;
+            description?: string;
+            /**
+             * Format: time
+             * @example 09:00:00
+             */
+            endTime?: string;
+            /** Format: int64 */
+            id?: number;
+            imageUrl?: string;
+            performer?: string;
+            /** Format: int64 */
+            serviceId?: number;
+            /**
+             * Format: time
+             * @example 09:00:00
+             */
+            startTime?: string;
+            title?: string;
         };
         PublicReservationRequest: {
             customer: components["schemas"]["CustomerDetails"];
@@ -2579,6 +2917,9 @@ export interface components {
             resourceSelections?: components["schemas"]["ResourceSelection"][];
             /** Format: date-time */
             startTime: string;
+        };
+        ResendCodeRequest: {
+            email: string;
         };
         ReservationResponse: {
             cancellationReason?: string;
@@ -2761,6 +3102,9 @@ export interface components {
             /** Format: int64 */
             resourceTypeId?: number;
             resourceTypeName?: string;
+        };
+        SignupStartedResponse: {
+            existingAccount?: boolean;
         };
         SlotResponse: {
             /** Format: date-time */
@@ -3072,7 +3416,7 @@ export interface operations {
             };
         };
     };
-    list_10: {
+    list_11: {
         parameters: {
             query?: {
                 from?: string;
@@ -3095,7 +3439,7 @@ export interface operations {
             };
         };
     };
-    create_8: {
+    create_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -3119,7 +3463,7 @@ export interface operations {
             };
         };
     };
-    delete_7: {
+    delete_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -3159,7 +3503,7 @@ export interface operations {
             };
         };
     };
-    update_6: {
+    update_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -3251,7 +3595,7 @@ export interface operations {
             };
         };
     };
-    create_7: {
+    create_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -3275,7 +3619,7 @@ export interface operations {
             };
         };
     };
-    get_5: {
+    get_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -3297,7 +3641,7 @@ export interface operations {
             };
         };
     };
-    update_5: {
+    update_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -3323,7 +3667,7 @@ export interface operations {
             };
         };
     };
-    delete_6: {
+    delete_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -3388,7 +3732,7 @@ export interface operations {
             };
         };
     };
-    list_9: {
+    list_10: {
         parameters: {
             query?: never;
             header?: never;
@@ -3408,7 +3752,7 @@ export interface operations {
             };
         };
     };
-    create_6: {
+    create_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -3432,7 +3776,7 @@ export interface operations {
             };
         };
     };
-    get_4: {
+    get_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -3454,7 +3798,7 @@ export interface operations {
             };
         };
     };
-    update_4: {
+    update_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -3480,7 +3824,7 @@ export interface operations {
             };
         };
     };
-    delete_5: {
+    delete_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -3500,7 +3844,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -3520,7 +3864,7 @@ export interface operations {
             };
         };
     };
-    create_5: {
+    create_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -3606,7 +3950,7 @@ export interface operations {
             };
         };
     };
-    get_3: {
+    get_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -3628,7 +3972,7 @@ export interface operations {
             };
         };
     };
-    update_3: {
+    update_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -3654,7 +3998,7 @@ export interface operations {
             };
         };
     };
-    delete_4: {
+    delete_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -3721,6 +4065,118 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["DayInterval"][];
                 };
+            };
+        };
+    };
+    list_8: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EventResponse"][];
+                };
+            };
+        };
+    };
+    create_5: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EventResponse"];
+                };
+            };
+        };
+    };
+    get_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EventResponse"];
+                };
+            };
+        };
+    };
+    update_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EventResponse"];
+                };
+            };
+        };
+    };
+    delete_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -3838,7 +4294,7 @@ export interface operations {
             };
         };
     };
-    overview: {
+    overview_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -4940,7 +5396,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["SignupStartedResponse"];
+                };
             };
         };
     };
@@ -4985,6 +5443,28 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["CurrentUserResponse"];
                 };
+            };
+        };
+    };
+    resendSignupCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResendCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -5381,6 +5861,182 @@ export interface operations {
             };
         };
     };
+    accounts: {
+        parameters: {
+            query?: {
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlatformDtosAccountRow"][];
+                };
+            };
+        };
+    };
+    setAccountActive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformDtosActiveRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlatformDtosActivityRow"][];
+                };
+            };
+        };
+    };
+    businesses: {
+        parameters: {
+            query?: {
+                query?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlatformDtosBusinessRow"][];
+                };
+            };
+        };
+    };
+    setBusinessActive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformDtosActiveRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlatformDtosBusinessRow"];
+                };
+            };
+        };
+    };
+    enterBusiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+        };
+    };
+    exitBusiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+        };
+    };
+    overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlatformDtosOverview"];
+                };
+            };
+        };
+    };
     business: {
         parameters: {
             query?: never;
@@ -5399,6 +6055,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PublicBusinessResponse"];
+                };
+            };
+        };
+    };
+    events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicEventResponse"][];
                 };
             };
         };

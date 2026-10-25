@@ -6,7 +6,10 @@ import com.bookingsaas.availability.dto.DaySlotsResponse;
 import com.bookingsaas.business.Business;
 import com.bookingsaas.business.BusinessService;
 import com.bookingsaas.business.GalleryService;
-import com.bookingsaas.business.OpeningHoursService;import com.bookingsaas.pricing.PricingService;
+import com.bookingsaas.business.OpeningHoursService;
+import com.bookingsaas.event.EventService;
+import com.bookingsaas.event.dto.PublicEventResponse;
+import com.bookingsaas.pricing.PricingService;
 import com.bookingsaas.publicapi.dto.PublicBusinessResponse;
 import com.bookingsaas.publicapi.dto.PublicServiceResponse;
 import com.bookingsaas.pricing.dto.QuoteRequest;
@@ -69,6 +72,7 @@ public class PublicReservationController {
     private final BookingPageService bookingPageService;
     private final GalleryService galleryService;
     private final ReservationCalendarService calendarService;
+    private final EventService eventService;
 
     public PublicReservationController(BusinessService businessService,
                                        OpeningHoursService openingHoursService,
@@ -79,7 +83,8 @@ public class PublicReservationController {
                                        ReservationQueryService reservationQueryService,
                                        BookingPageService bookingPageService,
                                        GalleryService galleryService,
-                                       ReservationCalendarService calendarService) {
+                                       ReservationCalendarService calendarService,
+                                       EventService eventService) {
         this.businessService = businessService;
         this.openingHoursService = openingHoursService;
         this.serviceCatalog = serviceCatalog;
@@ -90,6 +95,7 @@ public class PublicReservationController {
         this.bookingPageService = bookingPageService;
         this.galleryService = galleryService;
         this.calendarService = calendarService;
+        this.eventService = eventService;
     }
 
     @GetMapping("/businesses/{slug}")
@@ -97,6 +103,12 @@ public class PublicReservationController {
         Business business = businessService.requireActiveBySlug(slug);
         return PublicBusinessResponse.from(business, openingHoursService.intervalsOf(business.getId()),
                 galleryService.publicGallery(business));
+    }
+
+    @GetMapping("/businesses/{slug}/events")
+    @Operation(summary = "Events on the booking page today, soonest first, with whether they are fully booked")
+    public List<PublicEventResponse> events(@PathVariable String slug) {
+        return eventService.showing(businessService.requireActiveBySlug(slug));
     }
 
     @GetMapping("/businesses/{slug}/services")

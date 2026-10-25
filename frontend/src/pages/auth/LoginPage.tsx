@@ -35,8 +35,8 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: '', password: '' } });
 
-  if (!initialising && isAuthenticated && user?.activeBusiness) {
-    return <Navigate to="/admin" replace />;
+  if (!initialising && isAuthenticated && (user?.activeBusiness || user?.platformAdmin)) {
+    return <Navigate to={user?.activeBusiness ? '/admin' : '/platform'} replace />;
   }
   const customerAccount = !initialising && isAuthenticated && !user?.activeBusiness;
 
@@ -44,6 +44,10 @@ export function LoginPage() {
     setSubmitError(null);
     try {
       const signedIn = await login(values.email, values.password);
+      if (!signedIn.activeBusiness && signedIn.platformAdmin) {
+        navigate('/platform', { replace: true });
+        return;
+      }
       if (!signedIn.activeBusiness) {
         logout();
         setSubmitError('This is a customer account for booking. Sign in with a business account to open the dashboard.');

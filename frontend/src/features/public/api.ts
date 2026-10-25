@@ -5,6 +5,7 @@ import type {
   DaySlots,
   PriceQuote,
   PublicBusiness,
+  PublicEvent,
   PublicReservation,
   PublicService,
   ResourceSelection,
@@ -32,6 +33,14 @@ export function usePublicServices(slug: string) {
   return useQuery({
     queryKey: queryKeys.publicServices(slug),
     queryFn: async () => (await apiClient.get<PublicService[]>(`/api/public/businesses/${slug}/services`)).data,
+  });
+}
+
+/** Events on the booking page today, each with whether it is fully booked. */
+export function usePublicEvents(slug: string) {
+  return useQuery({
+    queryKey: queryKeys.publicEvents(slug),
+    queryFn: async () => (await apiClient.get<PublicEvent[]>(`/api/public/businesses/${slug}/events`)).data,
   });
 }
 

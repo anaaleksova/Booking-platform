@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { apiClient, setSessionExpiredHandler } from '@/api/client';
-import type { AuthResponse, CurrentUser } from '@/types/api';
+import type { AuthResponse, CurrentUser, SignupStarted } from '@/types/api';
 
 interface AuthContextValue {
   user: CurrentUser | null;
@@ -10,8 +10,14 @@ interface AuthContextValue {
   isOwner: boolean;
   /** Resolves to the signed-in user, so callers can tell a customer account from a business one. */
   login: (email: string, password: string) => Promise<CurrentUser>;
-  /** Business sign-up, step 1: emails a 6-digit code. Nothing is created yet. */
-  register: (input: RegisterInput) => Promise<void>;
+  /**
+   * Business sign-up, step 1: emails a 6-digit code. Nothing is created yet.
+   * Resolves to whether the email already has an account (from booking), which
+   * the code then turns into the business's, with the password just entered.
+   */
+  register: (input: RegisterInput) => Promise<SignupStarted>;
+  /** Emails a new code for a sign-up (either kind) still waiting for one. Needs only the email. */
+  resendSignupCode: (email: string) => Promise<void>;
   /** Step 2: the code creates the account and the business, and signs in. */
   verifyRegistration: (email: string, code: string) => Promise<void>;
   /** Booking-only sign-up, step 1: emails a 6-digit code. No account yet. */
@@ -90,7 +96,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(async (input: RegisterInput) => {
-    await apiClient.post('/api/auth/register', input);
+    return (await apiClient.post<SignupStarted>('/api/auth/register', input)).data;
+  }, []);
+
+  const resendSignupCode = useCallback(async (email: string) => {
+    await apiClient.post('/api/auth/signup/resend', { email });
   }, []);
 
   const verifyRegistration = useCallback(
@@ -141,12 +151,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resetPassword,
       logout,
       adoptSession: applySession,
+      resendSignupCode,
     }),
     [
       user,
       initialising,
       login,
       register,
+      resendSignupCode,
       verifyRegistration,
       startCustomerSignup,
       verifyCustomerSignup,

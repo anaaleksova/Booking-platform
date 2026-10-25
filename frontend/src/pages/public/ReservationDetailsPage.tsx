@@ -92,15 +92,20 @@ export function ReservationDetailsPage() {
           {data.customerName ? <Row label="Name" value={data.customerName} /> : null}
         </Stack>
 
-        <Divider sx={{ my: 3 }} />
-        <Stack spacing={0.75}>
-          <Row label="Service" value={formatMoney(data.originalPrice, data.currency)} />
-          <Row
-            label={data.discountCode ? `Discount (${data.discountCode})` : 'Discount'}
-            value={data.discountAmount > 0 ? `− ${formatMoney(data.discountAmount, data.currency)}` : formatMoney(0, data.currency)}
-          />
-          <Row bold label="Total" value={formatMoney(data.finalPrice, data.currency)} />
-        </Stack>
+        {/* A free booking (a table) has no bill to show. */}
+        {data.originalPrice > 0 ? (
+          <>
+            <Divider sx={{ my: 3 }} />
+            <Stack spacing={0.75}>
+              <Row label="Service" value={formatMoney(data.originalPrice, data.currency)} />
+              <Row
+                label={data.discountCode ? `Discount (${data.discountCode})` : 'Discount'}
+                value={data.discountAmount > 0 ? `− ${formatMoney(data.discountAmount, data.currency)}` : formatMoney(0, data.currency)}
+              />
+              <Row bold label="Total" value={formatMoney(data.finalPrice, data.currency)} />
+            </Stack>
+          </>
+        ) : null}
 
         <Divider sx={{ my: 3 }} />
         <Typography variant="subtitle2">{data.businessName}</Typography>

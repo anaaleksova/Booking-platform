@@ -17,8 +17,10 @@ import PhoneRoundedIcon from '@mui/icons-material/PhoneRounded';
 import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { mediaUrl } from '@/features/media/api';
-import { usePublicBusiness, usePublicServices } from '@/features/public/api';
+import { usePublicBusiness, usePublicEvents, usePublicServices } from '@/features/public/api';
 import { BusinessShell } from '@/features/public/BusinessShell';
+import { EventsSection } from '@/features/public/EventsSection';
+import { bookLabel, isFree, onlyFree } from '@/features/public/freeBooking';
 import { GallerySection } from '@/features/public/GallerySection';
 import { Reveal } from '@/features/public/Reveal';
 import type { DayInterval, PublicBusiness, PublicService } from '@/types/api';
@@ -32,6 +34,7 @@ export function BusinessPage() {
   const slug = useParams().slug!;
   const business = usePublicBusiness(slug);
   const services = usePublicServices(slug);
+  const events = usePublicEvents(slug);
 
   if (business.isLoading) {
     return <LoadingState />;
@@ -46,20 +49,32 @@ export function BusinessPage() {
     );
   }
   const info = business.data;
+  // A restaurant or bar only takes table reservations: no price list to show.
+  const free = onlyFree(services.data);
+  const bookButton = bookLabel(services.data);
 
   return (
     <BusinessShell business={info} transparentHeader>
-      <Hero business={info} />
+      <Hero business={info} free={free} />
+      <EventsSection
+        slug={slug}
+        events={events.data ?? []}
+        title={(eyebrow, heading) => <SectionTitle eyebrow={eyebrow} title={heading} />}
+      />
       <Box id="services" sx={{ py: { xs: 6, md: 10 }, bgcolor: 'background.paper' }}>
         <Container maxWidth="lg">
-          <SectionTitle eyebrow="Price list" title="Services & prices" />
+          {free ? (
+            <SectionTitle eyebrow="Reservations" title="What you can book" />
+          ) : (
+            <SectionTitle eyebrow="Price list" title="Services & prices" />
+          )}
           {services.isLoading ? <LoadingState /> : null}
           {services.isError ? <ErrorState error={services.error} /> : null}
           {services.data?.length === 0 ? <EmptyState title="No services are open for booking right now" /> : null}
           <ServiceGroups slug={slug} services={services.data ?? []} />
           <Stack alignItems="center" sx={{ mt: 5 }}>
             <Button component={RouterLink} to={`/b/${slug}/book`} variant="contained" size="large" sx={{ borderRadius: 999, px: 4, bgcolor: 'text.primary', color: 'background.default', '&:hover': { bgcolor: 'text.secondary' } }}>
-              Book an appointment
+              {bookButton}
             </Button>
           </Stack>
         </Container>
@@ -80,7 +95,7 @@ export function BusinessPage() {
           </Container>
         </Box>
       ) : null}
-      <FindUs business={info} />
+      <FindUs business={info} bookButton={bookButton} />
     </BusinessShell>
   );
 }
@@ -112,7 +127,7 @@ const heroLine = (step: number) => ({
   '@media (prefers-reduced-motion: reduce)': { opacity: 1, animation: 'none' },
 });
 
-function Hero({ business }: { business: PublicBusiness }) {
+function Hero({ business, free }: { business: PublicBusiness; free: boolean }) {
   const cover = mediaUrl(business.coverUrl);
 
   return (
@@ -174,7 +189,7 @@ function Hero({ business }: { business: PublicBusiness }) {
             '&:hover': { transform: 'translateY(-2px)' },
           }}
         >
-          See free times & prices
+          {free ? 'See free times' : 'See free times & prices'}
         </Button>
       </Stack>
     </Box>
@@ -185,7 +200,7 @@ function ServiceGroups({ slug, services }: { slug: string; services: PublicServi
   const groups = useMemo(() => {
     const map = new Map<string, PublicService[]>();
     services.forEach((service) => {
-      const key = service.category?.trim() || 'Services';
+      const key = service.category?.trim() || (isFree(service) ? 'Reservations' : 'Services');
       map.set(key, [...(map.get(key) ?? []), service]);
     });
     return [...map.entries()];
@@ -248,16 +263,20 @@ function ServiceGroups({ slug, services }: { slug: string; services: PublicServi
                       <Typography fontWeight={700} noWrap>
                         {service.name}
                       </Typography>
-                      <Box sx={{ flex: 1, borderBottom: '1px dotted', borderColor: 'divider', minWidth: 16, transform: 'translateY(-4px)' }} />
-                      <Typography fontWeight={800} sx={{ whiteSpace: 'nowrap' }}>
-                        {formatMoney(service.price, service.currency)}
-                        {service.pricePerParticipant ? (
-                          <Typography component="span" variant="caption" color="text.secondary">
-                            {' '}
-                            / person
+                      {isFree(service) ? null : (
+                        <>
+                          <Box sx={{ flex: 1, borderBottom: '1px dotted', borderColor: 'divider', minWidth: 16, transform: 'translateY(-4px)' }} />
+                          <Typography fontWeight={800} sx={{ whiteSpace: 'nowrap' }}>
+                            {formatMoney(service.price, service.currency)}
+                            {service.pricePerParticipant ? (
+                              <Typography component="span" variant="caption" color="text.secondary">
+                                {' '}
+                                / person
+                              </Typography>
+                            ) : null}
                           </Typography>
-                        ) : null}
-                      </Typography>
+                        </>
+                      )}
                     </Stack>
                     {service.description ? (
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -284,7 +303,7 @@ function ServiceGroups({ slug, services }: { slug: string; services: PublicServi
   );
 }
 
-function FindUs({ business }: { business: PublicBusiness }) {
+function FindUs({ business, bookButton }: { business: PublicBusiness; bookButton: string }) {
   const mapsQuery = encodeURIComponent([business.name, business.address].filter(Boolean).join(', '));
   const showMap = business.showMap && Boolean(business.address);
 
@@ -337,7 +356,7 @@ function FindUs({ business }: { business: PublicBusiness }) {
                   </Button>
                 ) : null}
                 <Button component={RouterLink} to={`/b/${business.slug}/book`} variant="contained" sx={{ borderRadius: 999 }}>
-                  Book an appointment
+                  {bookButton}
                 </Button>
               </Stack>
             </Paper>

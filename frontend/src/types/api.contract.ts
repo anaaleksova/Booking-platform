@@ -38,6 +38,7 @@ type Assert<T extends true> = T;
 export type Contract = [
   Assert<Fits<Schemas['CurrentUserResponse'], Api.CurrentUser>>,
   Assert<Fits<Schemas['AuthResponse'], Api.AuthResponse>>,
+  Assert<Fits<Schemas['SignupStartedResponse'], Api.SignupStarted>>,
   Assert<Fits<Schemas['BusinessResponse'], Api.Business>>,
   Assert<Fits<Schemas['BusinessSettingsResponse'], Api.BusinessSettings>>,
   Assert<Fits<Schemas['BlockedTimeResponse'], Api.BlockedTime>>,
@@ -54,6 +55,8 @@ export type Contract = [
   Assert<Fits<Schemas['DaySlotsResponse'], Api.DaySlots>>,
   Assert<Fits<Schemas['QuoteResponse'], Api.PriceQuote>>,
   Assert<Fits<Schemas['DiscountResponse'], Api.Discount>>,
+  Assert<Fits<Schemas['EventResponse'], Api.BusinessEvent>>,
+  Assert<Fits<Schemas['PublicEventResponse'], Api.PublicEvent>>,
   Assert<Fits<Schemas['AnalyticsDtosRevenuePeriods'], Api.RevenuePeriods>>,
   Assert<Fits<Schemas['AnalyticsDtosRevenueReport'], Api.RevenueReport>>,
   Assert<Fits<Schemas['AnalyticsDtosReservationReport'], Api.ReservationReport>>,
@@ -65,4 +68,8 @@ export type Contract = [
   Assert<Fits<Schemas['GalleryImageResponse'], Api.GalleryImage>>,
   Assert<Fits<Schemas['MediaControllerUploadResponse'], Api.UploadedMedia>>,
   Assert<Fits<Schemas['IntegrationAdminDtosOverview'], Api.IntegrationsOverview>>,
+  Assert<Fits<Schemas['PlatformDtosOverview'], Api.PlatformOverview>>,
+  Assert<Fits<Schemas['PlatformDtosBusinessRow'], Api.PlatformBusiness>>,
+  Assert<Fits<Schemas['PlatformDtosAccountRow'], Api.PlatformAccount>>,
+  Assert<Fits<Schemas['PlatformDtosActivityRow'], Api.PlatformActivity>>,
 ];

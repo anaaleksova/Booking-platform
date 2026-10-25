@@ -7,6 +7,8 @@ import com.bookingsaas.auth.dto.ForgotPasswordRequest;
 import com.bookingsaas.auth.dto.ResetPasswordRequest;
 import com.bookingsaas.auth.dto.LoginRequest;
 import com.bookingsaas.auth.dto.RegisterRequest;
+import com.bookingsaas.auth.dto.ResendCodeRequest;
+import com.bookingsaas.auth.dto.SignupStartedResponse;
 import com.bookingsaas.auth.dto.VerifySignupRequest;
 import com.bookingsaas.common.security.CurrentTenant;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,12 +45,13 @@ public class AuthController {
 
     /**
      * A business owner's sign-up, step one: emails a 6-digit code. The account
-     * and the business are created by {@code /register/verify}.
+     * and the business are created by {@code /register/verify}; for an email
+     * that already has a booking account, the business is added to that account.
      */
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public void register(@Valid @RequestBody RegisterRequest request) {
-        authService.startOwnerSignup(request);
+    public SignupStartedResponse register(@Valid @RequestBody RegisterRequest request) {
+        return authService.startOwnerSignup(request);
     }
 
     /** The emailed code creates the owner's account and business, and signs them in. */
@@ -87,6 +90,16 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse verifyCustomerSignup(@Valid @RequestBody VerifySignupRequest request) {
         return authService.verifySignup(request);
+    }
+
+    /**
+     * A new code for a sign-up (owner or customer) still waiting for one —
+     * all the page needs after a reload, as the server kept the details.
+     */
+    @PostMapping("/signup/resend")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void resendSignupCode(@Valid @RequestBody ResendCodeRequest request) {
+        authService.resendSignupCode(request.email());
     }
 
     /** Emails a reset code if the account exists. Always 202, so it reveals nothing. */

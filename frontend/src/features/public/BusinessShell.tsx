@@ -22,7 +22,9 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { mediaUrl } from '@/features/media/api';
 import type { PublicBusiness } from '@/types/api';
 import { prefetchCustomerPages } from '@/routes/prefetch';
+import { usePublicServices } from './api';
 import { brandTheme } from './brandTheme';
+import { bookLabel } from './freeBooking';
 
 /**
  * The frame of every customer page of one business: its colour, its logo and
@@ -157,6 +159,7 @@ function AccountButton() {
 }
 
 function Footer({ business }: { business: PublicBusiness }) {
+  const services = usePublicServices(business.slug);
   const socials = [
     { href: business.instagramUrl, label: 'Instagram', icon: <InstagramIcon /> },
     { href: business.facebookUrl, label: 'Facebook', icon: <FacebookRoundedIcon /> },
@@ -195,7 +198,7 @@ function Footer({ business }: { business: PublicBusiness }) {
           size="large"
           sx={{ mt: 3, borderRadius: 999, px: 4 }}
         >
-          Book an appointment
+          {bookLabel(services.data)}
         </Button>
         <Typography variant="caption" display="block" sx={{ mt: 4, opacity: 0.5 }}>
           Online reservations

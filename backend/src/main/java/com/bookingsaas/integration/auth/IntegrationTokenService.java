@@ -1,5 +1,7 @@
 package com.bookingsaas.integration.auth;
 
+import com.bookingsaas.business.Business;
+import com.bookingsaas.business.BusinessRepository;
 import com.bookingsaas.common.error.ApiException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +30,13 @@ public class IntegrationTokenService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final IntegrationTokenRepository repository;
+    private final BusinessRepository businessRepository;
     private final Clock clock;
 
-    public IntegrationTokenService(IntegrationTokenRepository repository, Clock clock) {
+    public IntegrationTokenService(IntegrationTokenRepository repository, BusinessRepository businessRepository,
+                                   Clock clock) {
         this.repository = repository;
+        this.businessRepository = businessRepository;
         this.clock = clock;
     }
 
@@ -58,7 +63,10 @@ public class IntegrationTokenService {
         return new IssuedToken(repository.save(token), secret);
     }
 
-    /** The principal behind a presented token, if it is known and not revoked. */
+    /**
+     * The principal behind a presented token, if it is known, not revoked, and
+     * its business is active: a business taken offline takes no chat bookings either.
+     */
     @Transactional
     public Optional<IntegrationPrincipal> authenticate(String presented) {
         if (presented == null || !presented.startsWith(TOKEN_PREFIX)) {
@@ -66,6 +74,7 @@ public class IntegrationTokenService {
         }
         return repository.findByTokenHash(hash(presented))
                 .filter(token -> !token.isRevoked())
+                .filter(token -> businessRepository.findById(token.getBusinessId()).map(Business::isActive).orElse(false))
                 .map(token -> {
                     Instant now = clock.instant();
                     if (token.getLastUsedAt() == null

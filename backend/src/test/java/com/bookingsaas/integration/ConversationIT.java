@@ -310,6 +310,25 @@ class ConversationIT extends AbstractSpaIntegrationTest {
         assertThat(reply.get("business").get("services").size()).isEqualTo(2);
     }
 
+    @Test
+    void whats_on_is_answered_from_the_events_on_the_booking_page() throws Exception {
+        send(post("/api/admin/events"), owner, """
+                {"title":"Live jazz","performer":"The Quartet","date":"%s","startTime":"18:00","endTime":"20:00",
+                 "serviceId":%d}""".formatted(day, couplesId), 201);
+        send(post("/api/admin/events"), owner, """
+                {"title":"Later","date":"%s","startTime":"18:00"}""".formatted(day.plusDays(30)), 201);
+
+        JsonNode events = turn("""
+                {"intent":"QUESTION"}""").get("business").get("events");
+        assertThat(events.size()).isEqualTo(1);
+        JsonNode event = events.get(0);
+        assertThat(event.get("title").asText()).isEqualTo("Live jazz");
+        assertThat(event.get("performer").asText()).isEqualTo("The Quartet");
+        assertThat(event.get("date").asText()).isEqualTo(day.toString());
+        assertThat(event.get("start").asText()).isEqualTo("18:00");
+        assertThat(event.get("booking").asText()).isEqualTo("OPEN");
+    }
+
     // --- helpers -------------------------------------------------------------
 
     private void book(String time) throws Exception {

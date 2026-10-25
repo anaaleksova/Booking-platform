@@ -10,10 +10,14 @@ import type { StepKey } from './useWizardState';
 export interface ReviewLine {
   label: string;
   value: string;
-  step: StepKey;
+  /** Where "Change" leads; none when there is nothing else to choose. */
+  step?: StepKey;
 }
 
-/** Step 5: everything at a glance, each part editable, the server's price, and confirm. */
+/**
+ * Step 5: everything at a glance, each part editable, the server's price, and confirm.
+ * A free booking (a table) has no price and no discount code to show.
+ */
 export function ReviewStep({
   lines,
   onEdit,
@@ -22,6 +26,7 @@ export function ReviewStep({
   onApplyCode,
   codeError,
   quote,
+  free = false,
 }: {
   lines: ReviewLine[];
   onEdit: (step: StepKey) => void;
@@ -30,24 +35,14 @@ export function ReviewStep({
   onApplyCode: () => void;
   codeError: string | null;
   quote: PriceQuote | null;
+  free?: boolean;
 }) {
+  if (free) {
+    return <Lines lines={lines} onEdit={onEdit} />;
+  }
   return (
     <Stack spacing={3}>
-      <Stack divider={<Divider flexItem />} spacing={1.5}>
-        {lines.map((line) => (
-          <Stack key={line.label} direction="row" spacing={2} alignItems="center">
-            <Typography variant="body2" color="text.secondary" sx={{ width: { xs: 72, sm: 110 }, flexShrink: 0 }}>
-              {line.label}
-            </Typography>
-            <Typography fontWeight={600} sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
-              {line.value}
-            </Typography>
-            <Button size="small" onClick={() => onEdit(line.step)}>
-              Change
-            </Button>
-          </Stack>
-        ))}
-      </Stack>
+      <Lines lines={lines} onEdit={onEdit} />
 
       <div>
         <Stack direction="row" spacing={1}>
@@ -86,6 +81,28 @@ export function ReviewStep({
           </Typography>
         </Stack>
       ) : null}
+    </Stack>
+  );
+}
+
+function Lines({ lines, onEdit }: { lines: ReviewLine[]; onEdit: (step: StepKey) => void }) {
+  return (
+    <Stack divider={<Divider flexItem />} spacing={1.5}>
+      {lines.map((line) => (
+        <Stack key={line.label} direction="row" spacing={2} alignItems="center">
+          <Typography variant="body2" color="text.secondary" sx={{ width: { xs: 72, sm: 110 }, flexShrink: 0 }}>
+            {line.label}
+          </Typography>
+          <Typography fontWeight={600} sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+            {line.value}
+          </Typography>
+          {line.step ? (
+            <Button size="small" onClick={() => onEdit(line.step!)}>
+              Change
+            </Button>
+          ) : null}
+        </Stack>
+      ))}
     </Stack>
   );
 }

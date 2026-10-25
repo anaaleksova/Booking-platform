@@ -23,8 +23,12 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  // A customer (booking-only) account has no business to manage.
+  // A customer (booking-only) account has no business to manage; a platform administrator
+  // without one of their own starts in the platform area.
   if (!user?.activeBusiness) {
+    if (user?.platformAdmin) {
+      return <Navigate to="/platform" replace />;
+    }
     return <Navigate to="/login" replace state={{ from: location.pathname, customerAccount: true }} />;
   }
 

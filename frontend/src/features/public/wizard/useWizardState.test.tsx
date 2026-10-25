@@ -49,6 +49,10 @@ describe('wizard steps', () => {
     expect(stepsFor(service())).toEqual(['service', 'time', 'details', 'review']);
   });
 
+  it('a business with a single service starts after it', () => {
+    expect(stepsFor(service(), true)).toEqual(['time', 'details', 'review']);
+  });
+
   it('groups and listed choices add the options step', () => {
     expect(needsOptions(service({ maxParticipants: 4 }))).toBe(true);
     expect(stepsFor(service({ choosableRequirements: [requirement(3)] }))).toContain('options');

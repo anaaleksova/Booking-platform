@@ -46,9 +46,13 @@ export function needsSpot(service: PublicService | undefined): boolean {
   return mappedRequirements(service).length > 0;
 }
 
-export function stepsFor(service: PublicService | undefined): StepKey[] {
+/**
+ * @param onlyService the business offers just this one service, so there is
+ *                    nothing to choose and the wizard starts after it
+ */
+export function stepsFor(service: PublicService | undefined, onlyService = false): StepKey[] {
   return [
-    'service',
+    ...(onlyService ? [] : (['service'] as StepKey[])),
     ...(needsOptions(service) ? (['options'] as StepKey[]) : []),
     'time',
     ...(needsSpot(service) ? (['spot'] as StepKey[]) : []),

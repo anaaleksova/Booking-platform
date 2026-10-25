@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import type { DayInterval, DiscountState, ReservationSource, ReservationStatus } from '@/types/api';
+import type { DayInterval, DiscountState, EventState, ReservationSource, ReservationStatus } from '@/types/api';
 
 /**
  * Formatting helpers.
@@ -118,6 +118,17 @@ export const DISCOUNT_STATE_LABELS: Record<DiscountState, string> = {
   EXHAUSTED: 'Used up',
   INACTIVE: 'Inactive',
 };
+
+export const EVENT_STATE_LABELS: Record<EventState, string> = {
+  UPCOMING: 'Not shown yet',
+  SHOWING: 'On the page',
+  PAST: 'Past',
+};
+
+/** "21:00 – 23:00", or "from 21:00" when the event has no set end. */
+export function formatEventHours(event: { startTime: string; endTime?: string | null }): string {
+  return event.endTime ? `${event.startTime.slice(0, 5)} – ${event.endTime.slice(0, 5)}` : `from ${event.startTime.slice(0, 5)}`;
+}
 
 /** The API's `LocalDateTime` wire format, which the backend parses back. */
 export function toLocalDateTimeString(date: string, time: string): string {

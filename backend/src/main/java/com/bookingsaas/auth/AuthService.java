@@ -3,6 +3,7 @@ package com.bookingsaas.auth;
 import com.bookingsaas.auth.dto.AuthResponse;
 import com.bookingsaas.auth.dto.CurrentUserResponse;
 import com.bookingsaas.auth.dto.CustomerRegisterRequest;
+import com.bookingsaas.auth.dto.SignupStartedResponse;
 import com.bookingsaas.auth.dto.ForgotPasswordRequest;
 import com.bookingsaas.auth.dto.ResetPasswordRequest;
 import com.bookingsaas.auth.dto.LoginRequest;
@@ -97,11 +98,15 @@ public class AuthService {
      * {@link #verifySignup} once the code proves the address is theirs. The
      * owner's address receives customer details and calendar invitations, so
      * it has to be real.
+     *
+     * <p>Someone who already has an account from booking signs up the same
+     * way: the code then adds the business to that account (see {@link #verifySignup}).
      */
     @Transactional
-    public void startOwnerSignup(RegisterRequest request) {
-        startSignup(request.email(), request.fullName(), request.password(),
+    public SignupStartedResponse startOwnerSignup(RegisterRequest request) {
+        boolean existingAccount = startSignup(request.email(), request.fullName(), request.password(),
                 request.businessName().trim(), request.timezone());
+        return new SignupStartedResponse(existingAccount);
     }
 
     /**
@@ -114,42 +119,73 @@ public class AuthService {
         startSignup(request.email(), request.fullName(), request.password(), null, null);
     }
 
-    private void startSignup(String rawEmail, String fullName, String password, String businessName, String timezone) {
+    /** @return whether the email already has an account the business will be added to */
+    private boolean startSignup(String rawEmail, String fullName, String password, String businessName,
+                                String timezone) {
         String email = normalizeEmail(rawEmail);
-        if (userRepository.existsByEmail(email)) {
+        User existing = userRepository.findByEmail(email).orElse(null);
+        if (existing != null && (businessName == null || !canAddBusiness(existing))) {
             throw ApiException.of(ErrorCode.EMAIL_ALREADY_REGISTERED,
                     "An account with this email already exists. Sign in instead.");
         }
-        Instant now = clock.instant();
         PendingSignup pending = pendingSignups.findById(email).orElseGet(PendingSignup::new);
+        pending.setEmail(email);
+        pending.setFullName(fullName.trim());
+        pending.setPasswordHash(passwordEncoder.encode(password));
+        pending.setBusinessName(businessName);
+        pending.setTimezone(timezone);
+        sendCode(pending);
+        return existing != null;
+    }
+
+    /**
+     * Emails a fresh code for a sign-up still waiting for one, from what the
+     * server kept: the page asking (say, reloaded while the person fetched
+     * the email) no longer has the password to start over with.
+     */
+    @Transactional
+    public void resendSignupCode(String rawEmail) {
+        PendingSignup pending = pendingSignups.findById(normalizeEmail(rawEmail))
+                .filter(candidate -> candidate.getExpiresAt().isAfter(clock.instant()))
+                .orElseThrow(() -> ApiException.of(ErrorCode.VERIFICATION_EXPIRED,
+                        "This sign-up has expired. Please fill in the form again."));
+        sendCode(pending);
+    }
+
+    /** A new code for the sign-up, with the resend cool-down and the hourly limit applied. */
+    private void sendCode(PendingSignup pending) {
+        Instant now = clock.instant();
         if (pending.getSentAt() != null && pending.getSentAt().plus(RESEND_COOLDOWN).isAfter(now)) {
             throw ApiException.of(ErrorCode.TOO_MANY_REQUESTS,
                     "A code was just sent. Please wait a minute before asking for another.");
         }
-        if (!rateLimiter.tryAcquire(CODES_SENT + email, MAX_CODES_PER_HOUR, Duration.ofHours(1))) {
+        if (!rateLimiter.tryAcquire(CODES_SENT + pending.getEmail(), MAX_CODES_PER_HOUR, Duration.ofHours(1))) {
             throw ApiException.of(ErrorCode.TOO_MANY_REQUESTS,
                     "Too many codes were sent to this address. Please try again in an hour.");
         }
 
         String code = "%06d".formatted(random.nextInt(1_000_000));
-        pending.setEmail(email);
-        pending.setFullName(fullName.trim());
-        pending.setPasswordHash(passwordEncoder.encode(password));
         pending.setCodeHash(sha256(code));
         pending.setAttempts(0);
         pending.setSentAt(now);
         pending.setExpiresAt(now.plus(CODE_LIFETIME));
-        pending.setBusinessName(businessName);
-        pending.setTimezone(timezone);
         pendingSignups.save(pending);
 
         try {
-            signupCodeSender.send(email, pending.getFullName(), code);
+            signupCodeSender.send(pending.getEmail(), pending.getFullName(), code);
         } catch (RuntimeException ex) {
             log.warn("Could not send sign-up code: {}", ex.getMessage());
             throw ApiException.of(ErrorCode.EMAIL_DELIVERY_FAILED,
                     "We could not send an email to this address. Check it and try again.");
         }
+    }
+
+    /**
+     * Whether a business may be added to an existing account by signing up:
+     * only to one made for booking, never to an owner's or staff member's.
+     */
+    private boolean canAddBusiness(User user) {
+        return user.isActive() && principalLoader.loadByUserId(user.getId(), null).memberships().isEmpty();
     }
 
     /**
@@ -178,12 +214,23 @@ public class AuthService {
                             "Too many wrong codes. Ask for a new one.");
         }
 
-        if (userRepository.existsByEmail(email)) {
+        User existing = userRepository.findByEmail(email).orElse(null);
+        if (existing != null && (pending.getBusinessName() == null || !canAddBusiness(existing))) {
             pendingSignups.delete(pending);
             throw ApiException.of(ErrorCode.EMAIL_ALREADY_REGISTERED,
                     "An account with this email already exists. Sign in instead.");
         }
-        User user = userRepository.save(new User(email, pending.getPasswordHash(), pending.getFullName()));
+        User user;
+        if (existing != null) {
+            // The code proves the address is theirs, as a password reset does, so the password
+            // typed at sign-up becomes the account's. Sessions elsewhere end with the old one.
+            existing.setPasswordHash(pending.getPasswordHash());
+            user = userRepository.save(existing);
+            log.info("Existing account id={} becomes a business owner (email verified, password replaced)",
+                    user.getId());
+        } else {
+            user = userRepository.save(new User(email, pending.getPasswordHash(), pending.getFullName()));
+        }
         pendingSignups.delete(pending);
         if (pending.getBusinessName() == null) {
             log.info("Registered customer account id={} (email verified)", user.getId());

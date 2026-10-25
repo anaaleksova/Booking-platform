@@ -1,6 +1,7 @@
 package com.bookingsaas.common.security;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Lets the auth module build a principal without depending on the business
@@ -10,4 +11,10 @@ import java.util.List;
 public interface MembershipProvider {
 
     List<BusinessMembership> membershipsOf(Long userId);
+
+    /**
+     * Owner rights in any existing business, active or not, for a platform
+     * administrator entering it. Empty when there is no such business.
+     */
+    Optional<BusinessMembership> platformAccessTo(Long businessId);
 }

@@ -1,6 +1,7 @@
 import { Suspense, lazy, type ComponentType } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { OwnerRoute } from '@/routes/OwnerRoute';
+import { PlatformRoute } from '@/routes/PlatformRoute';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { LoadingState } from '@/components/states';
 
@@ -41,10 +42,12 @@ const EmployeesPage = page(() => import('@/pages/admin/EmployeesPage'), 'Employe
 const CustomersPage = page(() => import('@/pages/admin/CustomersPage'), 'CustomersPage');
 const CustomerDetailPage = page(() => import('@/pages/admin/CustomerDetailPage'), 'CustomerDetailPage');
 const DiscountsPage = page(() => import('@/pages/admin/DiscountsPage'), 'DiscountsPage');
+const EventsPage = page(() => import('@/pages/admin/EventsPage'), 'EventsPage');
 const RevenuePage = page(() => import('@/pages/admin/RevenuePage'), 'RevenuePage');
 const AnalyticsPage = page(() => import('@/pages/admin/AnalyticsPage'), 'AnalyticsPage');
 const SettingsPage = page(() => import('@/pages/admin/SettingsPage'), 'SettingsPage');
 const IntegrationsPage = page(() => import('@/pages/admin/IntegrationsPage'), 'IntegrationsPage');
+const PlatformPage = page(() => import('@/pages/platform/PlatformPage'), 'PlatformPage');
 
 function ToWizard() {
   const { slug, serviceId } = useParams();
@@ -87,11 +90,15 @@ export function App() {
           <Route path="customers" element={<OwnerRoute><CustomersPage /></OwnerRoute>} />
           <Route path="customers/:id" element={<OwnerRoute><CustomerDetailPage /></OwnerRoute>} />
           <Route path="discounts" element={<OwnerRoute><DiscountsPage /></OwnerRoute>} />
+          <Route path="events" element={<OwnerRoute><EventsPage /></OwnerRoute>} />
           <Route path="revenue" element={<OwnerRoute><RevenuePage /></OwnerRoute>} />
           <Route path="analytics" element={<OwnerRoute><AnalyticsPage /></OwnerRoute>} />
           <Route path="integrations" element={<OwnerRoute><IntegrationsPage /></OwnerRoute>} />
           <Route path="settings" element={<OwnerRoute><SettingsPage /></OwnerRoute>} />
         </Route>
+
+        {/* Running the platform itself: every business and account. */}
+        <Route path="/platform" element={<PlatformRoute><PlatformPage /></PlatformRoute>} />
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

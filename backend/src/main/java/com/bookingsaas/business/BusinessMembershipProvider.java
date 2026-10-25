@@ -1,12 +1,14 @@
 package com.bookingsaas.business;
 
 import com.bookingsaas.common.security.BusinessMembership;
+import com.bookingsaas.common.security.BusinessRole;
 import com.bookingsaas.common.security.MembershipProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -46,5 +48,13 @@ public class BusinessMembershipProvider implements MembershipProvider {
                                 .orElseThrow()
                                 .getRole()))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<BusinessMembership> platformAccessTo(Long businessId) {
+        return businessRepository.findById(businessId)
+                .map(business -> new BusinessMembership(business.getId(), business.getName(), business.getSlug(),
+                        BusinessRole.BUSINESS_OWNER));
     }
 }

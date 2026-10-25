@@ -25,6 +25,7 @@ public class AuthenticatedUser implements UserDetails {
     private final boolean active;
     private final List<BusinessMembership> memberships;
     private final BusinessMembership activeMembership;
+    private final boolean platformAdmin;
 
     public AuthenticatedUser(Long userId,
                              String email,
@@ -32,7 +33,8 @@ public class AuthenticatedUser implements UserDetails {
                              String passwordHash,
                              boolean active,
                              List<BusinessMembership> memberships,
-                             BusinessMembership activeMembership) {
+                             BusinessMembership activeMembership,
+                             boolean platformAdmin) {
         this.userId = userId;
         this.email = email;
         this.fullName = fullName;
@@ -40,11 +42,26 @@ public class AuthenticatedUser implements UserDetails {
         this.active = active;
         this.memberships = List.copyOf(memberships);
         this.activeMembership = activeMembership;
+        this.platformAdmin = platformAdmin;
     }
 
     /** Returns a copy of this principal scoped to a different membership. */
     public AuthenticatedUser withActiveMembership(BusinessMembership membership) {
-        return new AuthenticatedUser(userId, email, fullName, passwordHash, active, memberships, membership);
+        return new AuthenticatedUser(userId, email, fullName, passwordHash, active, memberships, membership,
+                platformAdmin);
+    }
+
+    /** Runs the platform (see {@link PlatformAdmins}). */
+    public boolean isPlatformAdmin() {
+        return platformAdmin;
+    }
+
+    /**
+     * Acting in a business the user does not belong to, as platform administrator:
+     * with owner rights there, which the admin pages make visible.
+     */
+    public boolean inBusinessAsPlatformAdmin() {
+        return platformAdmin && activeMembership != null && membershipFor(activeMembership.businessId()).isEmpty();
     }
 
     public Long userId() {

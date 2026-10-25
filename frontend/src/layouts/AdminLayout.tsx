@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import Alert from '@mui/material/Alert';
 import AppBar from '@mui/material/AppBar';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
@@ -20,8 +21,10 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
+import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded';
 import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
+import CelebrationRoundedIcon from '@mui/icons-material/CelebrationRounded';
 import DesignServicesRoundedIcon from '@mui/icons-material/DesignServicesRounded';
 import EventNoteRoundedIcon from '@mui/icons-material/EventNoteRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
@@ -37,6 +40,7 @@ import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useBusiness } from '@/features/business/api';
+import { usePlatformSession } from '@/features/platform/api';
 import { LoadingState } from '@/components/states';
 import { prefetchAdminPages } from '@/routes/prefetch';
 
@@ -67,6 +71,7 @@ const NAV_SECTIONS: Array<{ label: string; items: NavItem[] }> = [
       { to: '/admin/resource-types', label: 'Resource types', icon: <CategoryRoundedIcon />, ownerOnly: true },
       { to: '/admin/employees', label: 'Employees', icon: <GroupsRoundedIcon />, ownerOnly: true },
       { to: '/admin/discounts', label: 'Discounts', icon: <LocalOfferRoundedIcon />, ownerOnly: true },
+      { to: '/admin/events', label: 'Events', icon: <CelebrationRoundedIcon />, ownerOnly: true },
     ],
   },
   {
@@ -89,6 +94,7 @@ export function AdminLayout() {
   const { user, isOwner, logout } = useAuth();
   const { data: business } = useBusiness();
   const navigate = useNavigate();
+  const { exit } = usePlatformSession();
 
   useEffect(() => {
     prefetchAdminPages();
@@ -200,7 +206,8 @@ export function AdminLayout() {
           {user?.activeBusiness ? (
             <Chip
               size="small"
-              label={user.activeBusiness.role === 'BUSINESS_OWNER' ? 'Owner' : 'Staff'}
+              color={user.platformView ? 'warning' : 'default'}
+              label={user.platformView ? 'Platform admin' : user.activeBusiness.role === 'BUSINESS_OWNER' ? 'Owner' : 'Staff'}
               sx={{ mr: 2 }}
             />
           ) : null}
@@ -223,6 +230,23 @@ export function AdminLayout() {
               </Stack>
             </MenuItem>
             <Divider />
+            {user?.platformAdmin ? (
+              <MenuItem
+                onClick={() => {
+                  setMenuAnchor(null);
+                  if (user.platformView) {
+                    void exit();
+                  } else {
+                    navigate('/platform');
+                  }
+                }}
+              >
+                <ListItemIcon>
+                  <AdminPanelSettingsRoundedIcon fontSize="small" />
+                </ListItemIcon>
+                Platform administration
+              </MenuItem>
+            ) : null}
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>
                 <LogoutRoundedIcon fontSize="small" />
@@ -255,6 +279,21 @@ export function AdminLayout() {
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0, width: { md: `calc(100% - ${DRAWER_WIDTH}px)` } }}>
         <Toolbar />
         <Box sx={{ p: { xs: 2, md: 4 } }}>
+          {user?.platformView ? (
+            <Alert
+              severity="warning"
+              icon={<AdminPanelSettingsRoundedIcon />}
+              sx={{ mb: 3 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => void exit()}>
+                  Exit
+                </Button>
+              }
+            >
+              You are in <strong>{user.activeBusiness?.businessName}</strong> as platform administrator, with the
+              owner&apos;s rights. Changes you make here are real.
+            </Alert>
+          ) : null}
           {/* Only the content area waits for a page; the sidebar and bar stay put. */}
           <Suspense fallback={<LoadingState />}>
             <Outlet />

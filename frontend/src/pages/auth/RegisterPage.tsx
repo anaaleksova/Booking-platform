@@ -15,6 +15,7 @@ import { errorMessage } from '@/api/client';
 import { AuthShell } from '@/pages/auth/LoginPage';
 import { PasswordField } from '@/components/PasswordField';
 import { VerificationCodeForm } from '@/features/auth/VerificationCodeForm';
+import { clearPendingSignup, loadPendingSignup, savePendingSignup, type PendingSignup } from '@/features/auth/pendingSignup';
 
 /** A short list plus the browser's own zone, which covers most sign-ups. */
 const COMMON_TIMEZONES = [
@@ -43,11 +44,11 @@ type FormValues = z.infer<typeof schema>;
  * owner. Nothing is created until the code proves the address is theirs.
  */
 export function RegisterPage() {
-  const { register: signUp, verifyRegistration, isAuthenticated, initialising } = useAuth();
+  const { register: signUp, verifyRegistration, resendSignupCode, user, initialising } = useAuth();
   const navigate = useNavigate();
   const [submitError, setSubmitError] = useState<string | null>(null);
-  /** The details sent, while waiting for the code; null while filling them in. */
-  const [pending, setPending] = useState<FormValues | null>(null);
+  /** The sign-up waiting for its code (kept across a reload); null while filling in the form. */
+  const [pending, setPending] = useState<PendingSignup | null>(() => loadPendingSignup('owner'));
 
   const detectedZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const timezones = COMMON_TIMEZONES.includes(detectedZone)
@@ -63,7 +64,8 @@ export function RegisterPage() {
     defaultValues: { fullName: '', email: '', password: '', businessName: '', timezone: detectedZone },
   });
 
-  if (!initialising && isAuthenticated) {
+  // Someone signed in only for booking may still sign up their business here.
+  if (!initialising && user?.activeBusiness) {
     return <Navigate to="/admin" replace />;
   }
 
@@ -71,8 +73,10 @@ export function RegisterPage() {
     setSubmitError(null);
     const details = { ...values, email: values.email.trim() };
     try {
-      await signUp(details);
-      setPending(details);
+      const { existingAccount } = await signUp(details);
+      const waiting = { email: details.email, businessName: details.businessName, existingAccount };
+      savePendingSignup('owner', waiting);
+      setPending(waiting);
     } catch (error) {
       setSubmitError(errorMessage(error, 'Could not create the account.'));
     }
@@ -81,15 +85,26 @@ export function RegisterPage() {
   if (pending) {
     return (
       <AuthShell title="Confirm your email" subtitle="One last step before your dashboard.">
+        {pending.existingAccount ? (
+          <Alert severity="info" sx={{ mb: 2.5 }}>
+            You already have an account on this platform with this email, for example from booking somewhere. When
+            you confirm, {pending.businessName} is added to that account and your password becomes the one you just
+            entered.
+          </Alert>
+        ) : null}
         <VerificationCodeForm
           email={pending.email}
           purpose="create your business account"
           onVerify={async (code) => {
             await verifyRegistration(pending.email, code);
+            clearPendingSignup('owner');
             navigate('/admin', { replace: true });
           }}
-          onResend={() => signUp(pending)}
-          onBack={() => setPending(null)}
+          onResend={() => resendSignupCode(pending.email)}
+          onBack={() => {
+            clearPendingSignup('owner');
+            setPending(null);
+          }}
         />
       </AuthShell>
     );

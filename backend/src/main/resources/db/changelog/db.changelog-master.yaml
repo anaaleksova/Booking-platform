@@ -89,3 +89,9 @@ databaseChangeLog:
       changes:
         - customChange:
             class: com.bookingsaas.customer.migration.MergeCustomersByPhone
+  - include:
+      file: db/changelog/changes/026-events.sql
+  - include:
+      file: db/changelog/seed/110-demo-events.sql
+  - include:
+      file: db/changelog/changes/027-platform-activity.sql

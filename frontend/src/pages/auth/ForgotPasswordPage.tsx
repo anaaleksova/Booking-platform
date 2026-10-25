@@ -8,7 +8,9 @@ export function ForgotPasswordPage() {
   return (
     <AuthShell title="Reset your password" subtitle="It only takes a minute.">
       <ForgotPasswordFlow
-        onDone={(user) => navigate(user.activeBusiness ? '/admin' : '/login', { replace: true })}
+        onDone={(user) =>
+          navigate(user.activeBusiness ? '/admin' : user.platformAdmin ? '/platform' : '/login', { replace: true })
+        }
         onCancel={() => navigate('/login')}
       />
     </AuthShell>

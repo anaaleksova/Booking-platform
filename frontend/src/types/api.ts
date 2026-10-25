@@ -23,6 +23,66 @@ export interface CurrentUser {
   fullName: string;
   activeBusiness: Membership | null;
   businesses: Membership[];
+  /** Runs the platform: the platform area, and any business's admin. */
+  platformAdmin?: boolean;
+  /** The active business was entered as platform administrator (not a membership). */
+  platformView?: boolean;
+}
+
+// --- platform administration ---------------------------------------------------
+
+export interface PlatformOverview {
+  businesses: number;
+  activeBusinesses: number;
+  accounts: number;
+  reservationsThisMonth: number;
+  newBusinesses: number;
+}
+
+export interface PlatformBusiness {
+  id: number;
+  name: string;
+  slug: string;
+  active: boolean;
+  createdAt: string;
+  ownerEmails: string[];
+  /** Reservations made in the last 30 days. */
+  recentReservations: number;
+}
+
+export interface PlatformAccount {
+  id: number;
+  email: string;
+  fullName: string;
+  active: boolean;
+  createdAt: string;
+  /** e.g. "Owner · Harbor Bistro". */
+  roles: string[];
+  /** How many businesses know this email as a customer. */
+  customerAt: number;
+  platformAdmin: boolean;
+}
+
+export type PlatformAction =
+  | 'ENTERED_BUSINESS'
+  | 'BUSINESS_DEACTIVATED'
+  | 'BUSINESS_REACTIVATED'
+  | 'ACCOUNT_DEACTIVATED'
+  | 'ACCOUNT_REACTIVATED';
+
+export interface PlatformActivity {
+  id: number;
+  actorEmail: string;
+  action: PlatformAction;
+  targetType: 'BUSINESS' | 'ACCOUNT';
+  targetId: number;
+  targetName: string;
+  createdAt: string;
+}
+
+/** A business sign-up's code was sent; `existingAccount`: the email already has a (booking) account. */
+export interface SignupStarted {
+  existingAccount: boolean;
 }
 
 /** A new session. The token itself is only ever in the httpOnly session cookie. */
@@ -401,6 +461,51 @@ export interface Discount {
 }
 
 export type DiscountInput = Omit<Discount, 'id' | 'usageCount' | 'state'>;
+
+// --- events --------------------------------------------------------------------
+
+/** UPCOMING: not on the booking page yet; SHOWING: on it now; PAST: no longer shown. */
+export type EventState = 'UPCOMING' | 'SHOWING' | 'PAST';
+
+/** Dates are business-local "YYYY-MM-DD", times business-local "HH:mm[:ss]". */
+export interface BusinessEvent {
+  id: number;
+  title: string;
+  description?: string | null;
+  performer?: string | null;
+  imageMediaId?: string | null;
+  imageUrl?: string | null;
+  date: string;
+  startTime: string;
+  /** Earlier than the start when the event runs past midnight. */
+  endTime?: string | null;
+  showFrom: string;
+  showUntil: string;
+  serviceId?: number | null;
+  state: EventState;
+}
+
+/** Empty show dates take the defaults: a week before, until the day itself. */
+export type EventInput = Omit<BusinessEvent, 'id' | 'imageUrl' | 'state' | 'showFrom' | 'showUntil'> & {
+  showFrom: string | null;
+  showUntil: string | null;
+};
+
+/** OPEN: tables left; FULL: fully booked; NONE: nothing to book (no service, or already started). */
+export type EventBooking = 'OPEN' | 'FULL' | 'NONE';
+
+export interface PublicEvent {
+  id: number;
+  title: string;
+  description?: string | null;
+  performer?: string | null;
+  imageUrl?: string | null;
+  date: string;
+  startTime: string;
+  endTime?: string | null;
+  serviceId?: number | null;
+  booking: EventBooking;
+}
 
 // --- analytics ---------------------------------------------------------------
 
