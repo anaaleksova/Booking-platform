@@ -1,11 +1,12 @@
 package com.bookingsaas.business;
 
 import com.bookingsaas.common.domain.DayInterval;
+import com.bookingsaas.common.domain.SetupAreaEdited;
 import com.bookingsaas.common.security.CurrentTenant;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalTime;
 import java.util.List;
 
 /** The business's opening hours, replaced as a whole week at a time. */
@@ -14,10 +15,13 @@ public class OpeningHoursService {
 
     private final BusinessHourRepository repository;
     private final CurrentTenant currentTenant;
+    private final ApplicationEventPublisher events;
 
-    public OpeningHoursService(BusinessHourRepository repository, CurrentTenant currentTenant) {
+    public OpeningHoursService(BusinessHourRepository repository, CurrentTenant currentTenant,
+                               ApplicationEventPublisher events) {
         this.repository = repository;
         this.currentTenant = currentTenant;
+        this.events = events;
     }
 
     /** The business's week as plain intervals — what the availability engine consumes. */
@@ -47,17 +51,20 @@ public class OpeningHoursService {
                             interval.startTime(), interval.endTime()))
                     .toList());
         }
+        events.publishEvent(new SetupAreaEdited(businessId, SetupAreaEdited.Area.HOURS));
         return current();
     }
 
-    /** Seeds a sensible Mon–Fri week so a new business is bookable at once. */
+    /** Seeds a new business's week (its template's) so it is bookable at once. Never overwrites hours. */
     @Transactional
-    public void applyDefaultWeek(Long businessId) {
+    public void applyWeek(Long businessId, List<DayInterval> intervals) {
         if (!repository.findByBusinessIdOrderByDayOfWeekAscStartTimeAsc(businessId).isEmpty()) {
             return;
         }
-        repository.saveAll(java.util.stream.IntStream.rangeClosed(1, 5)
-                .mapToObj(day -> new BusinessHour(businessId, day, LocalTime.of(9, 0), LocalTime.of(17, 0)))
+        DayInterval.validate(intervals);
+        repository.saveAll(intervals.stream()
+                .map(interval -> new BusinessHour(businessId, interval.dayOfWeek(),
+                        interval.startTime(), interval.endTime()))
                 .toList());
     }
 

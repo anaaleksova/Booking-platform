@@ -1,6 +1,7 @@
 package com.bookingsaas.business.dto;
 
 import com.bookingsaas.business.Business;
+import com.bookingsaas.business.BusinessType;
 import com.bookingsaas.media.Media;
 
 import java.time.Instant;
@@ -30,7 +31,9 @@ public record BusinessResponse(
         String currency,
         String timezone,
         boolean active,
-        Instant createdAt
+        Instant createdAt,
+        /* Null for businesses created before sign-up asked for it. */
+        BusinessType businessType
 ) {
 
     public static BusinessResponse from(Business business) {
@@ -40,6 +43,7 @@ public record BusinessResponse(
                 business.getCoverMediaId(), Media.urlOf(business.getCoverMediaId()),
                 business.getInstagramUrl(), business.getFacebookUrl(), business.getWebsiteUrl(),
                 business.isShowMap(), business.isShowGallery(), business.isDarkTheme(), business.getPhone(), business.getEmail(),
-                business.getAddress(), business.getCurrency(), business.getTimezone(), business.isActive(), business.getCreatedAt());
+                business.getAddress(), business.getCurrency(), business.getTimezone(), business.isActive(), business.getCreatedAt(),
+                business.getBusinessType());
     }
 }

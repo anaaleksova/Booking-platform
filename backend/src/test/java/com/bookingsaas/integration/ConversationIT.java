@@ -312,6 +312,8 @@ class ConversationIT extends AbstractSpaIntegrationTest {
 
     @Test
     void whats_on_is_answered_from_the_events_on_the_booking_page() throws Exception {
+        // Events are a restaurant's and a bar's; this test business is otherwise a spa.
+        jdbcTemplate.update("update business set business_type = 'RESTAURANT'");
         send(post("/api/admin/events"), owner, """
                 {"title":"Live jazz","performer":"The Quartet","date":"%s","startTime":"18:00","endTime":"20:00",
                  "serviceId":%d}""".formatted(day, couplesId), 201);

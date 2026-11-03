@@ -50,6 +50,7 @@ test.describe('business sign-up', () => {
     const email = uniqueEmail('owner');
 
     await page.goto('/register');
+    await page.getByRole('radio', { name: 'Hair salon / Barber' }).click();
     await page.getByLabel('Your name').fill('Ana Tester');
     await page.getByLabel('Business name').fill('E2E Barbers');
     await page.getByLabel('Email').fill(email);
@@ -66,11 +67,16 @@ test.describe('business sign-up', () => {
 
     await expect(page).toHaveURL(/\/admin$/);
     await expect(page.getByText('E2E Barbers').first()).toBeVisible();
+    // The template set the business up: a checklist, and services customers can book at once.
+    await expect(page.getByText('Getting started')).toBeVisible();
+    await page.getByRole('link', { name: 'Open' }).first().click();
+    await expect(page.getByText('Haircut & beard')).toBeVisible();
     expect(problems).toEqual([]);
   });
 
   test('a wrong code says how many tries are left', async ({ page }) => {
     await page.goto('/register');
+    await page.getByRole('radio', { name: 'Something else' }).click();
     await page.getByLabel('Your name').fill('Ana Tester');
     await page.getByLabel('Business name').fill('E2E Wrong Code');
     await page.getByLabel('Email').fill(uniqueEmail('wrong'));

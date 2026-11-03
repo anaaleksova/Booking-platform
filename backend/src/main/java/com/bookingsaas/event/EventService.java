@@ -5,6 +5,7 @@ import com.bookingsaas.availability.AvailabilityService;
 import com.bookingsaas.business.Business;
 import com.bookingsaas.business.BusinessService;
 import com.bookingsaas.common.error.ApiException;
+import com.bookingsaas.common.error.ErrorCode;
 import com.bookingsaas.common.security.CurrentTenant;
 import com.bookingsaas.event.dto.EventRequest;
 import com.bookingsaas.event.dto.EventResponse;
@@ -63,6 +64,9 @@ public class EventService {
     /** The events on the booking page right now, soonest first. */
     @Transactional(readOnly = true)
     public List<PublicEventResponse> showing(Business business) {
+        if (!business.offersEvents()) {
+            return List.of();
+        }
         ZoneId zone = business.zoneId();
         Instant now = clock.instant();
         LocalDate today = LocalDate.ofInstant(now, zone);
@@ -154,6 +158,7 @@ public class EventService {
     public EventResponse create(EventRequest request) {
         currentTenant.requireOwner();
         Long businessId = currentTenant.businessId();
+        requireEventsOffered(businessId);
         BusinessEvent event = new BusinessEvent();
         event.setBusinessId(businessId);
         apply(businessId, event, request);
@@ -164,12 +169,19 @@ public class EventService {
     public EventResponse update(Long id, EventRequest request) {
         currentTenant.requireOwner();
         Long businessId = currentTenant.businessId();
+        requireEventsOffered(businessId);
         BusinessEvent event = require(businessId, id);
         UUID previousImage = event.getImageMediaId();
         apply(businessId, event, request);
         BusinessEvent saved = repository.save(event);
         mediaService.discardIfReplaced(businessId, previousImage, saved.getImageMediaId());
         return EventResponse.from(saved, clock.instant(), businessService.zoneOf(businessId));
+    }
+
+    private void requireEventsOffered(Long businessId) {
+        if (!businessService.requireById(businessId).offersEvents()) {
+            throw ApiException.of(ErrorCode.EVENTS_NOT_OFFERED, "Events are for restaurants and bars.");
+        }
     }
 
     /** Removes the event and its picture. Reservations made for it are untouched. */

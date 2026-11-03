@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link as RouterLink, Navigate, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Alert from '@mui/material/Alert';
@@ -16,6 +16,10 @@ import { AuthShell } from '@/pages/auth/LoginPage';
 import { PasswordField } from '@/components/PasswordField';
 import { VerificationCodeForm } from '@/features/auth/VerificationCodeForm';
 import { clearPendingSignup, loadPendingSignup, savePendingSignup, type PendingSignup } from '@/features/auth/pendingSignup';
+import { CURRENCIES, currencyForTimezone } from '@/features/business/currencies';
+import { BusinessTypePicker } from '@/features/onboarding/BusinessTypePicker';
+import { BUSINESS_TYPES } from '@/features/onboarding/businessTypes';
+import type { BusinessType } from '@/types/api';
 
 /** A short list plus the browser's own zone, which covers most sign-ups. */
 const COMMON_TIMEZONES = [
@@ -29,12 +33,18 @@ const COMMON_TIMEZONES = [
   'UTC',
 ];
 
+const DEFAULT_TIMEZONE = 'Europe/Skopje';
+
 const schema = z.object({
   fullName: z.string().min(1, 'Your name is required').max(160),
   email: z.string().min(1, 'Email is required').email('Enter a valid email address'),
   password: z.string().min(8, 'Use at least 8 characters').max(128),
   businessName: z.string().min(1, 'Business name is required').max(160),
   timezone: z.string().min(1, 'Pick a timezone'),
+  businessType: z.enum(BUSINESS_TYPES.map((info) => info.type) as [BusinessType, ...BusinessType[]], {
+    errorMap: () => ({ message: 'Pick what kind of business it is' }),
+  }),
+  currency: z.string().length(3),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -50,19 +60,34 @@ export function RegisterPage() {
   /** The sign-up waiting for its code (kept across a reload); null while filling in the form. */
   const [pending, setPending] = useState<PendingSignup | null>(() => loadPendingSignup('owner'));
 
+  // Skopje and denars by default; the browser's own zone is still offered.
   const detectedZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const timezones = COMMON_TIMEZONES.includes(detectedZone)
     ? COMMON_TIMEZONES
     : [detectedZone, ...COMMON_TIMEZONES];
 
+  const defaultCurrency = currencyForTimezone(DEFAULT_TIMEZONE);
+
   const {
     register,
+    control,
     handleSubmit,
+    setValue,
+    getFieldState,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { fullName: '', email: '', password: '', businessName: '', timezone: detectedZone },
+    defaultValues: {
+      fullName: '',
+      email: '',
+      password: '',
+      businessName: '',
+      timezone: DEFAULT_TIMEZONE,
+      businessType: undefined,
+      currency: defaultCurrency,
+    },
   });
+  const timezoneField = register('timezone');
 
   // Someone signed in only for booking may still sign up their business here.
   if (!initialising && user?.activeBusiness) {
@@ -118,6 +143,13 @@ export function RegisterPage() {
       <form onSubmit={onSubmit} noValidate>
         <Stack spacing={2.5}>
           {submitError ? <Alert severity="error">{submitError}</Alert> : null}
+          <Controller
+            name="businessType"
+            control={control}
+            render={({ field, fieldState }) => (
+              <BusinessTypePicker value={field.value} onChange={field.onChange} error={fieldState.error?.message} />
+            )}
+          />
           <TextField
             label="Your name"
             autoFocus
@@ -154,10 +186,17 @@ export function RegisterPage() {
             select
             label="Timezone"
             fullWidth
-            defaultValue={detectedZone}
+            defaultValue={DEFAULT_TIMEZONE}
             error={Boolean(errors.timezone)}
             helperText={errors.timezone?.message ?? 'All booking times are shown in this zone'}
-            {...register('timezone')}
+            {...timezoneField}
+            onChange={(event) => {
+              void timezoneField.onChange(event);
+              // The currency follows the zone until the owner picks one themselves.
+              if (!getFieldState('currency').isDirty) {
+                setValue('currency', currencyForTimezone(event.target.value));
+              }
+            }}
           >
             {timezones.map((zone) => (
               <MenuItem key={zone} value={zone}>
@@ -165,6 +204,26 @@ export function RegisterPage() {
               </MenuItem>
             ))}
           </TextField>
+          <Controller
+            name="currency"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                select
+                label="Currency"
+                fullWidth
+                value={field.value}
+                onChange={field.onChange}
+                helperText="Your prices are in this currency"
+              >
+                {CURRENCIES.map((code) => (
+                  <MenuItem key={code} value={code}>
+                    {code}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+          />
           <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
             {isSubmitting ? 'Sending code…' : 'Create account'}
           </Button>

@@ -40,6 +40,7 @@ import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useBusiness } from '@/features/business/api';
+import { offersEvents } from '@/features/onboarding/businessTypes';
 import { usePlatformSession } from '@/features/platform/api';
 import { LoadingState } from '@/components/states';
 import { prefetchAdminPages } from '@/routes/prefetch';
@@ -52,6 +53,8 @@ interface NavItem {
   icon: JSX.Element;
   end?: boolean;
   ownerOnly?: boolean;
+  /** Shown only to restaurants and bars. */
+  eventsOnly?: boolean;
 }
 
 const NAV_SECTIONS: Array<{ label: string; items: NavItem[] }> = [
@@ -71,7 +74,7 @@ const NAV_SECTIONS: Array<{ label: string; items: NavItem[] }> = [
       { to: '/admin/resource-types', label: 'Resource types', icon: <CategoryRoundedIcon />, ownerOnly: true },
       { to: '/admin/employees', label: 'Employees', icon: <GroupsRoundedIcon />, ownerOnly: true },
       { to: '/admin/discounts', label: 'Discounts', icon: <LocalOfferRoundedIcon />, ownerOnly: true },
-      { to: '/admin/events', label: 'Events', icon: <CelebrationRoundedIcon />, ownerOnly: true },
+      { to: '/admin/events', label: 'Events', icon: <CelebrationRoundedIcon />, ownerOnly: true, eventsOnly: true },
     ],
   },
   {
@@ -102,7 +105,9 @@ export function AdminLayout() {
 
   const sections = NAV_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => !item.ownerOnly || isOwner),
+    items: section.items.filter(
+      (item) => (!item.ownerOnly || isOwner) && (!item.eventsOnly || offersEvents(business?.businessType)),
+    ),
   })).filter((section) => section.items.length > 0);
 
   const handleLogout = () => {

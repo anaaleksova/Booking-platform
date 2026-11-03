@@ -38,6 +38,7 @@ public enum ErrorCode {
 
     // --- catalogue --------------------------------------------------------
     SERVICE_INACTIVE(HttpStatus.UNPROCESSABLE_ENTITY),
+    EVENTS_NOT_OFFERED(HttpStatus.UNPROCESSABLE_ENTITY),
     SERVICE_IN_USE(HttpStatus.CONFLICT),
     RESOURCE_TYPE_IN_USE(HttpStatus.CONFLICT),
     DUPLICATE_RESOURCE_TYPE(HttpStatus.CONFLICT),

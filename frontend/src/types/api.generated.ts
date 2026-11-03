@@ -174,7 +174,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["current_1"];
+        get: operations["current_2"];
         put: operations["update_7"];
         post?: never;
         delete?: never;
@@ -598,6 +598,57 @@ export interface paths {
         put?: never;
         /** Upload an image (JPEG, PNG, WebP or GIF, max 5 MB); attach it by id afterwards */
         post: operations["upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The checklist; 204 for a business that has none (created before templates) */
+        get: operations["current_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/onboarding/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hides the checklist */
+        post: operations["dismiss"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/onboarding/steps/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ticks a step: "Looks good", or the booking link was copied */
+        post: operations["markDone"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1863,6 +1914,8 @@ export interface components {
             accentColor?: string;
             active?: boolean;
             address?: string;
+            /** @enum {string} */
+            businessType?: "RESTAURANT" | "HAIR_SALON" | "NAILS_BEAUTY" | "SPA" | "FITNESS" | "COWORKING" | "OTHER";
             /** Format: uuid */
             coverMediaId?: string;
             coverUrl?: string;
@@ -2635,6 +2688,18 @@ export interface components {
             sizeBytes?: number;
             url?: string;
         };
+        OnboardingResponse: {
+            /** @enum {string} */
+            businessType?: "RESTAURANT" | "HAIR_SALON" | "NAILS_BEAUTY" | "SPA" | "FITNESS" | "COWORKING" | "OTHER";
+            dismissed?: boolean;
+            slug?: string;
+            steps?: components["schemas"]["OnboardingResponseStep"][];
+        };
+        OnboardingResponseStep: {
+            done?: boolean;
+            /** @enum {string} */
+            key?: "SERVICES" | "RESOURCES" | "HOURS" | "CONTACT" | "PHOTO" | "SHARE";
+        };
         PageCustomerResponse: {
             content?: components["schemas"]["CustomerResponse"][];
             empty?: boolean;
@@ -2908,6 +2973,9 @@ export interface components {
         };
         RegisterRequest: {
             businessName: string;
+            /** @enum {string} */
+            businessType?: "RESTAURANT" | "HAIR_SALON" | "NAILS_BEAUTY" | "SPA" | "FITNESS" | "COWORKING" | "OTHER";
+            currency?: string;
             email: string;
             fullName: string;
             password: string;
@@ -3483,7 +3551,7 @@ export interface operations {
             };
         };
     };
-    current_1: {
+    current_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -4473,6 +4541,68 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["MediaControllerUploadResponse"];
+                };
+            };
+        };
+    };
+    current_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OnboardingResponse"];
+                };
+            };
+        };
+    };
+    dismiss: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OnboardingResponse"];
+                };
+            };
+        };
+    };
+    markDone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: "SERVICES" | "RESOURCES" | "HOURS" | "CONTACT" | "PHOTO" | "SHARE";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OnboardingResponse"];
                 };
             };
         };

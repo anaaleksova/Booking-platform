@@ -322,6 +322,49 @@ Table 3: exactly one gets in, and nothing is half-written.
   reservations, attributed to the day they take place. Pending and cancelled
   reservations never count. "Gross" is the same set over `original_price`.
 
+## Starting a new business
+
+At sign-up the owner picks what kind of business it is. The business then
+starts with a working setup, so its booking page takes bookings straight away.
+Everything can be changed later.
+
+| Type | Starts with |
+|---|---|
+| Restaurant / Bar / Café | Tables 1–6 (2–6 seats) and one free *Table reservation* (2 h, up to 12 guests, tables combined for big groups). No prices, and the wizard skips choosing a service. Open every day 12:00–23:00. |
+| Hair salon / Barber | The owner as the first employee; Haircut, Haircut & beard, Colouring. Mon–Sat 09:00–19:00. |
+| Nails / Beauty | The owner as the first employee; Manicure, Pedicure, Gel nails. Mon–Sat 09:00–19:00. |
+| Spa / Massage | The owner as the first employee, Treatment room 1; three treatments that need both. Mon–Sat 10:00–20:00. |
+| Fitness / Classes | A shared studio with 12 places; *Group class*, priced per person, starting on the hour. There is no class timetable yet: everyone who books the same hour joins the same class. |
+| Co-working | Desks 1–8 and a meeting room; half-day and full-day desks (combined for teams) and the meeting room by the hour. Mon–Fri 08:00–20:00. |
+| Something else | An empty setup open Mon–Fri 09:00–17:00, as before templates. |
+
+- The employee type keeps its neutral name, *Employee*, because "Stylist" or
+  "Therapist" doesn't fit every salon or spa. Renaming it on the Resource
+  types page changes the booking page's "Choose your …" wording.
+- Sign-up defaults to Europe/Skopje and MKD. Picking another timezone moves
+  the currency with it (London → GBP) until the owner picks a currency
+  themselves. Sample prices are converted roughly, e.g. a 15 EUR haircut
+  becomes 900 MKD.
+- **Events** (a band, a quiz night) are only for restaurants and bars. Other
+  types have no Events page, the API refuses to create events for them, and
+  their booking page and chat show none. Businesses created before types
+  existed keep events.
+
+The templates are in `onboarding/BusinessTemplates`. They run inside the
+sign-up transaction and go through the same services as the admin.
+
+**Getting started.** A new business's dashboard shows a checklist:
+1. services and prices
+2. tables, team or desks
+3. opening hours
+4. address and phone
+5. a logo or cover photo
+6. sharing the booking link
+
+Saving one of those, or pressing *Looks good*, ticks its step. The address
+and photo steps follow the business's details, and *Hide* puts the checklist
+away. Businesses created before templates existed have no checklist.
+
 ## Roles
 
 - **Owner:** everything, for their business.

@@ -33,6 +33,8 @@ export const queryKeys = {
 
   events: ['events'] as const,
 
+  onboarding: ['onboarding'] as const,
+
   integrations: ['integrations'] as const,
 
   platformOverview: ['platform', 'overview'] as const,

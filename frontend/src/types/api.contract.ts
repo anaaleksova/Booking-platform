@@ -41,6 +41,7 @@ export type Contract = [
   Assert<Fits<Schemas['SignupStartedResponse'], Api.SignupStarted>>,
   Assert<Fits<Schemas['BusinessResponse'], Api.Business>>,
   Assert<Fits<Schemas['BusinessSettingsResponse'], Api.BusinessSettings>>,
+  Assert<Fits<Schemas['OnboardingResponse'], Api.Onboarding>>,
   Assert<Fits<Schemas['BlockedTimeResponse'], Api.BlockedTime>>,
   Assert<Fits<Schemas['ResourceTypeResponse'], Api.ResourceType>>,
   Assert<Fits<Schemas['FloorPlanDtosFloorPlanResponse'], Api.FloorPlan>>,

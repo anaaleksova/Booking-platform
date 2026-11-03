@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -37,14 +38,17 @@ import {
 } from '@/features/business/api';
 import { BookingPageTab } from '@/features/business/BookingPageTab';
 import { CalendarTab } from '@/features/business/CalendarTab';
+import { CURRENCIES } from '@/features/business/currencies';
 import { useResources } from '@/features/catalog/api';
 import type { BusinessSettings, DayInterval } from '@/types/api';
 import { formatLocalDate, formatLocalTime } from '@/utils/format';
 
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'MKD', 'RSD', 'BGN', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON'];
+/** Tabs that can be opened by link, e.g. from the Getting started checklist: /admin/settings?tab=hours. */
+const LINKABLE_TABS: Record<string, number> = { business: 0, 'booking-page': 1, hours: 2 };
 
 export function SettingsPage() {
-  const [tab, setTab] = useState(0);
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => LINKABLE_TABS[searchParams.get('tab') ?? ''] ?? 0);
   return (
     <>
       <PageHeader title="Settings" description="Your business profile, booking page, opening hours and booking rules." />

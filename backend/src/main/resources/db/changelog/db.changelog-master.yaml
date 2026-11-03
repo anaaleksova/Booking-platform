@@ -95,3 +95,7 @@ databaseChangeLog:
       file: db/changelog/seed/110-demo-events.sql
   - include:
       file: db/changelog/changes/027-platform-activity.sql
+  - include:
+      file: db/changelog/changes/028-onboarding.sql
+  - include:
+      file: db/changelog/seed/111-demo-business-types.sql

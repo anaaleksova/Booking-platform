@@ -3,6 +3,8 @@ package com.bookingsaas.business;
 import com.bookingsaas.common.domain.Auditable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -96,6 +98,19 @@ public class Business extends Auditable {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    /** What the owner said the business is at sign-up; null for businesses from before templates. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "business_type", length = 20)
+    private BusinessType businessType;
+
+    /**
+     * Whether the business can show events. A business from before types
+     * existed keeps them, so nothing it already had disappears.
+     */
+    public boolean offersEvents() {
+        return businessType == null || businessType.hasEvents();
+    }
 
     public ZoneId zoneId() {
         return ZoneId.of(timezone);

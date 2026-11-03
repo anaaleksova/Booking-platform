@@ -117,6 +117,21 @@ export interface Business {
   timezone: string;
   active: boolean;
   createdAt: string;
+  /** Null for businesses created before sign-up asked for it. */
+  businessType?: BusinessType | null;
+}
+
+/** What kind of business an owner signed up as; picks the starting setup. */
+export type BusinessType = 'RESTAURANT' | 'HAIR_SALON' | 'NAILS_BEAUTY' | 'SPA' | 'FITNESS' | 'COWORKING' | 'OTHER';
+
+export type OnboardingStepKey = 'SERVICES' | 'RESOURCES' | 'HOURS' | 'CONTACT' | 'PHOTO' | 'SHARE';
+
+/** The owner's "Getting started" checklist. */
+export interface Onboarding {
+  businessType?: BusinessType | null;
+  slug: string;
+  steps: { key: OnboardingStepKey; done: boolean }[];
+  dismissed: boolean;
 }
 
 export interface BusinessSettings {

@@ -1,6 +1,7 @@
 package com.bookingsaas.employee;
 
 import com.bookingsaas.common.domain.DayInterval;
+import com.bookingsaas.common.domain.SetupAreaEdited;
 import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
 import com.bookingsaas.common.security.CurrentTenant;
@@ -129,6 +130,14 @@ public class EmployeeService {
     public EmployeeResponse create(EmployeeRequest request) {
         currentTenant.requireOwner();
         Long businessId = currentTenant.businessId();
+        EmployeeResponse created = createFor(businessId, request);
+        events.publishEvent(new SetupAreaEdited(businessId, SetupAreaEdited.Area.RESOURCES));
+        return created;
+    }
+
+    /** Creates an employee for the given business, with no signed-in owner needed: a template at sign-up. */
+    @Transactional
+    public EmployeeResponse createFor(Long businessId, EmployeeRequest request) {
         String name = request.name().trim();
 
         Resource resource = resourceService.createManaged(businessId, name, capacityOf(request), request.active(),
@@ -154,6 +163,7 @@ public class EmployeeService {
         if (request.serviceIds() != null) {
             resourceService.replaceServicesOf(businessId, employee.getResourceId(), request.serviceIds());
         }
+        events.publishEvent(new SetupAreaEdited(businessId, SetupAreaEdited.Area.RESOURCES));
         return toResponse(businessId, saved);
     }
 

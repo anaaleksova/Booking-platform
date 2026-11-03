@@ -92,8 +92,14 @@ public class ResourceTypeService {
     @Transactional
     public ResourceTypeResponse create(ResourceTypeRequest request) {
         currentTenant.requireOwner();
+        return createFor(currentTenant.businessId(), request);
+    }
+
+    /** Creates a type for the given business, with no signed-in owner needed: a template at sign-up. */
+    @Transactional
+    public ResourceTypeResponse createFor(Long businessId, ResourceTypeRequest request) {
         ResourceType type = new ResourceType();
-        type.setBusinessId(currentTenant.businessId());
+        type.setBusinessId(businessId);
         apply(type, request);
         return ResourceTypeResponse.from(save(type), 0, 0);
     }

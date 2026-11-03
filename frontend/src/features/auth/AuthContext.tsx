@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { apiClient, setSessionExpiredHandler } from '@/api/client';
-import type { AuthResponse, CurrentUser, SignupStarted } from '@/types/api';
+import type { AuthResponse, BusinessType, CurrentUser, SignupStarted } from '@/types/api';
 
 interface AuthContextValue {
   user: CurrentUser | null;
@@ -40,6 +40,8 @@ export interface RegisterInput {
   password: string;
   businessName: string;
   timezone: string;
+  businessType: BusinessType;
+  currency: string;
 }
 
 export interface CustomerRegisterInput {

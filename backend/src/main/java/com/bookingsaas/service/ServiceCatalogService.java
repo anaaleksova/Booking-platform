@@ -1,5 +1,6 @@
 package com.bookingsaas.service;
 
+import com.bookingsaas.common.domain.SetupAreaEdited;
 import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
 import com.bookingsaas.common.security.CurrentTenant;
@@ -10,6 +11,7 @@ import com.bookingsaas.service.dto.ServiceDeletionResponse;
 import com.bookingsaas.service.dto.ServiceRequest;
 import com.bookingsaas.service.dto.ServiceResponse;
 import com.bookingsaas.service.dto.ServiceResponse.RequirementResponse;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,17 +33,20 @@ public class ServiceCatalogService {
     private final ResourceTypeService resourceTypeService;
     private final MediaService mediaService;
     private final CurrentTenant currentTenant;
+    private final ApplicationEventPublisher events;
 
     public ServiceCatalogService(BookableServiceRepository repository,
                                  ServiceResourceRequirementRepository requirementRepository,
                                  ResourceTypeService resourceTypeService,
                                  MediaService mediaService,
-                                 CurrentTenant currentTenant) {
+                                 CurrentTenant currentTenant,
+                                 ApplicationEventPublisher events) {
         this.repository = repository;
         this.requirementRepository = requirementRepository;
         this.resourceTypeService = resourceTypeService;
         this.mediaService = mediaService;
         this.currentTenant = currentTenant;
+        this.events = events;
     }
 
     // --- cross-module lookups ---------------------------------------------
@@ -120,6 +125,14 @@ public class ServiceCatalogService {
     public ServiceResponse create(ServiceRequest request) {
         currentTenant.requireOwner();
         Long businessId = currentTenant.businessId();
+        ServiceResponse created = createFor(businessId, request);
+        events.publishEvent(new SetupAreaEdited(businessId, SetupAreaEdited.Area.SERVICES));
+        return created;
+    }
+
+    /** Creates a service for the given business, with no signed-in owner needed: a template at sign-up. */
+    @Transactional
+    public ServiceResponse createFor(Long businessId, ServiceRequest request) {
         BookableService service = new BookableService();
         service.setBusinessId(businessId);
         apply(service, request);
@@ -140,6 +153,7 @@ public class ServiceCatalogService {
         BookableService saved = repository.saveAndFlush(service);
         mediaService.discardIfReplaced(businessId, previousImage, saved.getImageMediaId());
         replaceRequirements(businessId, id, request.requirements());
+        events.publishEvent(new SetupAreaEdited(businessId, SetupAreaEdited.Area.SERVICES));
         return ServiceResponse.from(saved, requirementViews(businessId, id));
     }
 

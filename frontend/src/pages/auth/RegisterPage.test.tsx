@@ -63,7 +63,8 @@ describe('RegisterPage after a reload', () => {
     });
     renderRegister();
 
-    await userEvent.type(await screen.findByLabelText('Your name'), 'Ana');
+    await userEvent.click(await screen.findByRole('radio', { name: 'Hair salon / Barber' }));
+    await userEvent.type(screen.getByLabelText('Your name'), 'Ana');
     await userEvent.type(screen.getByLabelText('Business name'), 'Fresh Cuts');
     await userEvent.type(screen.getByLabelText('Email'), 'ana@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'secret-password');
@@ -71,5 +72,52 @@ describe('RegisterPage after a reload', () => {
 
     await waitFor(() => expect(loadPendingSignup('owner')?.email).toBe('ana@example.com'));
     expect(sessionStorage.getItem('pendingSignup:owner')).not.toContain('secret-password');
+  });
+});
+
+describe('RegisterPage business type', () => {
+  let api: ReturnType<typeof fakeApi> | undefined;
+
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => api?.restore());
+
+  async function fillDetails() {
+    await userEvent.type(await screen.findByLabelText('Your name'), 'Ana');
+    await userEvent.type(screen.getByLabelText('Business name'), 'Harbor Bistro');
+    await userEvent.type(screen.getByLabelText('Email'), 'ana@example.com');
+    await userEvent.type(screen.getByLabelText('Password'), 'secret-password');
+  }
+
+  it('asks what kind of business it is before sending anything', async () => {
+    api = fakeApi({ 'GET /api/auth/session': { status: 204 } });
+    renderRegister();
+
+    await fillDetails();
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
+
+    expect(await screen.findByText('Pick what kind of business it is')).toBeInTheDocument();
+    expect(api.requests.some((r) => r.url === '/api/auth/register')).toBe(false);
+  });
+
+  it('sends the type, with Skopje and MKD by default', async () => {
+    api = fakeApi({
+      'GET /api/auth/session': { status: 204 },
+      'POST /api/auth/register': { status: 202, data: { existingAccount: false } },
+    });
+    renderRegister();
+
+    await fillDetails();
+    const restaurant = screen.getByRole('radio', { name: 'Restaurant / Bar / Café' });
+    await userEvent.click(restaurant);
+    expect(restaurant).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/table reservations, no menu needed/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
+
+    await waitFor(() => expect(api!.requests.some((r) => r.url === '/api/auth/register')).toBe(true));
+    const sent = api.requests.find((r) => r.url === '/api/auth/register')?.data as Record<string, string>;
+    expect(sent.businessType).toBe('RESTAURANT');
+    // Skopje and denars unless the owner picks otherwise.
+    expect(sent.timezone).toBe('Europe/Skopje');
+    expect(sent.currency).toBe('MKD');
   });
 });

@@ -139,10 +139,16 @@ public abstract class AbstractIntegrationTest {
      * and returns the access token.
      */
     protected String registerAndLogin(String email, String businessName) throws Exception {
+        return registerAndLogin(email, businessName, null);
+    }
+
+    /** The same, for a business of the given type (RESTAURANT, SPA …); null sends none, as old clients do. */
+    protected String registerAndLogin(String email, String businessName, String businessType) throws Exception {
         send(post("/api/auth/register"), null, """
                 {"fullName":"Test Owner","email":"%s","password":"password123",
-                 "businessName":"%s","timezone":"Europe/Skopje"}
-                """.formatted(email, businessName), 202);
+                 "businessName":"%s","timezone":"Europe/Skopje"%s}
+                """.formatted(email, businessName,
+                businessType == null ? "" : ",\"businessType\":\"" + businessType + "\""), 202);
         String normalized = email.toLowerCase(java.util.Locale.ROOT);
         send(post("/api/auth/register/verify"), null, """
                 {"email":"%s","code":"%s"}

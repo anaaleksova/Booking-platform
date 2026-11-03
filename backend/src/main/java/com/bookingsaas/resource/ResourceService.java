@@ -1,12 +1,14 @@
 package com.bookingsaas.resource;
 
 import com.bookingsaas.common.domain.DayInterval;
+import com.bookingsaas.common.domain.SetupAreaEdited;
 import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
 import com.bookingsaas.common.security.CurrentTenant;
 import com.bookingsaas.media.MediaService;
 import com.bookingsaas.resource.dto.ResourceRequest;
 import com.bookingsaas.resource.dto.ResourceResponse;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,19 +39,22 @@ public class ResourceService {
     private final ResourceServiceLinkRepository linkRepository;
     private final MediaService mediaService;
     private final CurrentTenant currentTenant;
+    private final ApplicationEventPublisher events;
 
     public ResourceService(ResourceRepository resourceRepository,
                            ResourceTypeService typeService,
                            ResourceHourRepository hourRepository,
                            ResourceServiceLinkRepository linkRepository,
                            MediaService mediaService,
-                           CurrentTenant currentTenant) {
+                           CurrentTenant currentTenant,
+                           ApplicationEventPublisher events) {
         this.resourceRepository = resourceRepository;
         this.typeService = typeService;
         this.hourRepository = hourRepository;
         this.linkRepository = linkRepository;
         this.mediaService = mediaService;
         this.currentTenant = currentTenant;
+        this.events = events;
     }
 
     // --- cross-module lookups ---------------------------------------------
@@ -221,6 +226,14 @@ public class ResourceService {
     public ResourceResponse create(ResourceRequest request) {
         currentTenant.requireOwner();
         Long businessId = currentTenant.businessId();
+        ResourceResponse created = createFor(businessId, request);
+        events.publishEvent(new SetupAreaEdited(businessId, SetupAreaEdited.Area.RESOURCES));
+        return created;
+    }
+
+    /** Creates a resource for the given business, with no signed-in owner needed: a template at sign-up. */
+    @Transactional
+    public ResourceResponse createFor(Long businessId, ResourceRequest request) {
         requireNonEmployeeType(businessId, request.resourceTypeId());
 
         Resource resource = new Resource();
@@ -248,6 +261,7 @@ public class ResourceService {
         if (request.serviceIds() != null) {
             replaceServicesOf(businessId, id, request.serviceIds());
         }
+        events.publishEvent(new SetupAreaEdited(businessId, SetupAreaEdited.Area.RESOURCES));
         return toResponse(businessId, saved);
     }
 

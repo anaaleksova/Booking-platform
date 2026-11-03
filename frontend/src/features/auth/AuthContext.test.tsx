@@ -54,6 +54,8 @@ describe('AuthProvider', () => {
         password: 'password123',
         businessName: 'Serenity',
         timezone: 'Europe/Skopje',
+        businessType: 'SPA',
+        currency: 'MKD',
       }),
     );
     expect(result.current.isAuthenticated).toBe(false);

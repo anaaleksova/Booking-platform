@@ -1,7 +1,10 @@
 package com.bookingsaas.auth;
 
+import com.bookingsaas.business.BusinessType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -52,4 +55,13 @@ public class PendingSignup {
 
     @Column(length = 64)
     private String timezone;
+
+    /** Set for a business owner's sign-up: which template the business starts from. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "business_type", length = 20)
+    private BusinessType businessType;
+
+    /** ISO-4217, for a business owner's sign-up; null means the default (EUR). */
+    @Column(length = 3)
+    private String currency;
 }

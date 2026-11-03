@@ -61,23 +61,36 @@ public class BusinessService {
     /**
      * Creates a tenant together with its owner membership and default rules.
      * Called from registration; a business is never left without an owner.
+     *
+     * <p>The type sets the opening week and slot grid here; listeners of
+     * {@link BusinessCreatedEvent} add the template's resources and services
+     * in the same transaction, so the booking page works at once.
      */
     @Transactional
-    public Business createBusiness(Long ownerUserId, String name, String requestedTimezone) {
+    public Business createBusiness(Long ownerUserId, String ownerName, String name, String requestedTimezone,
+                                   BusinessType requestedType, String requestedCurrency) {
+        BusinessType type = requestedType == null ? BusinessType.OTHER : requestedType;
         Business business = new Business();
         business.setName(name.trim());
         business.setSlug(Slugs.uniqueSlug(name, businessRepository::existsBySlug));
         business.setTimezone(validTimezone(requestedTimezone));
+        business.setBusinessType(type);
+        if (requestedCurrency != null && !requestedCurrency.isBlank()) {
+            business.setCurrency(requestedCurrency.trim().toUpperCase(Locale.ROOT));
+        }
         Business saved = businessRepository.save(business);
 
         businessUserRepository.save(new BusinessUser(saved.getId(), ownerUserId, BusinessRole.BUSINESS_OWNER));
-        settingsRepository.save(new BusinessSettings(saved.getId()));
+        BusinessSettings settings = new BusinessSettings(saved.getId());
+        settings.setSlotIntervalMinutes(type.slotIntervalMinutes());
+        settingsRepository.save(settings);
         // A business with no opening hours would have no availability at all,
-        // so onboarding starts from a weekday default the owner can edit.
-        openingHoursService.applyDefaultWeek(saved.getId());
-        events.publishEvent(new BusinessCreatedEvent(saved.getId()));
+        // so onboarding starts from the template's week, which the owner can edit.
+        openingHoursService.applyWeek(saved.getId(), type.openingHours());
+        events.publishEvent(new BusinessCreatedEvent(saved.getId(), type, ownerUserId, ownerName));
 
-        log.info("Business created id={} slug={} owner={}", saved.getId(), saved.getSlug(), ownerUserId);
+        log.info("Business created id={} slug={} type={} owner={}", saved.getId(), saved.getSlug(), type,
+                ownerUserId);
         return saved;
     }
 

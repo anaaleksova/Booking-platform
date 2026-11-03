@@ -11,6 +11,7 @@ import com.bookingsaas.auth.dto.RegisterRequest;
 import com.bookingsaas.auth.dto.VerifySignupRequest;
 import com.bookingsaas.business.Business;
 import com.bookingsaas.business.BusinessService;
+import com.bookingsaas.business.BusinessType;
 import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
 import com.bookingsaas.common.ratelimit.RateLimiter;
@@ -105,7 +106,9 @@ public class AuthService {
     @Transactional
     public SignupStartedResponse startOwnerSignup(RegisterRequest request) {
         boolean existingAccount = startSignup(request.email(), request.fullName(), request.password(),
-                request.businessName().trim(), request.timezone());
+                new BusinessDetails(request.businessName().trim(), request.timezone(),
+                        request.businessType() == null ? BusinessType.OTHER : request.businessType(),
+                        request.currency()));
         return new SignupStartedResponse(existingAccount);
     }
 
@@ -116,12 +119,17 @@ public class AuthService {
      */
     @Transactional
     public void startCustomerSignup(CustomerRegisterRequest request) {
-        startSignup(request.email(), request.fullName(), request.password(), null, null);
+        startSignup(request.email(), request.fullName(), request.password(), null);
     }
 
     /** @return whether the email already has an account the business will be added to */
-    private boolean startSignup(String rawEmail, String fullName, String password, String businessName,
-                                String timezone) {
+    /** The business an owner's sign-up creates once the code is confirmed. */
+    private record BusinessDetails(String name, String timezone, BusinessType type, String currency) {
+    }
+
+    /** @param business null for a customer's sign-up */
+    private boolean startSignup(String rawEmail, String fullName, String password, BusinessDetails business) {
+        String businessName = business == null ? null : business.name();
         String email = normalizeEmail(rawEmail);
         User existing = userRepository.findByEmail(email).orElse(null);
         if (existing != null && (businessName == null || !canAddBusiness(existing))) {
@@ -133,7 +141,10 @@ public class AuthService {
         pending.setFullName(fullName.trim());
         pending.setPasswordHash(passwordEncoder.encode(password));
         pending.setBusinessName(businessName);
-        pending.setTimezone(timezone);
+        pending.setTimezone(business == null ? null : business.timezone());
+        pending.setBusinessType(business == null ? null : business.type());
+        pending.setCurrency(business == null || business.currency() == null ? null
+                : business.currency().toUpperCase(Locale.ROOT));
         sendCode(pending);
         return existing != null;
     }
@@ -236,8 +247,8 @@ public class AuthService {
             log.info("Registered customer account id={} (email verified)", user.getId());
             return issueToken(principalLoader.loadByUserId(user.getId(), null));
         }
-        Business business = businessService.createBusiness(user.getId(), pending.getBusinessName(),
-                pending.getTimezone());
+        Business business = businessService.createBusiness(user.getId(), user.getFullName(),
+                pending.getBusinessName(), pending.getTimezone(), pending.getBusinessType(), pending.getCurrency());
         log.info("Registered user id={} with business id={} (email verified)", user.getId(), business.getId());
         return issueToken(principalLoader.loadByUserId(user.getId(), business.getId()));
     }

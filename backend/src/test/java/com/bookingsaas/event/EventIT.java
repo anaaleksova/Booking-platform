@@ -34,8 +34,10 @@ class EventIT extends AbstractIntegrationTest {
     /** A bar with one table for four and a free two-hour "Table reservation", open 08:00-20:00. */
     @BeforeEach
     void setUp() throws Exception {
+        // A restaurant, but with only the one table below rather than the template's six.
         token = registerAndLogin("owner@bar.test", "Corner Bar");
         slug = slugOf(token);
+        jdbcTemplate.update("update business set business_type = 'RESTAURANT' where slug = ?", slug);
         openEveryDay(token);
         today = LocalDate.now(ZONE);
         long tableType = send(post("/api/admin/resource-types"), token, """
@@ -88,6 +90,19 @@ class EventIT extends AbstractIntegrationTest {
                 """.formatted(serviceId, tomorrow), 201);
 
         assertThat(publicEvents().get(0).get("booking").asText()).isEqualTo("FULL");
+    }
+
+    @Test
+    void only_restaurants_and_bars_have_events() throws Exception {
+        String salon = registerAndLogin("owner@salon.test", "Fresh Cuts", "HAIR_SALON");
+
+        assertThat(send(post("/api/admin/events"), salon, event("Open day", today.plusDays(2), null), 422)
+                .get("error").asText()).isEqualTo("EVENTS_NOT_OFFERED");
+        // One that is already there (say, the type was set afterwards) stays off the booking page.
+        jdbcTemplate.update("update business set business_type = 'RESTAURANT' where slug = ?", slugOf(salon));
+        send(post("/api/admin/events"), salon, event("Open day", today.plusDays(2), null), 201);
+        jdbcTemplate.update("update business set business_type = 'HAIR_SALON' where slug = ?", slugOf(salon));
+        assertThat(send(get("/api/public/businesses/" + slugOf(salon) + "/events"), null, null, 200)).isEmpty();
     }
 
     @Test

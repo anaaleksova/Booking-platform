@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -30,9 +31,11 @@ import { ImageUpload } from '@/components/ImageUpload';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, TableLoadingRows } from '@/components/states';
 import { useToast } from '@/components/ToastProvider';
+import { useBusiness } from '@/features/business/api';
 import { useServices } from '@/features/catalog/api';
 import { useDeleteEvent, useEvents, useSaveEvent } from '@/features/events/api';
 import { mediaUrl } from '@/features/media/api';
+import { offersEvents } from '@/features/onboarding/businessTypes';
 import type { BusinessEvent, EventInput, EventState } from '@/types/api';
 import { EVENT_STATE_LABELS, formatEventHours, formatLocalDate, formatShortDate } from '@/utils/format';
 
@@ -69,6 +72,12 @@ export function EventsPage() {
   const remove = useDeleteEvent();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [deleting, setDeleting] = useState<BusinessEvent | null>(null);
+  const { data: business } = useBusiness();
+
+  // Events are for restaurants and bars; the menu hides them from everyone else.
+  if (business && !offersEvents(business.businessType)) {
+    return <Navigate to="/admin" replace />;
+  }
 
   const submit = async () => {
     if (!draft) {
