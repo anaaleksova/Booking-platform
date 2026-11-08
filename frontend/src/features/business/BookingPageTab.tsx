@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import ButtonBase from '@mui/material/ButtonBase';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded';
@@ -15,15 +12,17 @@ import { ImageUpload } from '@/components/ImageUpload';
 import { LoadingState } from '@/components/states';
 import { useToast } from '@/components/ToastProvider';
 import { toBusinessInput, useBusiness, useUpdateBusiness, type BusinessInput } from '@/features/business/api';
-import { mediaUrl } from '@/features/media/api';
+import { SiteDesigner } from '@/features/site/editor/SiteDesigner';
+import { LivePreview } from '@/features/site/editor/LivePreview';
+import type { SiteDocument } from '@/features/site/types';
 import { GalleryManager } from './GalleryManager';
 
-/** Brand colours that read well with white text on buttons. */
-const SWATCHES = ['#2f5bea', '#1f6f8b', '#0f9d76', '#3d7a3a', '#b4536a', '#d23f63', '#c2551d', '#7a4fd6', '#111827'];
-
 /**
- * How the business looks to its customers: images, words, colour and what
- * the page shows. Only this business's page is ever reachable from its link.
+ * How the business looks to its customers. The business details on top —
+ * images, words, links — are saved straight away: emails and the chat
+ * assistant use them too. The design below — theme and sections — is a draft
+ * until it is published. Only this business's page is ever reachable from
+ * its link.
  */
 export function BookingPageTab() {
   const toast = useToast();
@@ -32,6 +31,7 @@ export function BookingPageTab() {
   const [form, setForm] = useState<BusinessInput | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [draft, setDraft] = useState<SiteDocument | null>(null);
 
   useEffect(() => {
     if (business) {
@@ -50,7 +50,7 @@ export function BookingPageTab() {
   const save = () =>
     update
       .mutateAsync(form)
-      .then(() => toast.success('Booking page saved'))
+      .then(() => toast.success('Business details saved'))
       .catch((err) => toast.error(errorMessage(err)));
 
   return (
@@ -83,6 +83,10 @@ export function BookingPageTab() {
             </Stack>
           </Paper>
 
+          <Typography variant="h6" component="h2" fontWeight={700}>
+            Business details
+          </Typography>
+
           <Paper variant="outlined" sx={{ p: 3 }}>
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>
               Images
@@ -103,7 +107,7 @@ export function BookingPageTab() {
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <ImageUpload
                   label="Cover photo"
-                  hint="Shown behind your name at the top of the page. A wide photo of your space, at least 1600 px across."
+                  hint="Shown behind your name at the top of the page, unless the top section has photos of its own. A wide photo of your space, at least 1600 px across."
                   url={coverUrl}
                   aspectRatio="16 / 7"
                   width="100%"
@@ -115,8 +119,6 @@ export function BookingPageTab() {
               </Box>
             </Stack>
           </Paper>
-
-          <GalleryManager show={form.showGallery} onShowChange={(showGallery) => set({ showGallery })} />
 
           <Paper variant="outlined" sx={{ p: 3 }}>
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>
@@ -144,104 +146,51 @@ export function BookingPageTab() {
 
           <Paper variant="outlined" sx={{ p: 3 }}>
             <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-              Colour
-            </Typography>
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
-              {SWATCHES.map((color) => (
-                <ButtonBase
-                  key={color}
-                  aria-label={`Use colour ${color}`}
-                  onClick={() => set({ accentColor: color })}
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    bgcolor: color,
-                    outline: form.accentColor.toLowerCase() === color ? '3px solid' : 'none',
-                    outlineColor: 'text.primary',
-                    outlineOffset: 2,
-                  }}
-                />
-              ))}
-              <TextField
-                type="color"
-                label="Custom"
-                value={form.accentColor}
-                onChange={(e) => set({ accentColor: e.target.value })}
-                sx={{ width: 96 }}
-              />
-            </Stack>
-          </Paper>
-
-          <Paper variant="outlined" sx={{ p: 3 }}>
-            <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-              Links and sections
+              Links
             </Typography>
             <Stack spacing={2}>
               <TextField label="Instagram" placeholder="https://instagram.com/yourbusiness" value={form.instagramUrl ?? ''} onChange={(e) => set({ instagramUrl: e.target.value })} />
               <TextField label="Facebook" placeholder="https://facebook.com/yourbusiness" value={form.facebookUrl ?? ''} onChange={(e) => set({ facebookUrl: e.target.value })} />
               <TextField label="Website" placeholder="https://" value={form.websiteUrl ?? ''} onChange={(e) => set({ websiteUrl: e.target.value })} />
-              <FormControlLabel
-                control={<Switch checked={form.showMap} onChange={(e) => set({ showMap: e.target.checked })} />}
-                label="Show a map of your address"
-              />
-              <FormControlLabel
-                control={<Switch checked={form.darkTheme} onChange={(e) => set({ darkTheme: e.target.checked })} />}
-                label="Use a black background on your booking pages"
-              />
             </Stack>
           </Paper>
 
           <Box>
             <Button variant="contained" size="large" onClick={save} disabled={update.isPending}>
-              {update.isPending ? 'Saving…' : 'Save booking page'}
+              {update.isPending ? 'Saving…' : 'Save business details'}
             </Button>
           </Box>
+
+          <GalleryManager />
+
+          <Box>
+            <Typography variant="h6" component="h2" fontWeight={700}>
+              Design
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Changes here are a draft: your customers see them once you publish.
+            </Typography>
+          </Box>
+
+          <SiteDesigner onDocumentChange={setDraft} />
         </Stack>
       </Grid>
 
       <Grid item xs={12} lg={5}>
         <Box sx={{ position: { lg: 'sticky' }, top: 88 }}>
-          <Typography variant="overline" color="text.secondary">
-            Preview
-          </Typography>
-          <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-            <Box
-              sx={{
-                position: 'relative',
-                minHeight: 220,
-                display: 'grid',
-                placeItems: 'center',
-                textAlign: 'center',
-                color: '#fff',
-                p: 3,
-                backgroundColor: form.accentColor,
-                backgroundImage: coverUrl
-                  ? `linear-gradient(rgba(10,12,20,0.45), rgba(10,12,20,0.65)), url("${mediaUrl(coverUrl)}")`
-                  : `linear-gradient(135deg, ${form.accentColor}, #111827)`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
+          {draft ? (
+            <LivePreview
+              slug={business.slug}
+              document={draft}
+              business={{
+                name: form.name,
+                tagline: form.tagline || null,
+                description: form.description || null,
+                logoUrl,
+                coverUrl,
               }}
-            >
-              <Stack alignItems="center" spacing={1}>
-                {logoUrl ? (
-                  <Box component="img" src={mediaUrl(logoUrl)} alt="" sx={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff' }} />
-                ) : null}
-                <Typography variant="h5" fontWeight={800}>
-                  {form.name}
-                </Typography>
-                {form.tagline ? <Typography variant="body2" sx={{ opacity: 0.9 }}>{form.tagline}</Typography> : null}
-                <Box sx={{ mt: 1, px: 2.5, py: 1, borderRadius: 999, bgcolor: form.accentColor, fontWeight: 700, fontSize: 14 }}>
-                  Book an appointment
-                </Box>
-              </Stack>
-            </Box>
-            <Box sx={{ p: 2 }}>
-              <Typography variant="caption" color="text.secondary">
-                Save, then open your page to see it in full.
-              </Typography>
-            </Box>
-          </Paper>
+            />
+          ) : null}
         </Box>
       </Grid>
     </Grid>

@@ -1,9 +1,14 @@
 package com.bookingsaas.business;
 
 import com.bookingsaas.support.AbstractIntegrationTest;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -90,12 +95,68 @@ class MultiTenancyIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void a_homepage_cannot_show_another_businesss_services_people_or_images() throws Exception {
+        Long ownService = createService(tokenA, "A's Service", "[]");
+        long employeeOfB = send(post("/api/admin/employees"), tokenB, """
+                {"name":"B's Employee","active":true}""", 201).get("id").asLong();
+        String imageOfB = uploadImage(tokenB);
+
+        JsonNode site = send(get("/api/admin/site"), tokenA, null, 200);
+        ObjectNode draft = (ObjectNode) site.get("draft");
+        ArrayNode sections = (ArrayNode) draft.get("sections");
+        ObjectNode services = section(sections.addObject(), "SERVICES", "GRID");
+        services.putObject("content").put("source", "SELECTED").put("showBookButton", true)
+                .putArray("serviceIds").add(serviceOfB).add(ownService);
+        ObjectNode team = section(sections.addObject(), "TEAM", "CARDS");
+        team.putObject("content").putArray("members").addObject().put("employeeId", employeeOfB);
+        ObjectNode gallery = section(sections.addObject(), "GALLERY", "GRID");
+        gallery.putObject("content").put("source", "CUSTOM").putArray("images").addObject().put("mediaId", imageOfB);
+        ObjectNode body = objectMapper.createObjectNode().put("draftVersion", site.get("draftVersion").asInt());
+        body.set("document", draft);
+
+        JsonNode saved = send(put("/api/admin/site/draft"), tokenA, body.toString(), 200).get("draft");
+        send(post("/api/admin/site/publish"), tokenA, null, 200);
+
+        JsonNode stored = saved.get("sections");
+        int last = stored.size() - 1;
+        assertThat(stored.get(last - 2).at("/content/serviceIds").toString()).isEqualTo("[" + ownService + "]");
+        assertThat(stored.get(last - 1).at("/content/members")).isEmpty();
+        assertThat(stored.get(last).at("/content/images")).isEmpty();
+        assertThat(send(get("/api/public/businesses/" + slugOf(tokenA) + "/site"), null, null, 200).get("team"))
+                .isEmpty();
+    }
+
+    @Test
+    void one_businesss_homepage_draft_never_reaches_another() throws Exception {
+        JsonNode site = send(get("/api/admin/site"), tokenA, null, 200);
+        ObjectNode draft = (ObjectNode) site.get("draft");
+        ((ObjectNode) draft.at("/theme/colors")).put("primary", "#ff0000");
+        ObjectNode body = objectMapper.createObjectNode().put("draftVersion", site.get("draftVersion").asInt());
+        body.set("document", draft);
+        send(put("/api/admin/site/draft"), tokenA, body.toString(), 200);
+        send(post("/api/admin/site/publish"), tokenA, null, 200);
+
+        // There is no business id to aim at: B's own builder and B's public page are untouched.
+        assertThat(send(get("/api/admin/site"), tokenB, null, 200).at("/draft/theme/colors/primary").asText())
+                .isEqualTo("#2f5bea");
+        assertThat(send(get("/api/public/businesses/" + slugOf(tokenB) + "/site"), null, null, 200)
+                .at("/site/theme/colors/primary").asText()).isEqualTo("#2f5bea");
+    }
+
+    @Test
     void an_unauthenticated_request_is_rejected() throws Exception {
         assertThat(send(get("/api/admin/services"), null, null, 401).get("error").asText())
                 .isEqualTo("UNAUTHENTICATED");
     }
 
     // --- helpers -----------------------------------------------------------
+
+    private static ObjectNode section(ObjectNode section, String type, String layout) {
+        section.put("type", type).put("id", UUID.randomUUID().toString()).put("layout", layout);
+        section.putObject("visibility").put("desktop", true).put("mobile", true);
+        section.putObject("style").put("tone", "DEFAULT");
+        return section;
+    }
 
     private Long createService(String token, String name, String requirements) throws Exception {
         return send(post("/api/admin/services"), token, serviceBody(name, requirements), 201).get("id").asLong();

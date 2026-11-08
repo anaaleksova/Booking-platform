@@ -22,6 +22,7 @@ import com.bookingsaas.reservation.dto.PublicReservationRequest;
 import com.bookingsaas.reservation.dto.PublicReservationResponse;
 import com.bookingsaas.service.BookableService;
 import com.bookingsaas.service.ServiceCatalogService;
+import com.bookingsaas.site.SiteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -62,6 +63,9 @@ import java.util.UUID;
 @Tag(name = "Public · Customer booking")
 public class PublicReservationController {
 
+    /** How far ahead the booking page lists special opening hours. */
+    private static final int SPECIAL_HOURS_DAYS = 60;
+
     private final BusinessService businessService;
     private final OpeningHoursService openingHoursService;
     private final ServiceCatalogService serviceCatalog;
@@ -73,6 +77,7 @@ public class PublicReservationController {
     private final GalleryService galleryService;
     private final ReservationCalendarService calendarService;
     private final EventService eventService;
+    private final SiteService siteService;
 
     public PublicReservationController(BusinessService businessService,
                                        OpeningHoursService openingHoursService,
@@ -84,7 +89,8 @@ public class PublicReservationController {
                                        BookingPageService bookingPageService,
                                        GalleryService galleryService,
                                        ReservationCalendarService calendarService,
-                                       EventService eventService) {
+                                       EventService eventService,
+                                       SiteService siteService) {
         this.businessService = businessService;
         this.openingHoursService = openingHoursService;
         this.serviceCatalog = serviceCatalog;
@@ -96,13 +102,16 @@ public class PublicReservationController {
         this.galleryService = galleryService;
         this.calendarService = calendarService;
         this.eventService = eventService;
+        this.siteService = siteService;
     }
 
     @GetMapping("/businesses/{slug}")
     public PublicBusinessResponse business(@PathVariable String slug) {
         Business business = businessService.requireActiveBySlug(slug);
         return PublicBusinessResponse.from(business, openingHoursService.intervalsOf(business.getId()),
-                galleryService.publicGallery(business));
+                openingHoursService.upcomingSpecialHours(business.getId(), LocalDate.now(business.zoneId()),
+                        SPECIAL_HOURS_DAYS),
+                galleryService.publicGallery(business), siteService.publishedTheme(business));
     }
 
     @GetMapping("/businesses/{slug}/events")

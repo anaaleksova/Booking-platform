@@ -99,3 +99,7 @@ databaseChangeLog:
       file: db/changelog/changes/028-onboarding.sql
   - include:
       file: db/changelog/seed/111-demo-business-types.sql
+  - include:
+      file: db/changelog/changes/029-site-config.sql
+  - include:
+      file: db/changelog/changes/030-special-hours-and-time-off.sql

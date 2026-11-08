@@ -60,7 +60,7 @@ export function EventCard({ slug, event }: { slug: string; event: PublicEvent })
   const full = event.booking === 'FULL';
 
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 4, overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Paper variant="outlined" sx={{ borderRadius: 'var(--site-radius-card, 56px)', overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box
         sx={{
           position: 'relative',
@@ -114,7 +114,7 @@ export function EventCard({ slug, event }: { slug: string; event: PublicEvent })
             component={RouterLink}
             to={`/b/${slug}/book?service=${event.serviceId}&date=${event.date}`}
             variant="contained"
-            sx={{ borderRadius: 999, alignSelf: 'flex-start', mt: 1 }}
+            sx={{ borderRadius: 'var(--site-radius-button, 999px)', alignSelf: 'flex-start', mt: 1 }}
           >
             Reserve your spot
           </Button>

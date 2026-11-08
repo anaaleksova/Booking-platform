@@ -27,7 +27,8 @@ import java.util.PriorityQueue;
  *       search decides <em>how many</em> of each class to use. Forty two-seat
  *       tables are one class, not forty branches; a desk floor of identical
  *       desks is a single class. The concrete resources are chosen afterwards,
- *       most preferred first.</li>
+ *       most preferred first; when only one of a class is needed, each member
+ *       is offered (Table 1 or Table 2), up to the limit.</li>
  *   <li><b>Pruning.</b> Classes are visited largest first, so a branch stops as
  *       soon as the remaining capacity cannot reach the group, as soon as it
  *       already seats the group (adding more would only waste resources), and
@@ -226,7 +227,7 @@ public final class AllocationFinder {
             }
             if (capacity >= participants && used >= minResources) {
                 // Seats the group; anything more would be a resource it does not need.
-                offer(best, limit, materialize());
+                offerWithAlternatives();
                 return;
             }
             if (index == classes.size() || used == maxResources
@@ -258,10 +259,34 @@ public final class AllocationFinder {
             counts[index] = 0;
         }
 
-        private Allocation materialize() {
+        /**
+         * The counts as concrete resources, most preferred first. A class used
+         * once is a real choice for the customer — Table 1 or Table 2 for a
+         * couple — so each of its members is offered too; a class used several
+         * times (four of forty desks) stays one option.
+         */
+        private void offerWithAlternatives() {
+            offer(best, limit, materialize(-1, 0));
+            for (int i = 0; i < classes.size(); i++) {
+                if (counts[i] == 1) {
+                    int members = Math.min(classes.get(i).members().size(), limit);
+                    for (int member = 1; member < members; member++) {
+                        offer(best, limit, materialize(i, member));
+                    }
+                }
+            }
+        }
+
+        /** With {@code swapClass}'s single resource replaced by its {@code member}-th one. */
+        private Allocation materialize(int swapClass, int member) {
             List<ResourceSpec> chosen = new ArrayList<>();
             for (int i = 0; i < classes.size(); i++) {
-                chosen.addAll(classes.get(i).members().subList(0, counts[i]));
+                List<ResourceSpec> members = classes.get(i).members();
+                if (i == swapClass) {
+                    chosen.add(members.get(member));
+                } else {
+                    chosen.addAll(members.subList(0, counts[i]));
+                }
             }
             chosen.sort(Comparator.comparingInt(resource -> rank.get(resource.id())));
             return allocationOf(chosen, participants, rank);

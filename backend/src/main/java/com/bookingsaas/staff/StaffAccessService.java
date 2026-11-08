@@ -94,6 +94,17 @@ public class StaffAccessService {
     public record StaffAccess(Long employeeId, State state, String email, Instant invitedAt, Instant expiresAt) {
     }
 
+    /** The signed-in member's own employee record: whose calendar "my time off" is. */
+    public record OwnCalendar(Long employeeId, Long resourceId, String name) {
+    }
+
+    @Transactional(readOnly = true)
+    public OwnCalendar ownCalendar() {
+        return employeeService.employeeOf(currentTenant.businessId(), currentTenant.userId())
+                .map(employee -> new OwnCalendar(employee.getId(), employee.getResourceId(), employee.getName()))
+                .orElseThrow(() -> ApiException.notFound("You are not linked to an employee of this business."));
+    }
+
     @Transactional(readOnly = true)
     public List<StaffAccess> list() {
         currentTenant.requireOwner();

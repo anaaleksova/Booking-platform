@@ -94,6 +94,36 @@ describe('seatingRules — tables combined for larger groups', () => {
   });
 });
 
+describe('seatingRules — the best fit is recommended', () => {
+  it('a couple is recommended the two-seat tables, not the bigger ones', () => {
+    const rules = seatingRules(
+      requirement({ combinable: true }),
+      slot(free(1, 2, 3, 4), [
+        { ids: [1], capacity: 2 },
+        { ids: [2], capacity: 2 },
+        { ids: [3], capacity: 4 },
+        { ids: [4], capacity: 8 },
+      ]),
+      2,
+    );
+    expect(rules.recommended.map((allocation) => allocation.resources[0].id)).toEqual([1, 2]);
+    // The bigger tables are still free to pick.
+    expect(rules.statusOf(option(3, 4))).toBe('free');
+  });
+
+  it('a big table alone beats a combination', () => {
+    const rules = seatingRules(
+      requirement({ combinable: true }),
+      slot(free(1, 2, 3), [
+        { ids: [3], capacity: 8 },
+        { ids: [1, 2], capacity: 8 },
+      ]),
+      8,
+    );
+    expect(rules.recommended).toHaveLength(1);
+  });
+});
+
 describe('withoutTakenPicks', () => {
   it('keeps what is still free and reports no change', () => {
     expect(withoutTakenPicks([requirement()], slot(free(1)), { 1: [1] })).toBeNull();

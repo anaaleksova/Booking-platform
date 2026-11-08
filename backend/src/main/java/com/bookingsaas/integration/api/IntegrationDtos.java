@@ -1,5 +1,6 @@
 package com.bookingsaas.integration.api;
 
+import com.bookingsaas.business.dto.SpecialHours;
 import com.bookingsaas.common.domain.DayInterval;
 import com.bookingsaas.integration.ChannelProvider;
 import com.bookingsaas.reservation.dto.ResourceSelection;
@@ -35,7 +36,8 @@ public final class IntegrationDtos {
      */
     public record BusinessInfo(Long id, String name, String slug, String description, String phone, String email,
                                String address, String timezone, String currency, String bookingPageUrl,
-                               List<DayInterval> openingHours, Policies policies, List<Channel> channels) {
+                               List<DayInterval> openingHours, List<SpecialHours> specialHours,
+                               Policies policies, List<Channel> channels) {
     }
 
     public record Policies(int minimumBookingNoticeMinutes, int maximumBookingAdvanceDays,

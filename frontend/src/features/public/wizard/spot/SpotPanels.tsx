@@ -47,7 +47,7 @@ export function SelectionDetails({
           together for your group of {people}.
         </Typography>
       </Box>
-      <Button variant="outlined" onClick={onClear} sx={{ borderRadius: 999, flexShrink: 0 }}>
+      <Button variant="outlined" onClick={onClear} sx={{ borderRadius: 'var(--site-radius-button, 999px)', flexShrink: 0 }}>
         Selected ✓
       </Button>
     </Paper>
@@ -106,7 +106,7 @@ export function SpotDetails({
         ) : null}
       </Box>
       {status === 'free' ? (
-        <Button variant={picked ? 'outlined' : 'contained'} onClick={onToggle} sx={{ borderRadius: 999, flexShrink: 0 }}>
+        <Button variant={picked ? 'outlined' : 'contained'} onClick={onToggle} sx={{ borderRadius: 'var(--site-radius-button, 999px)', flexShrink: 0 }}>
           {picked ? 'Selected ✓' : 'Choose'}
         </Button>
       ) : null}
@@ -115,8 +115,9 @@ export function SpotDetails({
 }
 
 /**
- * Ready-made ways to seat the group, found by the server — "Table 3 + Table 4".
- * The customer never has to put tables together themselves.
+ * The best ways to seat the group, found by the server — "Table 3 + Table 4".
+ * The customer never has to put tables together themselves; the other free
+ * tables are on the map.
  */
 export function Suggestions({
   suggestions,
@@ -134,7 +135,7 @@ export function Suggestions({
   return (
     <Box sx={{ mb: 2 }}>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Available seating for {people}:
+        Best fit for {people} {people === 1 ? 'person' : 'people'} — or pick any free {noun} below:
       </Typography>
       <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' } }}>
         {suggestions.map((allocation) => {

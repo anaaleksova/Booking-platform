@@ -14,7 +14,8 @@ import java.util.List;
  * Who may use the admin API, decided in one place.
  *
  * <p>An owner may use all of it. A STAFF member may use only the short list
- * below: seeing the business, their own reservations, and marking them done.
+ * below: seeing the business, their own reservations, marking them done, and
+ * their own time off.
  * Which reservations are "their own" is then decided per row by
  * {@code ReservationAccess}. Everything not on the list is owner-only, so a
  * new admin endpoint is closed to staff unless it is deliberately added here.
@@ -36,7 +37,13 @@ public class AdminAccessInterceptor implements HandlerInterceptor {
             new Allowed(HttpMethod.GET, "/api/admin/reservations"),
             new Allowed(HttpMethod.GET, "/api/admin/reservations/{id}"),
             // Confirm, complete or mark a no-show; ReservationService refuses a cancellation from staff.
-            new Allowed(HttpMethod.PATCH, "/api/admin/reservations/{id}"));
+            new Allowed(HttpMethod.PATCH, "/api/admin/reservations/{id}"),
+            // Their own time off; BlockedTimeService limits staff to their own calendar.
+            new Allowed(HttpMethod.GET, "/api/admin/staff/me"),
+            new Allowed(HttpMethod.GET, "/api/admin/blocked-times"),
+            new Allowed(HttpMethod.GET, "/api/admin/blocked-times/conflicts"),
+            new Allowed(HttpMethod.POST, "/api/admin/blocked-times"),
+            new Allowed(HttpMethod.DELETE, "/api/admin/blocked-times/{id}"));
 
     private final CurrentTenant currentTenant;
 

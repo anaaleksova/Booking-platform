@@ -35,6 +35,8 @@ public enum ErrorCode {
 
     // --- business ---------------------------------------------------------
     SLUG_ALREADY_TAKEN(HttpStatus.CONFLICT),
+    /** The homepage draft was saved elsewhere since this editor loaded it. */
+    SITE_DRAFT_OUTDATED(HttpStatus.CONFLICT),
 
     // --- catalogue --------------------------------------------------------
     SERVICE_INACTIVE(HttpStatus.UNPROCESSABLE_ENTITY),

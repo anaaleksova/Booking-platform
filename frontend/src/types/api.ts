@@ -5,6 +5,7 @@
  * moment already rendered in the business timezone. The UI reads the local
  * fields, so no page does timezone maths of its own.
  */
+import type { SiteTheme } from '@/features/site/types';
 
 // --- auth ------------------------------------------------------------------
 
@@ -163,6 +164,49 @@ export interface BlockedTime {
   localStartTime: string;
   localEndTime: string;
   reason?: string | null;
+  /** The employee entered this time off themselves. */
+  enteredByStaff: boolean;
+  /** Bookings still inside the blocked time: they need moving or cancelling. */
+  conflicts: ScheduleConflict[];
+}
+
+/** A booking a schedule change leaves stranded: in time off, a closure, or outside a date's special hours. */
+export interface ScheduleConflict {
+  reservationId: number;
+  customerName?: string | null;
+  serviceName?: string | null;
+  participants: number;
+  startTime: string;
+  endTime: string;
+  localStartTime: string;
+  localEndTime: string;
+  resources: string[];
+}
+
+/** A wall-clock span, "HH:mm". */
+export interface TimeSpan {
+  startTime: string;
+  endTime: string;
+}
+
+/** A date whose opening hours replace the week's; no hours means closed. */
+export interface SpecialHours {
+  date: string;
+  closed: boolean;
+  hours: TimeSpan[];
+  note?: string | null;
+}
+
+/** A special date in the admin panel, with the bookings it leaves outside its hours. */
+export interface SpecialDay extends SpecialHours {
+  conflicts: ScheduleConflict[];
+}
+
+/** The signed-in staff member's own employee record. */
+export interface OwnCalendar {
+  employeeId: number;
+  resourceId: number;
+  name: string;
 }
 
 // --- catalogue ---------------------------------------------------------------
@@ -651,8 +695,12 @@ export interface PublicBusiness {
   timezone: string;
   currency: string;
   openingHours: DayInterval[];
+  /** Dates in the coming weeks whose hours differ from the week's. */
+  specialHours: SpecialHours[];
   /** Empty when the business has no photos or hides its gallery. */
   gallery: Array<{ url: string; caption?: string | null }>;
+  /** The published homepage theme; every customer page is drawn in it. */
+  theme?: SiteTheme | null;
 }
 
 export interface GalleryImage {

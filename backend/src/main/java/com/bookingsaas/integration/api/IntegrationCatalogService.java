@@ -85,6 +85,7 @@ public class IntegrationCatalogService {
         return new BusinessInfo(business.getId(), business.getName(), business.getSlug(), business.getDescription(),
                 business.getPhone(), business.getEmail(), business.getAddress(), business.getTimezone(),
                 business.getCurrency(), bookingPageUrl(business), openingHoursService.intervalsOf(businessId),
+                openingHoursService.upcomingSpecialHours(businessId, LocalDate.now(business.zoneId()), 60),
                 new Policies(settings.getMinimumBookingNoticeMinutes(), settings.getMaximumBookingAdvanceDays(),
                         settings.isAllowCustomerCancellation(), settings.getCancellationDeadlineHours()),
                 channels);

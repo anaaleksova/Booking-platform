@@ -2,7 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { queryKeys } from '@/features/queryKeys';
 import { useInvalidatingMutation } from '@/features/mutation';
-import type { BlockedTime, Business, BusinessSettings, DayInterval, GalleryImage } from '@/types/api';
+import type {
+  BlockedTime,
+  Business,
+  BusinessSettings,
+  DayInterval,
+  GalleryImage,
+  OwnCalendar,
+  ScheduleConflict,
+  SpecialDay,
+  TimeSpan,
+} from '@/types/api';
 
 export type BusinessInput = Pick<
   Business,
@@ -112,7 +122,64 @@ export function useBlockedTimes() {
 export function useCreateBlockedTime() {
   return useInvalidatingMutation(
     async (input: BlockedTimeInput) => (await apiClient.post<BlockedTime>('/api/admin/blocked-times', input)).data,
-    [queryKeys.blockedTimes],
+    [queryKeys.blockedTimes, ['reservations']],
+  );
+}
+
+/** The bookings a block would collide with, asked before saving it. */
+export async function fetchBlockedTimeConflicts(input: BlockedTimeInput) {
+  return (
+    await apiClient.get<ScheduleConflict[]>('/api/admin/blocked-times/conflicts', {
+      params: { resourceId: input.resourceId ?? undefined, startTime: input.startTime, endTime: input.endTime },
+    })
+  ).data;
+}
+
+/** The signed-in staff member's own calendar (their employee resource). */
+export function useOwnCalendar(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.ownCalendar,
+    queryFn: async () => (await apiClient.get<OwnCalendar>('/api/admin/staff/me')).data,
+    enabled,
+  });
+}
+
+// --- special dates -------------------------------------------------------------
+
+export interface SpecialDayInput {
+  date: string;
+  /** Empty closes the business that day. */
+  hours: TimeSpan[];
+  note?: string;
+}
+
+const SPECIAL_HOURS_AFFECT = [queryKeys.specialHours, ['reservations'], ['public']];
+
+export function useSpecialHours() {
+  return useQuery({
+    queryKey: queryKeys.specialHours,
+    queryFn: async () => (await apiClient.get<SpecialDay[]>('/api/admin/special-hours')).data,
+  });
+}
+
+export async function fetchSpecialDayConflicts({ date, ...body }: SpecialDayInput) {
+  return (await apiClient.post<ScheduleConflict[]>(`/api/admin/special-hours/${date}/conflicts`, body)).data;
+}
+
+export function useSaveSpecialDay() {
+  return useInvalidatingMutation(
+    async ({ date, ...body }: SpecialDayInput) =>
+      (await apiClient.put<SpecialDay>(`/api/admin/special-hours/${date}`, body)).data,
+    SPECIAL_HOURS_AFFECT,
+  );
+}
+
+export function useDeleteSpecialDay() {
+  return useInvalidatingMutation(
+    async (date: string) => {
+      await apiClient.delete(`/api/admin/special-hours/${date}`);
+    },
+    SPECIAL_HOURS_AFFECT,
   );
 }
 

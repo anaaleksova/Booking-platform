@@ -4,11 +4,7 @@ import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Grid from '@mui/material/Grid';
-import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -17,18 +13,14 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import { errorMessage } from '@/api/client';
 import { PageHeader } from '@/components/PageHeader';
 import { ErrorState, LoadingState } from '@/components/states';
 import { useToast } from '@/components/ToastProvider';
 import { WeeklyHoursEditor } from '@/components/WeeklyHoursEditor';
 import {
-  useBlockedTimes,
   useBusiness,
   useBusinessSettings,
-  useCreateBlockedTime,
-  useDeleteBlockedTime,
   useOpeningHours,
   useReplaceOpeningHours,
   useUpdateBusiness,
@@ -39,12 +31,13 @@ import {
 import { BookingPageTab } from '@/features/business/BookingPageTab';
 import { CalendarTab } from '@/features/business/CalendarTab';
 import { CURRENCIES } from '@/features/business/currencies';
+import { SpecialHoursEditor } from '@/features/schedule/SpecialHours';
+import { BlockedTimeList, BlockTimeForm } from '@/features/schedule/TimeOff';
 import { useResources } from '@/features/catalog/api';
 import type { BusinessSettings, DayInterval } from '@/types/api';
-import { formatLocalDate, formatLocalTime } from '@/utils/format';
 
 /** Tabs that can be opened by link, e.g. from the Getting started checklist: /admin/settings?tab=hours. */
-const LINKABLE_TABS: Record<string, number> = { business: 0, 'booking-page': 1, hours: 2 };
+const LINKABLE_TABS: Record<string, number> = { business: 0, 'booking-page': 1, hours: 2, 'time-off': 4 };
 
 export function SettingsPage() {
   const [searchParams] = useSearchParams();
@@ -172,6 +165,7 @@ function OpeningHoursTab() {
       >
         Save opening hours
       </Button>
+      <SpecialHoursEditor />
     </Stack>
   );
 }
@@ -248,92 +242,14 @@ function RulesTab() {
 }
 
 function BlockedTimeTab() {
-  const toast = useToast();
-  const { data: blocks, isLoading } = useBlockedTimes();
   const { data: resources } = useResources();
-  const create = useCreateBlockedTime();
-  const remove = useDeleteBlockedTime();
-  const [draft, setDraft] = useState({ resourceId: '' as number | '', start: '', end: '', reason: '' });
-
   return (
     <Grid container spacing={3}>
       <Grid item xs={12} md={5}>
-        <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="subtitle1" fontWeight={700} gutterBottom>
-            Block time
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Close the whole business (a holiday) or take one resource out — an employee's day off, a room in maintenance.
-          </Typography>
-          <Stack spacing={2}>
-            <TextField select label="Applies to" value={draft.resourceId} onChange={(e) => setDraft({ ...draft, resourceId: e.target.value === '' ? '' : Number(e.target.value) })}>
-              <MenuItem value="">The whole business</MenuItem>
-              {(resources ?? []).map((resource) => (
-                <MenuItem key={resource.id} value={resource.id}>
-                  {resource.name} · {resource.resourceTypeName}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField type="datetime-local" label="From" value={draft.start} InputLabelProps={{ shrink: true }} onChange={(e) => setDraft({ ...draft, start: e.target.value })} />
-            <TextField type="datetime-local" label="To" value={draft.end} InputLabelProps={{ shrink: true }} onChange={(e) => setDraft({ ...draft, end: e.target.value })} />
-            <TextField label="Reason" value={draft.reason} onChange={(e) => setDraft({ ...draft, reason: e.target.value })} />
-            <Button
-              variant="contained"
-              disabled={!draft.start || !draft.end || create.isPending}
-              onClick={() =>
-                create
-                  .mutateAsync({
-                    resourceId: draft.resourceId === '' ? null : draft.resourceId,
-                    startTime: draft.start.length === 16 ? `${draft.start}:00` : draft.start,
-                    endTime: draft.end.length === 16 ? `${draft.end}:00` : draft.end,
-                    reason: draft.reason || undefined,
-                  })
-                  .then(() => {
-                    toast.success('Time blocked');
-                    setDraft({ resourceId: '', start: '', end: '', reason: '' });
-                  })
-                  .catch((err) => toast.error(errorMessage(err)))
-              }
-            >
-              Block time
-            </Button>
-          </Stack>
-        </Paper>
+        <BlockTimeForm ownerView resources={resources} />
       </Grid>
       <Grid item xs={12} md={7}>
-        <Paper variant="outlined">
-          <Typography variant="subtitle1" fontWeight={700} sx={{ p: 2, pb: 0 }}>
-            Upcoming
-          </Typography>
-          {isLoading ? (
-            <LoadingState />
-          ) : blocks?.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-              Nothing blocked in the next three months.
-            </Typography>
-          ) : (
-            <List>
-              {blocks?.map((block) => (
-                <ListItem
-                  key={block.id}
-                  secondaryAction={
-                    <IconButton
-                      aria-label="Remove"
-                      onClick={() => remove.mutateAsync(block.id).catch((err) => toast.error(errorMessage(err)))}
-                    >
-                      <DeleteOutlineRoundedIcon fontSize="small" />
-                    </IconButton>
-                  }
-                >
-                  <ListItemText
-                    primary={`${block.resourceName ?? 'Whole business'}${block.reason ? ` — ${block.reason}` : ''}`}
-                    secondary={`${formatLocalDate(block.localStartTime)} ${formatLocalTime(block.localStartTime)} → ${formatLocalDate(block.localEndTime)} ${formatLocalTime(block.localEndTime)}`}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </Paper>
+        <BlockedTimeList ownerView />
       </Grid>
     </Grid>
   );

@@ -409,13 +409,17 @@ public class AvailabilityEngine {
 
     // --- per-day schedule --------------------------------------------------
 
-    /** Resolves a date's windows once, then reuses them for every candidate. */
+    /**
+     * Resolves a date's windows once, then reuses them for every candidate. A
+     * special date's own hours replace the week's.
+     */
     private DaySchedule scheduleFor(AvailabilityContext ctx, LocalDate date) {
-        List<TimeRange> gridWindows = TimeRange.merge(toRanges(ctx, date, ctx.businessHours()));
+        List<TimeRange> gridWindows = TimeRange.merge(toRanges(ctx, date, ctx.businessHoursOn(date)));
         List<TimeRange> openWindows = gridWindows.isEmpty()
                 ? List.of()
                 : TimeRange.subtractAll(gridWindows, ctx.businessBlocks());
-        return new DaySchedule(date, gridWindows, openWindows, new HashMap<>());
+        boolean extraOpenDay = ctx.isSpecial(date) && toRanges(ctx, date, ctx.businessHours()).isEmpty();
+        return new DaySchedule(date, gridWindows, openWindows, extraOpenDay, new HashMap<>());
     }
 
     /**
@@ -444,11 +448,13 @@ public class AvailabilityEngine {
     /**
      * @param gridWindows opening hours as configured, used to lay out the slot grid
      * @param openWindows the same windows minus business-wide closures
+     * @param extraOpenDay a special date on a weekday the business is normally closed
      * @param resourceWindowCache each resource's windows for the day, computed on first use
      */
     private record DaySchedule(LocalDate date,
                                List<TimeRange> gridWindows,
                                List<TimeRange> openWindows,
+                               boolean extraOpenDay,
                                Map<Long, List<TimeRange>> resourceWindowCache) {
 
         /** When the resource can be used that day: its own hours within the open windows. */
@@ -460,6 +466,12 @@ public class AvailabilityEngine {
                     return openWindows;
                 }
                 List<TimeRange> ranges = TimeRange.merge(toRanges(ctx, date, own));
+                if (ranges.isEmpty() && extraOpenDay) {
+                    // Nobody has shifts on a day the business never opens, so on an
+                    // extra open day everyone follows its hours; the owner blocks
+                    // whoever is not coming in.
+                    return openWindows;
+                }
                 return ranges.isEmpty() ? List.of() : TimeRange.intersect(ranges, openWindows);
             });
         }

@@ -20,6 +20,15 @@ export function seatingRules(requirement: ChoosableRequirement, slot: Slot, peop
   /** The server's ways to seat the group at this time, best first (combinable requirements only). */
   const suggestions: AllocationOption[] =
     slot.requirements.find((candidate) => candidate.requirementId === requirement.requirementId)?.allocations ?? [];
+  /**
+   * The most suitable of those — as few tables and as few spare seats as the
+   * best one. A couple is shown the two-seat tables, not the six-seat one; the
+   * bigger tables stay free to pick on the map.
+   */
+  const recommended = suggestions.filter(
+    (allocation) =>
+      allocation.resources.length === suggestions[0].resources.length && allocation.capacity === suggestions[0].capacity,
+  );
   const suggestionWith = (id: number) =>
     suggestions.find((allocation) => allocation.resources.some((resource) => resource.id === id));
 
@@ -82,7 +91,7 @@ export function seatingRules(requirement: ChoosableRequirement, slot: Slot, peop
     return picked.length >= requirement.quantity ? [...picked.slice(1), option.id] : [...picked, option.id];
   };
 
-  return { combined, many, suggestions, seatsLeftOf, statusOf, isSuggestionPicked, afterClick };
+  return { combined, many, suggestions, recommended, seatsLeftOf, statusOf, isSuggestionPicked, afterClick };
 }
 
 export type SeatingRules = ReturnType<typeof seatingRules>;

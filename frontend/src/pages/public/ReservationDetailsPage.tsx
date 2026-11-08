@@ -125,7 +125,7 @@ export function ReservationDetailsPage() {
         ) : null}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 3 }}>
-          <Button component={RouterLink} to={`/b/${data.businessSlug}/book`} variant="outlined" sx={{ borderRadius: 999 }}>
+          <Button component={RouterLink} to={`/b/${data.businessSlug}/book`} variant="outlined" sx={{ borderRadius: 'var(--site-radius-button, 999px)' }}>
             Book something else
           </Button>
           {data.cancellable ? (

@@ -7,7 +7,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -72,6 +74,12 @@ public class MediaService {
         return repository.findByIdAndBusinessId(mediaId, businessId)
                 .map(Media::getId)
                 .orElseThrow(() -> ApiException.validation("The selected image does not exist."));
+    }
+
+    /** Which of these images belong to the business; the rest are another business's, or gone. */
+    @Transactional(readOnly = true)
+    public Set<UUID> ownedAmong(Long businessId, Collection<UUID> mediaIds) {
+        return mediaIds.isEmpty() ? Set.of() : Set.copyOf(repository.findOwnedIds(businessId, mediaIds));
     }
 
     /**

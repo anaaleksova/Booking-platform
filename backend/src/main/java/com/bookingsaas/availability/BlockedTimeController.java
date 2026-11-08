@@ -2,6 +2,7 @@ package com.bookingsaas.availability;
 
 import com.bookingsaas.availability.dto.BlockedTimeRequest;
 import com.bookingsaas.availability.dto.BlockedTimeResponse;
+import com.bookingsaas.availability.spi.ScheduleConflict;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -36,6 +38,15 @@ public class BlockedTimeController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return blockedTimeService.list(from, to);
+    }
+
+    /** The bookings a block would collide with, asked before saving it. Times are business-local. */
+    @GetMapping("/conflicts")
+    public List<ScheduleConflict> conflicts(
+            @RequestParam(required = false) Long resourceId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
+        return blockedTimeService.previewConflicts(resourceId, startTime, endTime);
     }
 
     @PostMapping

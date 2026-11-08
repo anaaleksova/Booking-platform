@@ -44,6 +44,17 @@ public class GalleryService {
                 .toList();
     }
 
+    /**
+     * Every photo, in order, whatever the old show/hide switch says: the
+     * homepage builder decides with its own gallery section whether they show.
+     */
+    @Transactional(readOnly = true)
+    public List<GalleryImageResponse> photosOf(Long businessId) {
+        return repository.findByBusinessIdOrderByPositionAscIdAsc(businessId).stream()
+                .map(GalleryImageResponse::from)
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<GalleryImageResponse> list() {
         return repository.findByBusinessIdOrderByPositionAscIdAsc(currentTenant.businessId()).stream()

@@ -9,8 +9,13 @@ export const queryKeys = {
   business: ['business'] as const,
   businessSettings: ['business', 'settings'] as const,
   openingHours: ['business', 'opening-hours'] as const,
-  blockedTimes: ['business', 'blocked-times'] as const,
+  /** Under 'schedule-changes': they list clashing bookings, so reservation changes refresh them. */
+  blockedTimes: ['schedule-changes', 'blocked-times'] as const,
+  specialHours: ['schedule-changes', 'special-hours'] as const,
+  ownCalendar: ['staff', 'me'] as const,
   gallery: ['business', 'gallery'] as const,
+  /** Not under 'business': saving the business details must not refetch (and reset) an open homepage editor. */
+  site: ['site'] as const,
 
   services: ['services'] as const,
   service: (id: number) => ['services', id] as const,
@@ -54,6 +59,7 @@ export const queryKeys = {
   publicBusiness: (slug: string) => ['public', slug] as const,
   publicServices: (slug: string) => ['public', slug, 'services'] as const,
   publicEvents: (slug: string) => ['public', slug, 'events'] as const,
+  publicSite: (slug: string) => ['public', slug, 'site'] as const,
   publicService: (slug: string, id: number) => ['public', slug, 'services', id] as const,
   publicAvailability: (slug: string, filters: object) => ['public', slug, 'availability', filters] as const,
   publicReservation: (reference: string) => ['public', 'reservations', reference] as const,

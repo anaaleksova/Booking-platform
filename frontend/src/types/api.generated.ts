@@ -142,9 +142,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_11"];
+        get: operations["list_12"];
         put?: never;
         post: operations["create_9"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/blocked-times/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["conflicts"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -161,7 +177,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete: operations["delete_8"];
+        delete: operations["delete_9"];
         options?: never;
         head?: never;
         patch?: never;
@@ -174,7 +190,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["current_2"];
+        get: operations["current_3"];
         put: operations["update_7"];
         post?: never;
         delete?: never;
@@ -225,7 +241,7 @@ export interface paths {
         get: operations["get_6"];
         put: operations["update_6"];
         post?: never;
-        delete: operations["delete_7"];
+        delete: operations["delete_8"];
         options?: never;
         head?: never;
         patch?: never;
@@ -270,7 +286,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_10"];
+        get: operations["list_11"];
         put?: never;
         post: operations["create_7"];
         delete?: never;
@@ -289,7 +305,7 @@ export interface paths {
         get: operations["get_5"];
         put: operations["update_5"];
         post?: never;
-        delete: operations["delete_6"];
+        delete: operations["delete_7"];
         options?: never;
         head?: never;
         patch?: never;
@@ -302,7 +318,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_9"];
+        get: operations["list_10"];
         put?: never;
         post: operations["create_6"];
         delete?: never;
@@ -355,7 +371,7 @@ export interface paths {
         get: operations["get_4"];
         put: operations["update_4"];
         post?: never;
-        delete: operations["delete_5"];
+        delete: operations["delete_6"];
         options?: never;
         head?: never;
         patch?: never;
@@ -400,7 +416,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_8"];
+        get: operations["list_9"];
         put?: never;
         post: operations["create_5"];
         delete?: never;
@@ -419,7 +435,7 @@ export interface paths {
         get: operations["get_3"];
         put: operations["update_3"];
         post?: never;
-        delete: operations["delete_4"];
+        delete: operations["delete_5"];
         options?: never;
         head?: never;
         patch?: never;
@@ -432,7 +448,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         /** Add an uploaded image to the gallery (max 12) */
         post: operations["add"];
@@ -469,7 +485,7 @@ export interface paths {
         get?: never;
         put: operations["updateCaption"];
         post?: never;
-        delete: operations["delete_3"];
+        delete: operations["delete_4"];
         options?: never;
         head?: never;
         patch?: never;
@@ -612,7 +628,7 @@ export interface paths {
             cookie?: never;
         };
         /** The checklist; 204 for a business that has none (created before templates) */
-        get: operations["current_1"];
+        get: operations["current_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -662,7 +678,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_6"];
+        get: operations["list_7"];
         put: operations["replace"];
         post?: never;
         delete?: never;
@@ -695,7 +711,7 @@ export interface paths {
             cookie?: never;
         };
         /** List reservations starting in a date range (defaults to 30 days back, 60 ahead) */
-        get: operations["list_5"];
+        get: operations["list_6"];
         put?: never;
         post: operations["create_4"];
         delete?: never;
@@ -762,7 +778,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_3"];
+        get: operations["list_4"];
         put?: never;
         post: operations["create_3"];
         delete?: never;
@@ -781,7 +797,7 @@ export interface paths {
         get?: never;
         put: operations["update_2"];
         post?: never;
-        delete: operations["delete_2"];
+        delete: operations["delete_3"];
         options?: never;
         head?: never;
         patch?: never;
@@ -794,7 +810,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_4"];
+        get: operations["list_5"];
         /** Save every floor at once: names, order, room and placed resources. Floors left out are deleted; an empty list removes the floor plans. */
         put: operations["saveAll"];
         post?: never;
@@ -811,7 +827,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_2"];
+        get: operations["list_3"];
         put?: never;
         post: operations["create_2"];
         delete?: never;
@@ -830,7 +846,7 @@ export interface paths {
         get: operations["get_1"];
         put: operations["update_1"];
         post?: never;
-        delete: operations["delete_1"];
+        delete: operations["delete_2"];
         options?: never;
         head?: never;
         patch?: never;
@@ -875,7 +891,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_1"];
+        get: operations["list_2"];
         put?: never;
         post: operations["create_1"];
         delete?: never;
@@ -894,7 +910,7 @@ export interface paths {
         get: operations["get"];
         put: operations["update"];
         post?: never;
-        delete: operations["delete"];
+        delete: operations["delete_1"];
         options?: never;
         head?: never;
         patch?: never;
@@ -916,6 +932,125 @@ export interface paths {
         patch: operations["setActive"];
         trace?: never;
     };
+    "/api/admin/site": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["current_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/site/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Throw the draft away and start again from the published page */
+        post: operations["discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/site/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save the draft; customers keep seeing the published page */
+        put: operations["saveDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/site/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make the draft the page customers see */
+        post: operations["publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/special-hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Special dates from today on, with the bookings each leaves outside its hours */
+        get: operations["list_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/special-hours/{date}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set one date's hours; no hours closes the business that day */
+        put: operations["save"];
+        post?: never;
+        /** Back to the weekly hours on that date */
+        delete: operations["delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/special-hours/{date}/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The bookings these hours would leave outside, without saving */
+        post: operations["preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/staff": {
         parameters: {
             query?: never;
@@ -925,6 +1060,23 @@ export interface paths {
         };
         /** Login access of every employee: none, invited, expired or active */
         get: operations["list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/staff/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in member's own employee and calendar */
+        get: operations["me_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1655,6 +1807,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/businesses/{slug}/site": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The business's published homepage, with the team and gallery it shows */
+        get: operations["site"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/media/{id}": {
         parameters: {
             query?: never;
@@ -1723,6 +1892,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AboutContent: {
+            eyebrow?: string;
+            image?: components["schemas"]["SectionImage"];
+            stats?: components["schemas"]["AboutStat"][];
+            text?: string;
+            title?: string;
+        };
+        AboutStat: {
+            label: string;
+            value: string;
+        };
         AdminReservationRequest: {
             customer?: components["schemas"]["AdminReservationRequestNewCustomer"];
             /** Format: int64 */
@@ -1895,8 +2075,10 @@ export interface components {
             startTime: string;
         };
         BlockedTimeResponse: {
+            conflicts?: components["schemas"]["ScheduleConflict"][];
             /** Format: date-time */
             endTime?: string;
+            enteredByStaff?: boolean;
             /** Format: int64 */
             id?: number;
             /** Format: date-time */
@@ -1959,6 +2141,11 @@ export interface components {
         };
         CancelRequest: {
             reason?: string;
+        };
+        ContactContent: {
+            eyebrow?: string;
+            showHours?: boolean;
+            title?: string;
         };
         ConversationDtosAction: {
             idempotencyKey?: string;
@@ -2336,6 +2523,10 @@ export interface components {
             state?: string;
             title?: string;
         };
+        EventsContent: {
+            eyebrow?: string;
+            title?: string;
+        };
         FloorPlanDtosDecor: {
             height: number;
             /** @enum {string} */
@@ -2381,6 +2572,13 @@ export interface components {
         ForgotPasswordRequest: {
             email: string;
         };
+        GalleryContent: {
+            eyebrow?: string;
+            images?: components["schemas"]["SectionImage"][];
+            /** @enum {string} */
+            source: "GALLERY" | "CUSTOM";
+            title?: string;
+        };
         GalleryControllerAddRequest: {
             caption?: string;
             /** Format: uuid */
@@ -2398,6 +2596,14 @@ export interface components {
             /** Format: int32 */
             position?: number;
             url?: string;
+        };
+        HeroContent: {
+            buttons?: components["schemas"]["SectionButton"][];
+            eyebrow?: string;
+            images?: components["schemas"]["SectionImage"][];
+            subtitle?: string;
+            title?: string;
+            videoUrl?: string;
         };
         IntegrationAdminDtosChannelView: {
             displayName?: string;
@@ -2516,6 +2722,7 @@ export interface components {
             phone?: string;
             policies?: components["schemas"]["IntegrationDtosPolicies"];
             slug?: string;
+            specialHours?: components["schemas"]["SpecialHours"][];
             timezone?: string;
         };
         IntegrationDtosCancelReservationRequest: {
@@ -2799,6 +3006,15 @@ export interface components {
             /** Format: int64 */
             reservationsThisMonth?: number;
         };
+        PricingContent: {
+            eyebrow?: string;
+            /** Format: int64 */
+            highlightServiceId?: number;
+            serviceIds?: number[];
+            /** @enum {string} */
+            source: "ALL" | "SELECTED";
+            title?: string;
+        };
         PublicBusinessResponse: {
             accentColor?: string;
             address?: string;
@@ -2816,7 +3032,9 @@ export interface components {
             phone?: string;
             showMap?: boolean;
             slug?: string;
+            specialHours?: components["schemas"]["SpecialHours"][];
             tagline?: string;
+            theme?: components["schemas"]["SiteDocumentTheme"];
             timezone?: string;
             websiteUrl?: string;
         };
@@ -3102,6 +3320,171 @@ export interface components {
             /** Format: int64 */
             resourceCount?: number;
         };
+        ScheduleConflict: {
+            customerName?: string;
+            /** Format: date-time */
+            endTime?: string;
+            /** Format: date-time */
+            localEndTime?: string;
+            /** Format: date-time */
+            localStartTime?: string;
+            /** Format: int32 */
+            participants?: number;
+            /** Format: int64 */
+            reservationId?: number;
+            resources?: string[];
+            serviceName?: string;
+            /** Format: date-time */
+            startTime?: string;
+        };
+        Section: {
+            type: string;
+        };
+        SectionAbout: Omit<components["schemas"]["Section"], "type"> & {
+            content: components["schemas"]["AboutContent"];
+            id: string;
+            /** @enum {string} */
+            layout: "CENTERED_TEXT" | "TEXT_IMAGE" | "TEXT_STATS";
+            style: components["schemas"]["SectionStyle"];
+            visibility: components["schemas"]["SectionVisibility"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "ABOUT";
+        };
+        SectionButton: {
+            /** @enum {string} */
+            action: "BOOKING" | "SECTION" | "URL";
+            label: string;
+            target?: string;
+        };
+        SectionContact: Omit<components["schemas"]["Section"], "type"> & {
+            content: components["schemas"]["ContactContent"];
+            id: string;
+            /** @enum {string} */
+            layout: "MAP_AND_INFO" | "INFO_ONLY" | "WITH_HOURS";
+            style: components["schemas"]["SectionStyle"];
+            visibility: components["schemas"]["SectionVisibility"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "CONTACT";
+        };
+        SectionEvents: Omit<components["schemas"]["Section"], "type"> & {
+            content: components["schemas"]["EventsContent"];
+            id: string;
+            /** @enum {string} */
+            layout: "CARDS" | "LIST";
+            style: components["schemas"]["SectionStyle"];
+            visibility: components["schemas"]["SectionVisibility"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "EVENTS";
+        };
+        SectionGallery: Omit<components["schemas"]["Section"], "type"> & {
+            content: components["schemas"]["GalleryContent"];
+            id: string;
+            /** @enum {string} */
+            layout: "GRID" | "MASONRY" | "CAROUSEL";
+            style: components["schemas"]["SectionStyle"];
+            visibility: components["schemas"]["SectionVisibility"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "GALLERY";
+        };
+        SectionHero: Omit<components["schemas"]["Section"], "type"> & {
+            content: components["schemas"]["HeroContent"];
+            id: string;
+            /** @enum {string} */
+            layout: "FULL_WIDTH_IMAGE" | "SPLIT" | "CENTERED" | "VIDEO" | "SLIDESHOW";
+            style: components["schemas"]["SectionStyle"];
+            visibility: components["schemas"]["SectionVisibility"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "HERO";
+        };
+        SectionImage: {
+            alt?: string;
+            /** Format: uuid */
+            mediaId: string;
+        };
+        SectionPricing: Omit<components["schemas"]["Section"], "type"> & {
+            content: components["schemas"]["PricingContent"];
+            id: string;
+            /** @enum {string} */
+            layout: "CARDS" | "TABLE";
+            style: components["schemas"]["SectionStyle"];
+            visibility: components["schemas"]["SectionVisibility"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "PRICING";
+        };
+        SectionServices: Omit<components["schemas"]["Section"], "type"> & {
+            content: components["schemas"]["ServicesContent"];
+            id: string;
+            /** @enum {string} */
+            layout: "GROUPED_LIST" | "GRID" | "LIST" | "CAROUSEL" | "ALTERNATING";
+            style: components["schemas"]["SectionStyle"];
+            visibility: components["schemas"]["SectionVisibility"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "SERVICES";
+        };
+        SectionStyle: {
+            /** @enum {string} */
+            tone?: "DEFAULT" | "SURFACE" | "PRIMARY" | "SECONDARY";
+        };
+        SectionTeam: Omit<components["schemas"]["Section"], "type"> & {
+            content: components["schemas"]["TeamContent"];
+            id: string;
+            /** @enum {string} */
+            layout: "CARDS" | "LIST";
+            style: components["schemas"]["SectionStyle"];
+            visibility: components["schemas"]["SectionVisibility"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "TEAM";
+        };
+        SectionTestimonials: Omit<components["schemas"]["Section"], "type"> & {
+            content: components["schemas"]["TestimonialsContent"];
+            id: string;
+            /** @enum {string} */
+            layout: "CARDS" | "SLIDER" | "FEATURED";
+            style: components["schemas"]["SectionStyle"];
+            visibility: components["schemas"]["SectionVisibility"];
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "TESTIMONIALS";
+        };
+        SectionVisibility: {
+            desktop?: boolean;
+            mobile?: boolean;
+        };
         ServiceDeletionResponse: {
             deactivated?: boolean;
             deleted?: boolean;
@@ -3171,8 +3554,106 @@ export interface components {
             resourceTypeId?: number;
             resourceTypeName?: string;
         };
+        ServicesContent: {
+            eyebrow?: string;
+            serviceIds?: number[];
+            showBookButton?: boolean;
+            /** @enum {string} */
+            source: "ALL" | "SELECTED";
+            title?: string;
+        };
         SignupStartedResponse: {
             existingAccount?: boolean;
+        };
+        SiteDocument: {
+            footer: components["schemas"]["SiteDocumentFooter"];
+            header: components["schemas"]["SiteDocumentHeader"];
+            /** Format: int32 */
+            schemaVersion: number;
+            sections: (components["schemas"]["SectionAbout"] | components["schemas"]["SectionContact"] | components["schemas"]["SectionEvents"] | components["schemas"]["SectionGallery"] | components["schemas"]["SectionHero"] | components["schemas"]["SectionPricing"] | components["schemas"]["SectionServices"] | components["schemas"]["SectionTeam"] | components["schemas"]["SectionTestimonials"])[];
+            theme: components["schemas"]["SiteDocumentTheme"];
+        };
+        SiteDocumentColors: {
+            accent: string;
+            background: string;
+            primary: string;
+            secondary: string;
+            surface: string;
+            text: string;
+        };
+        SiteDocumentComponents: {
+            /** Format: int32 */
+            borderWidth: number;
+            /** @enum {string} */
+            buttonShape: "SQUARE" | "ROUNDED" | "PILL";
+            /** @enum {string} */
+            buttonStyle: "FILLED" | "OUTLINE" | "GHOST";
+            /** @enum {string} */
+            cardStyle: "MINIMAL" | "BORDERED" | "SHADOW";
+            /** @enum {string} */
+            corners: "SHARP" | "SOFT" | "ROUNDED";
+            /** @enum {string} */
+            imageShape: "SQUARE" | "ROUNDED" | "CIRCLE";
+            /** @enum {string} */
+            shadow: "SOFT" | "STRONG";
+        };
+        SiteDocumentFooter: {
+            /** @enum {string} */
+            layout: "CENTERED";
+        };
+        SiteDocumentHeader: {
+            /** @enum {string} */
+            layout: "LOGO_LEFT_NAV_RIGHT";
+            sticky?: boolean;
+            transparentOverHero?: boolean;
+        };
+        SiteDocumentTheme: {
+            colors: components["schemas"]["SiteDocumentColors"];
+            components: components["schemas"]["SiteDocumentComponents"];
+            typography: components["schemas"]["SiteDocumentTypography"];
+        };
+        SiteDocumentTypography: {
+            /** Format: int32 */
+            baseSize: number;
+            /** @enum {string} */
+            bodyFont: "SYSTEM" | "INTER" | "ROBOTO" | "OPEN_SANS" | "LATO" | "MONTSERRAT" | "POPPINS" | "NUNITO" | "WORK_SANS" | "RALEWAY" | "PLAYFAIR_DISPLAY" | "LORA" | "MERRIWEATHER" | "CORMORANT_GARAMOND" | "DM_SERIF_DISPLAY" | "OSWALD" | "BEBAS_NEUE";
+            /** @enum {string} */
+            headingAlign: "CENTER" | "LEFT";
+            /** @enum {string} */
+            headingFont: "SYSTEM" | "INTER" | "ROBOTO" | "OPEN_SANS" | "LATO" | "MONTSERRAT" | "POPPINS" | "NUNITO" | "WORK_SANS" | "RALEWAY" | "PLAYFAIR_DISPLAY" | "LORA" | "MERRIWEATHER" | "CORMORANT_GARAMOND" | "DM_SERIF_DISPLAY" | "OSWALD" | "BEBAS_NEUE";
+            /** @enum {string} */
+            headingStyle: "NORMAL" | "UPPERCASE" | "ITALIC";
+            /** Format: int32 */
+            headingWeight: number;
+        };
+        SiteDtosPhoto: {
+            caption?: string;
+            url?: string;
+        };
+        SiteDtosPublicSiteResponse: {
+            gallery?: components["schemas"]["SiteDtosPhoto"][];
+            site?: components["schemas"]["SiteDocument"];
+            team?: components["schemas"]["SiteDtosTeamMember"][];
+        };
+        SiteDtosSaveDraftRequest: {
+            document: components["schemas"]["SiteDocument"];
+            /** Format: int32 */
+            draftVersion: number;
+        };
+        SiteDtosSiteResponse: {
+            draft?: components["schemas"]["SiteDocument"];
+            /** Format: int32 */
+            draftVersion?: number;
+            hasUnpublishedChanges?: boolean;
+            published?: components["schemas"]["SiteDocument"];
+            /** Format: date-time */
+            publishedAt?: string;
+        };
+        SiteDtosTeamMember: {
+            /** Format: int64 */
+            id?: number;
+            imageUrl?: string;
+            name?: string;
         };
         SlotResponse: {
             /** Format: date-time */
@@ -3222,11 +3703,49 @@ export interface components {
             nullHandling?: string;
             property?: string;
         };
+        SpecialDayRequest: {
+            hours?: components["schemas"]["SpecialHoursSpan"][];
+            note?: string;
+        };
+        SpecialDayResponse: {
+            closed?: boolean;
+            conflicts?: components["schemas"]["ScheduleConflict"][];
+            /** Format: date */
+            date?: string;
+            hours?: components["schemas"]["SpecialHoursSpan"][];
+            note?: string;
+        };
+        SpecialHours: {
+            closed?: boolean;
+            /** Format: date */
+            date?: string;
+            hours?: components["schemas"]["SpecialHoursSpan"][];
+            note?: string;
+        };
+        SpecialHoursSpan: {
+            /**
+             * Format: time
+             * @example 09:00:00
+             */
+            endTime: string;
+            /**
+             * Format: time
+             * @example 09:00:00
+             */
+            startTime: string;
+        };
         StaffAccessServiceInvitationInfo: {
             accountExists?: boolean;
             businessName?: string;
             email?: string;
             employeeName?: string;
+        };
+        StaffAccessServiceOwnCalendar: {
+            /** Format: int64 */
+            employeeId?: number;
+            name?: string;
+            /** Format: int64 */
+            resourceId?: number;
         };
         StaffAccessServiceStaffAccess: {
             email?: string;
@@ -3247,6 +3766,30 @@ export interface components {
             reason?: string;
             /** @enum {string} */
             status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW";
+        };
+        TeamContent: {
+            eyebrow?: string;
+            members?: components["schemas"]["TeamMember"][];
+            title?: string;
+        };
+        TeamMember: {
+            bio?: string;
+            /** Format: int64 */
+            employeeId: number;
+            role?: string;
+        };
+        TestimonialsContent: {
+            eyebrow?: string;
+            items?: components["schemas"]["TestimonialsQuote"][];
+            title?: string;
+        };
+        TestimonialsQuote: {
+            author: string;
+            detail?: string;
+            photo?: components["schemas"]["SectionImage"];
+            quote: string;
+            /** Format: int32 */
+            rating?: number;
         };
         UpdateBusinessRequest: {
             accentColor?: string;
@@ -3484,7 +4027,7 @@ export interface operations {
             };
         };
     };
-    list_11: {
+    list_12: {
         parameters: {
             query?: {
                 from?: string;
@@ -3531,7 +4074,31 @@ export interface operations {
             };
         };
     };
-    delete_8: {
+    conflicts: {
+        parameters: {
+            query: {
+                resourceId?: number;
+                startTime: string;
+                endTime: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ScheduleConflict"][];
+                };
+            };
+        };
+    };
+    delete_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -3551,7 +4118,7 @@ export interface operations {
             };
         };
     };
-    current_2: {
+    current_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -3735,7 +4302,7 @@ export interface operations {
             };
         };
     };
-    delete_7: {
+    delete_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -3800,7 +4367,7 @@ export interface operations {
             };
         };
     };
-    list_10: {
+    list_11: {
         parameters: {
             query?: never;
             header?: never;
@@ -3892,7 +4459,7 @@ export interface operations {
             };
         };
     };
-    delete_6: {
+    delete_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -3912,7 +4479,7 @@ export interface operations {
             };
         };
     };
-    list_9: {
+    list_10: {
         parameters: {
             query?: never;
             header?: never;
@@ -4066,7 +4633,7 @@ export interface operations {
             };
         };
     };
-    delete_5: {
+    delete_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -4136,7 +4703,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -4228,7 +4795,7 @@ export interface operations {
             };
         };
     };
-    delete_4: {
+    delete_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -4248,7 +4815,7 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -4342,7 +4909,7 @@ export interface operations {
             };
         };
     };
-    delete_3: {
+    delete_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -4545,7 +5112,7 @@ export interface operations {
             };
         };
     };
-    current_1: {
+    current_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -4607,7 +5174,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -4675,7 +5242,7 @@ export interface operations {
             };
         };
     };
-    list_5: {
+    list_6: {
         parameters: {
             query?: {
                 from?: string;
@@ -4822,7 +5389,7 @@ export interface operations {
             };
         };
     };
-    list_3: {
+    list_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -4892,7 +5459,7 @@ export interface operations {
             };
         };
     };
-    delete_2: {
+    delete_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -4912,7 +5479,7 @@ export interface operations {
             };
         };
     };
-    list_4: {
+    list_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -4960,7 +5527,7 @@ export interface operations {
             };
         };
     };
-    list_2: {
+    list_3: {
         parameters: {
             query?: {
                 resourceTypeId?: number;
@@ -5054,7 +5621,7 @@ export interface operations {
             };
         };
     };
-    delete_1: {
+    delete_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -5124,7 +5691,7 @@ export interface operations {
             };
         };
     };
-    list_1: {
+    list_2: {
         parameters: {
             query?: {
                 activeOnly?: boolean;
@@ -5218,7 +5785,7 @@ export interface operations {
             };
         };
     };
-    delete: {
+    delete_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -5264,6 +5831,182 @@ export interface operations {
             };
         };
     };
+    current_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SiteDtosSiteResponse"];
+                };
+            };
+        };
+    };
+    discard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SiteDtosSiteResponse"];
+                };
+            };
+        };
+    };
+    saveDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteDtosSaveDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SiteDtosSiteResponse"];
+                };
+            };
+        };
+    };
+    publish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SiteDtosSiteResponse"];
+                };
+            };
+        };
+    };
+    list_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SpecialDayResponse"][];
+                };
+            };
+        };
+    };
+    save: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecialDayRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SpecialDayResponse"];
+                };
+            };
+        };
+    };
+    delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecialDayRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ScheduleConflict"][];
+                };
+            };
+        };
+    };
     list: {
         parameters: {
             query?: never;
@@ -5280,6 +6023,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["StaffAccessServiceStaffAccess"][];
+                };
+            };
+        };
+    };
+    me_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StaffAccessServiceOwnCalendar"];
                 };
             };
         };
@@ -6331,6 +7094,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["DaySlotsResponse"][];
+                };
+            };
+        };
+    };
+    site: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SiteDtosPublicSiteResponse"];
                 };
             };
         };

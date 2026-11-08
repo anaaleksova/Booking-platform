@@ -2,6 +2,7 @@ package com.bookingsaas.support;
 
 import com.bookingsaas.auth.PasswordResetCodeSender;
 import com.bookingsaas.auth.SignupCodeSender;
+import com.bookingsaas.availability.TimeOffNoticeSender;
 import com.bookingsaas.staff.StaffInviteSender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +16,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -28,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -90,6 +93,10 @@ public abstract class AbstractIntegrationTest {
 
     @MockBean
     protected StaffInviteSender staffInviteSender;
+
+    /** Owners' time-off emails, captured instead of sent. */
+    @MockBean
+    protected TimeOffNoticeSender timeOffNoticeSender;
 
     /** The last staff invitation link "sent" to each email in the current test. */
     protected final Map<String, String> inviteLinks = new ConcurrentHashMap<>();
@@ -200,6 +207,14 @@ public abstract class AbstractIntegrationTest {
             }
         }
         throw new AssertionError("business has no employee type");
+    }
+
+    /** Uploads a 1×1 PNG for the business and returns its media id. */
+    protected String uploadImage(String token) throws Exception {
+        byte[] png = java.util.Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
+        return send(multipart("/api/admin/media").file(new MockMultipartFile("file", "photo.png", "image/png", png)),
+                token, null, 201).get("id").asText();
     }
 
     protected String slugOf(String token) throws Exception {

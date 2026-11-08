@@ -1,12 +1,10 @@
 import { useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import LinearProgress from '@mui/material/LinearProgress';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -32,10 +30,10 @@ const MAX_BYTES = 5 * 1024 * 1024;
 
 /**
  * The booking-page gallery: add photos (several at once), caption, reorder
- * with the arrows, remove. Changes are saved as they happen; the switch is
- * part of the booking-page form and saved with it.
+ * with the arrows, remove. Changes are saved as they happen. Whether and how
+ * the photos show is the homepage's Gallery section, under Sections.
  */
-export function GalleryManager({ show, onShowChange }: { show: boolean; onShowChange: (show: boolean) => void }) {
+export function GalleryManager() {
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const { data: photos = [] } = useGallery();
@@ -79,22 +77,13 @@ export function GalleryManager({ show, onShowChange }: { show: boolean; onShowCh
 
   return (
     <Paper variant="outlined" sx={{ p: 3 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
-        <div>
-          <Typography variant="subtitle1" fontWeight={700}>
-            Gallery
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Photos of your work and your space, shown below your services. Up to {MAX_PHOTOS}; the section is hidden
-            while it is empty.
-          </Typography>
-        </div>
-        <FormControlLabel
-          control={<Switch checked={show} onChange={(event) => onShowChange(event.target.checked)} />}
-          label="Show"
-          sx={{ flexShrink: 0, mr: 0 }}
-        />
-      </Stack>
+      <Typography variant="subtitle1" fontWeight={700}>
+        Gallery
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Photos of your work and your space, up to {MAX_PHOTOS}. They are saved straight away; where and how they
+        show is the Gallery section under Sections below.
+      </Typography>
 
       {uploading ? (
         <Box sx={{ mt: 2 }}>

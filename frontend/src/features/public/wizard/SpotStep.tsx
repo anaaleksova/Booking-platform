@@ -210,9 +210,9 @@ function RequirementMap({
         {picked.length === 0 ? <CheckCircleRoundedIcon color="primary" /> : null}
       </ButtonBase>
 
-      {combined && suggestions.length ? (
+      {combined && rules.recommended.length ? (
         <Suggestions
-          suggestions={suggestions}
+          suggestions={rules.recommended}
           people={people}
           noun={noun}
           isPicked={(allocation) => rules.isSuggestionPicked(allocation, picked)}

@@ -60,6 +60,7 @@ final class AvailabilityTestFixtures {
         private final Map<Long, List<DayInterval>> resourceHours = new HashMap<>();
         private final Map<Long, List<TimeRange>> busy = new HashMap<>();
         private final Map<Long, List<SeatUse>> seatUse = new HashMap<>();
+        private final Map<LocalDate, List<DayInterval>> specialHours = new HashMap<>();
         private final List<Object[]> requirements = new ArrayList<>();
         private final java.util.Set<Long> combinable = new java.util.HashSet<>();
 
@@ -142,6 +143,24 @@ final class AvailabilityTestFixtures {
             return this;
         }
 
+        /** {@link #DATE}'s own hours instead of the week's; no spans closes it. Pairs of "HH:mm". */
+        Builder specialHours(String... fromTo) {
+            List<DayInterval> hours = new ArrayList<>();
+            for (int i = 0; i + 1 < fromTo.length; i += 2) {
+                hours.add(new DayInterval(DATE.getDayOfWeek().getValue(), LocalTime.parse(fromTo[i]),
+                        LocalTime.parse(fromTo[i + 1])));
+            }
+            specialHours.put(DATE, hours);
+            return this;
+        }
+
+        /** The employee works the business's usual week, but never on {@link #DATE}'s weekday. */
+        Builder worksOtherDaysOnly(long resourceId) {
+            resourceHours.computeIfAbsent(resourceId, key -> new ArrayList<>()).add(new DayInterval(
+                    DATE.plusDays(1).getDayOfWeek().getValue(), LocalTime.of(9, 0), LocalTime.of(17, 0)));
+            return this;
+        }
+
         Builder closure(String from, String to) {
             businessBlocks.add(range(from, to));
             return this;
@@ -192,7 +211,7 @@ final class AvailabilityTestFixtures {
                     new ServiceSpec(duration, bufferBefore, bufferAfter, specs),
                     participants,
                     new ReservationRules(slotInterval, minimumNotice, maximumAdvanceDays, enforceLeadTimes),
-                    businessHours, businessBlocks, resources, resourceHours, busy, seatUse, now);
+                    businessHours, businessBlocks, resources, resourceHours, busy, seatUse, now, specialHours);
         }
 
         private static String typeName(long typeId) {

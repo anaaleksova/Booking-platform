@@ -268,7 +268,9 @@ public class AvailabilityService {
                 resourceService.hoursOf(businessId, resourceIds),
                 busy,
                 seatUse,
-                clock.instant());
+                clock.instant(),
+                // A day either side: a booking near midnight reads the neighbouring date's hours.
+                openingHoursService.specialHoursBetween(businessId, from.minusDays(1), to.plusDays(1)));
         return new Loaded(context, resources.stream().collect(Collectors.toMap(Resource::getId, Function.identity())),
                 areas);
     }

@@ -35,6 +35,36 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long>,
                                    @Param("statuses") Collection<ReservationStatus> statuses,
                                    Pageable pageable);
 
+    /** Bookings not yet over that hold the resource at some moment of {@code [from, to)}, buffers included. */
+    @EntityGraph(attributePaths = "resources")
+    @Query("""
+           select distinct r from Reservation r join r.resources held
+           where r.businessId = :businessId and r.status in :statuses and r.endTime > :now
+             and held.resourceId = :resourceId and held.occupying = true
+             and held.blockStartTime < :to and held.blockEndTime > :from
+           order by r.startTime
+           """)
+    List<Reservation> findHoldingResource(@Param("businessId") Long businessId,
+                                          @Param("resourceId") Long resourceId,
+                                          @Param("from") Instant from,
+                                          @Param("to") Instant to,
+                                          @Param("now") Instant now,
+                                          @Param("statuses") Collection<ReservationStatus> statuses);
+
+    /** Bookings not yet over whose appointment touches {@code [from, to)}. */
+    @EntityGraph(attributePaths = "resources")
+    @Query("""
+           select r from Reservation r
+           where r.businessId = :businessId and r.status in :statuses and r.endTime > :now
+             and r.startTime < :to and r.endTime > :from
+           order by r.startTime
+           """)
+    List<Reservation> findDuring(@Param("businessId") Long businessId,
+                                 @Param("from") Instant from,
+                                 @Param("to") Instant to,
+                                 @Param("now") Instant now,
+                                 @Param("statuses") Collection<ReservationStatus> statuses);
+
     /** One customer's reservations that are still ahead, soonest first. */
     @EntityGraph(attributePaths = "resources")
     @Query("""

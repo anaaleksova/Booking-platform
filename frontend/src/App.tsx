@@ -46,6 +46,7 @@ const EventsPage = page(() => import('@/pages/admin/EventsPage'), 'EventsPage');
 const RevenuePage = page(() => import('@/pages/admin/RevenuePage'), 'RevenuePage');
 const AnalyticsPage = page(() => import('@/pages/admin/AnalyticsPage'), 'AnalyticsPage');
 const SettingsPage = page(() => import('@/pages/admin/SettingsPage'), 'SettingsPage');
+const TimeOffPage = page(() => import('@/pages/admin/TimeOffPage'), 'TimeOffPage');
 const IntegrationsPage = page(() => import('@/pages/admin/IntegrationsPage'), 'IntegrationsPage');
 const PlatformPage = page(() => import('@/pages/platform/PlatformPage'), 'PlatformPage');
 
@@ -81,6 +82,7 @@ export function App() {
         >
           <Route index element={<OwnerRoute><DashboardPage /></OwnerRoute>} />
           <Route path="reservations" element={<ReservationsPage />} />
+          <Route path="time-off" element={<TimeOffPage />} />
           <Route path="services" element={<OwnerRoute><ServicesPage /></OwnerRoute>} />
           <Route path="services/new" element={<OwnerRoute><ServiceEditorPage /></OwnerRoute>} />
           <Route path="services/:id" element={<OwnerRoute><ServiceEditorPage /></OwnerRoute>} />

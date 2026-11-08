@@ -40,17 +40,17 @@ export function AddToCalendar({ reservation }: { reservation: PublicReservation 
         <EventRoundedIcon fontSize="small" color="action" /> Add to your calendar
       </Typography>
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <Button size="small" variant="outlined" href={google} target="_blank" rel="noopener" sx={{ borderRadius: 999 }}>
+        <Button size="small" variant="outlined" href={google} target="_blank" rel="noopener" sx={{ borderRadius: 'var(--site-radius-button, 999px)' }}>
           Google
         </Button>
-        <Button size="small" variant="outlined" href={outlook} target="_blank" rel="noopener" sx={{ borderRadius: 999 }}>
+        <Button size="small" variant="outlined" href={outlook} target="_blank" rel="noopener" sx={{ borderRadius: 'var(--site-radius-button, 999px)' }}>
           Outlook
         </Button>
         <Button
           size="small"
           variant="outlined"
           href={`/api/public/reservations/${reservation.reference}/calendar.ics`}
-          sx={{ borderRadius: 999 }}
+          sx={{ borderRadius: 'var(--site-radius-button, 999px)' }}
         >
           Apple / other
         </Button>

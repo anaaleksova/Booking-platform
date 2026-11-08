@@ -63,6 +63,12 @@ public class EmployeeService {
         return repository.findByBusinessIdOrderByNameAsc(businessId);
     }
 
+    /** The business's employees among these ids; ids of another business are left out. */
+    @Transactional(readOnly = true)
+    public List<Employee> byIds(Long businessId, Collection<Long> ids) {
+        return ids.isEmpty() ? List.of() : repository.findByBusinessIdAndIdIn(businessId, ids);
+    }
+
     /**
      * The employees behind these resources who can log in and have an email:
      * the people told about a reservation they are assigned to.

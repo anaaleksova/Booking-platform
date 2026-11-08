@@ -181,12 +181,15 @@ public class AnalyticsService {
         Map<Long, List<DayInterval>> ownHours = resourceService.hoursOf(businessId,
                 resources.stream().map(Resource::getId).toList());
         List<DayInterval> openingHours = openingHoursService.intervalsOf(businessId);
+        Map<LocalDate, List<DayInterval>> specialHours = openingHoursService.specialHoursBetween(businessId,
+                scope.period().from(), scope.period().to());
 
         return resources.stream()
                 .map(resource -> {
                     ResourceUsageRow row = usage.get(resource.getId());
                     long booked = row == null ? 0 : Math.round(row.bookedMinutes());
-                    long available = availableMinutes(scope, openingHours, ownHours.get(resource.getId()));
+                    long available = availableMinutes(scope, openingHours, specialHours,
+                            ownHours.get(resource.getId()));
                     ResourceType type = types.get(resource.getResourceTypeId());
                     return new ResourceUtilization(resource.getId(), resource.getName(), resource.getResourceTypeId(),
                             type == null ? null : type.getName(), row == null ? 0 : row.reservations(), booked,
@@ -228,12 +231,18 @@ public class AnalyticsService {
                 ReportingPeriod.of(from, to, today.minusDays(DEFAULT_DAYS - 1L), today, zone));
     }
 
-    private static long availableMinutes(Scope scope, List<DayInterval> openingHours, List<DayInterval> own) {
+    /** Open minutes in the period, read the way the availability engine reads hours and special dates. */
+    private static long availableMinutes(Scope scope, List<DayInterval> openingHours,
+                                         Map<LocalDate, List<DayInterval>> specialHours, List<DayInterval> own) {
         long minutes = 0;
         for (LocalDate day = scope.period().from(); !day.isAfter(scope.period().to()); day = day.plusDays(1)) {
-            List<TimeRange> open = ranges(day, openingHours, scope.zone());
+            List<TimeRange> open = ranges(day, specialHours.getOrDefault(day, openingHours), scope.zone());
+            boolean extraOpenDay = specialHours.containsKey(day) && ranges(day, openingHours, scope.zone()).isEmpty();
             if (own != null && !own.isEmpty()) {
-                open = TimeRange.intersect(ranges(day, own, scope.zone()), open);
+                List<TimeRange> shifts = ranges(day, own, scope.zone());
+                if (!(shifts.isEmpty() && extraOpenDay)) {
+                    open = TimeRange.intersect(shifts, open);
+                }
             }
             for (TimeRange range : open) {
                 minutes += range.duration().toMinutes();

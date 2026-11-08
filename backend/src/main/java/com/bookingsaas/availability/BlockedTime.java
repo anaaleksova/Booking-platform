@@ -47,6 +47,10 @@ public class BlockedTime extends Auditable {
     @Column(length = 255)
     private String reason;
 
+    /** Who entered it; tells time off staff entered themselves apart from the owner's blocks. */
+    @Column(name = "created_by_user_id")
+    private Long createdByUserId;
+
     public TimeRange range() {
         return TimeRange.of(startTime, endTime);
     }

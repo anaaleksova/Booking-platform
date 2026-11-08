@@ -104,7 +104,7 @@ class StaffAccessIT extends AbstractSpaIntegrationTest {
         send(post("/api/admin/reservations"), staff, booking(elenaResource, "17:00"), 403);
         for (String path : List.of("/api/admin/customers", "/api/admin/analytics/reservations", "/api/admin/discounts",
                 "/api/admin/business/settings", "/api/admin/integrations", "/api/admin/employees", "/api/admin/staff",
-                "/api/admin/dashboard")) {
+                "/api/admin/dashboard", "/api/admin/site")) {
             JsonNode denied = send(get(path), staff, null, 403);
             assertThat(denied.get("error").asText()).as(path).isEqualTo("ACCESS_DENIED");
         }

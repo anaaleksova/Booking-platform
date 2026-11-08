@@ -6,9 +6,11 @@ import Typography from '@mui/material/Typography';
 import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import { mediaUrl } from '@/features/media/api';
+import { useImageShape } from '@/features/site/sections/shared';
 import type { PublicBusiness } from '@/types/api';
 
-type Photo = PublicBusiness['gallery'][number];
+/** A gallery photo; `alt` describes it when it has no caption to do so. */
+type Photo = PublicBusiness['gallery'][number] & { alt?: string };
 
 /** Up to this many photos sit in a plain grid; more become a carousel. */
 const MAX_GRID = 3;
@@ -158,11 +160,12 @@ function Carousel({ photos }: { photos: Photo[] }) {
 }
 
 function Thumb({ photo, sx }: { photo: Photo; sx?: object }) {
+  const shape = useImageShape();
   return (
     <Box
       sx={{
         position: 'relative',
-        borderRadius: 3,
+        ...shape(42, { circle: false }),
         overflow: 'hidden',
         bgcolor: 'action.hover',
         ...sx,
@@ -171,7 +174,7 @@ function Thumb({ photo, sx }: { photo: Photo; sx?: object }) {
       <Box
         component="img"
         src={mediaUrl(photo.url)}
-        alt={photo.caption ?? ''}
+        alt={photo.alt || photo.caption || ''}
         loading="lazy"
         decoding="async"
         sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}

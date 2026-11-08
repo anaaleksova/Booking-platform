@@ -108,7 +108,7 @@ export function CustomerAuthPanel() {
             clearPendingSignup('customer');
             switchMode('signup');
           }}
-          buttonSx={{ borderRadius: 999 }}
+          buttonSx={{ borderRadius: 'var(--site-radius-button, 999px)' }}
         />
       </Box>
     );
@@ -166,7 +166,7 @@ export function CustomerAuthPanel() {
             Forgot password?
           </Link>
         ) : null}
-        <Button type="submit" variant="contained" size="large" disabled={submitting} sx={{ borderRadius: 999 }}>
+        <Button type="submit" variant="contained" size="large" disabled={submitting} sx={{ borderRadius: 'var(--site-radius-button, 999px)' }}>
           {submitting ? 'Please wait…' : mode === 'signup' ? 'Send me a code' : 'Sign in and continue'}
         </Button>
       </Stack>

@@ -22,6 +22,7 @@ import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
+import BeachAccessRoundedIcon from '@mui/icons-material/BeachAccessRounded';
 import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded';
 import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
 import CelebrationRoundedIcon from '@mui/icons-material/CelebrationRounded';
@@ -53,6 +54,8 @@ interface NavItem {
   icon: JSX.Element;
   end?: boolean;
   ownerOnly?: boolean;
+  /** Owners manage time off under Settings. */
+  staffOnly?: boolean;
   /** Shown only to restaurants and bars. */
   eventsOnly?: boolean;
 }
@@ -63,6 +66,7 @@ const NAV_SECTIONS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { to: '/admin', label: 'Dashboard', icon: <BarChartRoundedIcon />, end: true, ownerOnly: true },
       { to: '/admin/reservations', label: 'Reservations', icon: <EventNoteRoundedIcon /> },
+      { to: '/admin/time-off', label: 'My time off', icon: <BeachAccessRoundedIcon />, staffOnly: true },
       { to: '/admin/customers', label: 'Customers', icon: <PeopleAltRoundedIcon />, ownerOnly: true },
     ],
   },
@@ -106,7 +110,10 @@ export function AdminLayout() {
   const sections = NAV_SECTIONS.map((section) => ({
     ...section,
     items: section.items.filter(
-      (item) => (!item.ownerOnly || isOwner) && (!item.eventsOnly || offersEvents(business?.businessType)),
+      (item) =>
+        (!item.ownerOnly || isOwner) &&
+        (!item.staffOnly || !isOwner) &&
+        (!item.eventsOnly || offersEvents(business?.businessType)),
     ),
   })).filter((section) => section.items.length > 0);
 

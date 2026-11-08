@@ -14,6 +14,7 @@
  */
 import type { components } from './api.generated';
 import type * as Api from './api';
+import type * as Site from '@/features/site/types';
 
 type Schemas = components['schemas'];
 
@@ -43,6 +44,10 @@ export type Contract = [
   Assert<Fits<Schemas['BusinessSettingsResponse'], Api.BusinessSettings>>,
   Assert<Fits<Schemas['OnboardingResponse'], Api.Onboarding>>,
   Assert<Fits<Schemas['BlockedTimeResponse'], Api.BlockedTime>>,
+  Assert<Fits<Schemas['ScheduleConflict'], Api.ScheduleConflict>>,
+  Assert<Fits<Schemas['SpecialDayResponse'], Api.SpecialDay>>,
+  Assert<Fits<Schemas['SpecialHours'], Api.SpecialHours>>,
+  Assert<Fits<Schemas['StaffAccessServiceOwnCalendar'], Api.OwnCalendar>>,
   Assert<Fits<Schemas['ResourceTypeResponse'], Api.ResourceType>>,
   Assert<Fits<Schemas['FloorPlanDtosFloorPlanResponse'], Api.FloorPlan>>,
   Assert<Fits<Schemas['ResourceResponse'], Api.Resource>>,
@@ -73,4 +78,17 @@ export type Contract = [
   Assert<Fits<Schemas['PlatformDtosBusinessRow'], Api.PlatformBusiness>>,
   Assert<Fits<Schemas['PlatformDtosAccountRow'], Api.PlatformAccount>>,
   Assert<Fits<Schemas['PlatformDtosActivityRow'], Api.PlatformActivity>>,
+  Assert<Fits<Schemas['SiteDocument'], Site.SiteDocument>>,
+  // One by one: in the union, a section whose content drifted would still fit some other type's shape.
+  Assert<Fits<Schemas['SectionHero'], Site.HeroSection>>,
+  Assert<Fits<Schemas['SectionEvents'], Site.EventsSection>>,
+  Assert<Fits<Schemas['SectionServices'], Site.ServicesSection>>,
+  Assert<Fits<Schemas['SectionAbout'], Site.AboutSection>>,
+  Assert<Fits<Schemas['SectionGallery'], Site.GallerySection>>,
+  Assert<Fits<Schemas['SectionTestimonials'], Site.TestimonialsSection>>,
+  Assert<Fits<Schemas['SectionTeam'], Site.TeamSection>>,
+  Assert<Fits<Schemas['SectionPricing'], Site.PricingSection>>,
+  Assert<Fits<Schemas['SectionContact'], Site.ContactSection>>,
+  Assert<Fits<Schemas['SiteDtosSiteResponse'], Site.SiteState>>,
+  Assert<Fits<Schemas['SiteDtosPublicSiteResponse'], Site.PublicSite>>,
 ];

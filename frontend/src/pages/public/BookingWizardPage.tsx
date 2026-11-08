@@ -378,7 +378,7 @@ export function BookingWizardPage() {
 
               {action ? (
                 <Box sx={{ display: { xs: 'none', md: 'flex' }, justifyContent: 'flex-end', mt: 3 }}>
-                  <Button variant="contained" size="large" onClick={action.onClick} disabled={action.disabled} sx={{ borderRadius: 999, px: 4 }}>
+                  <Button variant="contained" size="large" onClick={action.onClick} disabled={action.disabled} sx={{ borderRadius: 'var(--site-radius-button, 999px)', px: 4 }}>
                     {action.label}
                   </Button>
                 </Box>
@@ -475,7 +475,7 @@ export function BookingWizardPage() {
                 .join(' · ')}
             </Typography>
           </Box>
-          <Button variant="contained" size="large" onClick={action.onClick} disabled={action.disabled} sx={{ borderRadius: 999, px: 3, flexShrink: 0 }}>
+          <Button variant="contained" size="large" onClick={action.onClick} disabled={action.disabled} sx={{ borderRadius: 'var(--site-radius-button, 999px)', px: 3, flexShrink: 0 }}>
             {action.label}
           </Button>
         </Paper>

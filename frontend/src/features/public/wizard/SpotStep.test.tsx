@@ -167,7 +167,7 @@ describe('SpotStep', () => {
       allocations: [{ resources: [FREE[0], FREE[1]], capacity: 6, area: 'Dining room' }],
     });
 
-    expect(await screen.findByText('Available seating for 6:')).toBeInTheDocument();
+    expect(await screen.findByText(/^Best fit for 6 people/)).toBeInTheDocument();
     await userEvent.click(await spot(/^Table 1, 2 seats — available/));
     expect(onPicks).toHaveBeenLastCalledWith({ 9: [1, 2] });
   });

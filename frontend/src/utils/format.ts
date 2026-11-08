@@ -70,6 +70,13 @@ export function formatInterval(interval: DayInterval): string {
   return `${interval.startTime.slice(0, 5)} – ${interval.endTime.slice(0, 5)}`;
 }
 
+/** A special date's hours: "10:00 – 14:00, 16:00 – 18:00", or "Closed". */
+export function describeSpecialHours(day: { closed: boolean; hours: Array<{ startTime: string; endTime: string }> }): string {
+  return day.closed
+    ? 'Closed'
+    : day.hours.map((span) => `${span.startTime.slice(0, 5)} – ${span.endTime.slice(0, 5)}`).join(', ');
+}
+
 export function formatCapacity(capacity: number | null | undefined): string {
   return capacity === null || capacity === undefined ? 'Unlimited' : String(capacity);
 }

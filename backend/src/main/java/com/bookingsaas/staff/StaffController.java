@@ -27,6 +27,14 @@ public class StaffController {
         this.staffAccess = staffAccess;
     }
 
+    // --- staff -----------------------------------------------------------------
+
+    @GetMapping("/api/admin/staff/me")
+    @Operation(summary = "The signed-in member's own employee and calendar")
+    public StaffAccessService.OwnCalendar me() {
+        return staffAccess.ownCalendar();
+    }
+
     // --- owner ---------------------------------------------------------------
 
     @GetMapping("/api/admin/staff")

@@ -195,6 +195,17 @@ public class BusinessService {
         return BusinessResponse.from(saved);
     }
 
+    /**
+     * Keeps the brand colour and light/dark choice that emails are drawn in
+     * the same as the published homepage theme.
+     */
+    @Transactional
+    public void applyBranding(Long businessId, String accentColor, boolean dark) {
+        Business business = requireById(businessId);
+        business.setAccentColor(accentColor.toLowerCase(Locale.ROOT));
+        business.setDarkTheme(dark);
+    }
+
     @Transactional(readOnly = true)
     public BusinessSettingsResponse currentSettings() {
         return BusinessSettingsResponse.from(settingsOf(currentTenant.businessId()));

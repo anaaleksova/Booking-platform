@@ -121,6 +121,16 @@ class AllocationFinderTest {
         }
 
         @Test
+        void a_couple_is_offered_every_two_seat_table_before_any_bigger_one() {
+            // T1:2 T2:2 T3:4 T4:4 Terrace:8 for two → T1 and T2 first, the bigger tables after.
+            List<Allocation> found = find(2, table(1, 2), table(2, 2), table(3, 4), table(4, 4), table(5, 8));
+
+            assertThat(ids(found).subList(0, 2)).containsExactly(List.of(1L), List.of(2L));
+            assertThat(found.subList(0, 2)).extracting(Allocation::excess).containsOnly(0L);
+            assertThat(found).isSortedAccordingTo(AllocationFinder.RANKING);
+        }
+
+        @Test
         void a_shared_resource_counts_only_the_seats_it_has_left() {
             ResourceSpec halfFull = new ResourceSpec(1L, TYPE, "Long table", 8, true, null).withCapacity(3);
 

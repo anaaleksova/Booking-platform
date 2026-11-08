@@ -26,6 +26,8 @@ import com.bookingsaas.integration.conversation.ConversationEnums.State;
 import org.springframework.stereotype.Component;
 
 import java.time.ZoneId;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -48,6 +50,10 @@ import static com.bookingsaas.integration.conversation.ConversationText.resource
  */
 @Component
 class ConversationReplies {
+
+    /** How far ahead the chat knows about special opening hours. */
+    private static final int SPECIAL_HOURS_DAYS = 30;
+    private static final DateTimeFormatter SPECIAL_DATE = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH);
 
     private final ConversationStore store;
     private final IntegrationCatalogService catalog;
@@ -135,6 +141,17 @@ class ConversationReplies {
                 .entrySet().stream()
                 .map(entry -> entry.getKey().getDisplayName(TextStyle.SHORT, Locale.ENGLISH) + " " + entry.getValue())
                 .collect(Collectors.joining("; "));
+        // Dates that differ from the week, so "are you open on the 24th?" gets the true answer.
+        String special = openingHoursService.upcomingSpecialHours(business.getId(),
+                        LocalDate.now(business.zoneId()), SPECIAL_HOURS_DAYS).stream()
+                .map(day -> day.date().format(SPECIAL_DATE) + (day.note() == null ? "" : " (" + day.note() + ")") + " "
+                        + (day.closed() ? "closed" : day.hours().stream()
+                        .map(span -> span.startTime().format(HH_MM) + "–" + span.endTime().format(HH_MM))
+                        .collect(Collectors.joining(", "))))
+                .collect(Collectors.joining("; "));
+        if (!special.isEmpty()) {
+            hours = (hours.isEmpty() ? "Closed" : hours) + ". Special dates: " + special;
+        }
         List<ServiceFact> services = catalog.services(business.getId()).stream()
                 .map(s -> new ServiceFact(s.name(), s.category(), s.durationMinutes(), s.price(),
                         s.pricePerParticipant(), s.maxParticipants(), s.currency()))

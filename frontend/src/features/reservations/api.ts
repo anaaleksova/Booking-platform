@@ -26,7 +26,8 @@ export interface AdminReservationInput {
 }
 
 /** Everything a reservation change can affect. */
-const AFFECTED = [['reservations'], ['analytics'], ['customers'], ['discounts']];
+// Time off and special dates list the bookings they clash with: moving or cancelling one clears its clash.
+const AFFECTED = [['reservations'], ['analytics'], ['customers'], ['discounts'], ['schedule-changes']];
 
 export function useReservations(filters: ReservationFilters) {
   return useQuery({
