@@ -103,3 +103,5 @@ databaseChangeLog:
       file: db/changelog/changes/029-site-config.sql
   - include:
       file: db/changelog/changes/030-special-hours-and-time-off.sql
+  - include:
+      file: db/changelog/changes/031-booking-approval.sql

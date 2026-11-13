@@ -6,6 +6,8 @@ import java.util.List;
 /**
  * A service as shown to customers — no buffers, no internals.
  *
+ * @param approvalRequired         online bookings are requests the business confirms
+ * @param approvalFromParticipants with approval on, the group size from which it applies; null = always
  * @param choosableRequirements what the customer picks before choosing a time
  *                              ("choose your therapist"), with every resource
  *                              that may serve this service; empty when the
@@ -22,6 +24,8 @@ public record PublicServiceResponse(
         boolean pricePerParticipant,
         int maxParticipants,
         String currency,
+        boolean approvalRequired,
+        Integer approvalFromParticipants,
         List<ChoosableRequirement> choosableRequirements
 ) {
 

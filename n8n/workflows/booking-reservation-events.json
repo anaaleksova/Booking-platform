@@ -166,9 +166,17 @@
                       "type": "string",
                       "operation": "equals"
                     }
+                  },
+                  {
+                    "leftValue": "={{ $('Verify signature').first().json.event.event }}",
+                    "rightValue": "reservation.approved",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
                   }
                 ],
-                "combinator": "and"
+                "combinator": "or"
               },
               "renameOutput": true,
               "outputKey": "reservation.created"
@@ -188,9 +196,17 @@
                       "type": "string",
                       "operation": "equals"
                     }
+                  },
+                  {
+                    "leftValue": "={{ $('Verify signature').first().json.event.event }}",
+                    "rightValue": "reservation.declined",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
                   }
                 ],
-                "combinator": "and"
+                "combinator": "or"
               },
               "renameOutput": true,
               "outputKey": "reservation.cancelled"

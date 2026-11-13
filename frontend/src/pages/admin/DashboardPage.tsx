@@ -18,6 +18,7 @@ import { StatusChip } from '@/components/StatusChip';
 import { presetRange } from '@/components/DateRangeFilter';
 import { useAuth } from '@/features/auth/AuthContext';
 import { GettingStartedCard } from '@/features/onboarding/GettingStartedCard';
+import { PendingRequestsAlert } from '@/features/reservations/PendingRequestsAlert';
 import {
   useDashboard,
   useReservationStats,
@@ -72,6 +73,7 @@ export function DashboardPage() {
       />
 
       <GettingStartedCard />
+      <PendingRequestsAlert />
 
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={6} lg={3}>

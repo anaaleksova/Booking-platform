@@ -135,12 +135,12 @@ public class ReservationService {
                 request.customer().lastName(), email, request.customer().phone());
 
         Reservation reservation = build(business, service, customer, participants, allocation, quote,
-                ReservationSource.WEB, request.notes(), null, null);
+                ReservationSource.WEB, request.notes(), null, null, initialStatus(service, participants));
         Reservation saved = persist(reservation, quote);
 
-        log.info("Reservation created id={} business={} service={} participants={} resources={} source=WEB",
-                saved.getId(), businessId, service.getId(), participants, saved.resourceIds());
-        events.publishEvent(ReservationNotificationEvent.created(payloadFor(business, saved, null)));
+        log.info("Reservation created id={} business={} service={} participants={} resources={} source=WEB status={}",
+                saved.getId(), businessId, service.getId(), participants, saved.resourceIds(), saved.getStatus());
+        events.publishEvent(createdEvent(business, saved));
         return assembler.toPublic(business, saved, isCancellableByCustomer(business, saved));
     }
 
@@ -159,7 +159,9 @@ public class ReservationService {
         Customer customer = resolveCustomer(businessId, request);
 
         Reservation reservation = build(business, service, customer, participants, allocation, quote,
-                ReservationSource.ADMIN, request.customerNotes(), request.internalNotes(), currentTenant.userId());
+                ReservationSource.ADMIN, request.customerNotes(), request.internalNotes(), currentTenant.userId(),
+                // The business taking a booking itself has nothing to approve.
+                ReservationStatus.CONFIRMED);
         Reservation saved = persist(reservation, quote);
 
         log.info("Reservation created id={} business={} service={} participants={} resources={} source=ADMIN",
@@ -186,12 +188,13 @@ public class ReservationService {
                 selections(command.resourceSelections()), null, true);
 
         Reservation reservation = build(business, service, customer, participants, allocation, quote,
-                command.source(), command.notes(), null, null);
+                command.source(), command.notes(), null, null, initialStatus(service, participants));
         Reservation saved = persist(reservation, quote);
 
-        log.info("Reservation created id={} business={} service={} participants={} resources={} source={}",
-                saved.getId(), businessId, service.getId(), participants, saved.resourceIds(), command.source());
-        events.publishEvent(ReservationNotificationEvent.created(payloadFor(business, saved, null)));
+        log.info("Reservation created id={} business={} service={} participants={} resources={} source={} status={}",
+                saved.getId(), businessId, service.getId(), participants, saved.resourceIds(), command.source(),
+                saved.getStatus());
+        events.publishEvent(createdEvent(business, saved));
         return saved;
     }
 
@@ -204,14 +207,14 @@ public class ReservationService {
                               ReservationSource source,
                               String customerNotes,
                               String internalNotes,
-                              Long actorUserId) {
+                              Long actorUserId,
+                              ReservationStatus status) {
         Reservation reservation = new Reservation();
         reservation.setBusinessId(business.getId());
         reservation.setServiceId(service.getId());
         reservation.setCustomerId(customer.getId());
         reservation.setNumberOfParticipants(participants);
-        // The MVP confirms immediately; PENDING exists for a later approval flow.
-        reservation.changeStatus(ReservationStatus.CONFIRMED);
+        reservation.changeStatus(status);
         reservation.schedule(allocation);
         reservation.assignResources(allocation.resources());
         reservation.setOriginalPrice(quote.originalPrice());
@@ -225,6 +228,22 @@ public class ReservationService {
         reservation.setInternalNotes(blankToNull(internalNotes));
         reservation.setCreatedByUserId(actorUserId);
         return reservation;
+    }
+
+    /**
+     * A customer's booking is a request when the service wants the owner's
+     * approval for a group this size. It holds its slot like any booking, so
+     * nobody else can take the time while the owner decides.
+     */
+    private static ReservationStatus initialStatus(BookableService service, int participants) {
+        return service.needsApproval(participants) ? ReservationStatus.PENDING : ReservationStatus.CONFIRMED;
+    }
+
+    private ReservationNotificationEvent createdEvent(Business business, Reservation saved) {
+        ReservationNotificationPayload payload = payloadFor(business, saved, null);
+        return saved.getStatus() == ReservationStatus.PENDING
+                ? ReservationNotificationEvent.requested(payload)
+                : ReservationNotificationEvent.created(payload);
     }
 
     /**
@@ -283,13 +302,28 @@ public class ReservationService {
                     + " reservation cannot be marked as " + describe(target) + ".");
         }
 
+        boolean request = reservation.getStatus() == ReservationStatus.PENDING;
         if (target == ReservationStatus.CANCELLED) {
             currentTenant.requireOwner();   // staff mark their visits done; cancelling stays with the owner
             // The business may always cancel — the deadline protects the
             // business from late customer cancellations, not the reverse.
             applyCancellation(reservation, reason);
-            log.info("Reservation cancelled id={} business={} by user={}", id, businessId, currentTenant.userId());
-            events.publishEvent(ReservationNotificationEvent.cancelled(payloadFor(business, reservation, reason)));
+            if (request) {
+                log.info("Booking request declined id={} business={} by user={}", id, businessId,
+                        currentTenant.userId());
+                events.publishEvent(ReservationNotificationEvent.declined(
+                        payloadFor(business, reservation, reason, false)));
+            } else {
+                log.info("Reservation cancelled id={} business={} by user={}", id, businessId,
+                        currentTenant.userId());
+                events.publishEvent(ReservationNotificationEvent.cancelled(payloadFor(business, reservation, reason)));
+            }
+        } else if (request && target == ReservationStatus.CONFIRMED) {
+            currentTenant.requireOwner();   // approving a request is the owner's decision
+            reservation.changeStatus(target);
+            saveAndFlush(reservation);
+            log.info("Booking request approved id={} business={} by user={}", id, businessId, currentTenant.userId());
+            events.publishEvent(ReservationNotificationEvent.approved(payloadFor(business, reservation, null)));
         } else {
             if (target == ReservationStatus.NO_SHOW && reservation.getStartTime().isAfter(clock.instant())) {
                 throw ApiException.of(ErrorCode.INVALID_RESERVATION_STATE,
@@ -326,7 +360,9 @@ public class ReservationService {
         LocalDateTime previousLocal = LocalDateTime.ofInstant(reservation.getStartTime(), business.zoneId());
         boolean moved = !newStart.equals(reservation.getStartTime());
         // Who was on it before the change: someone taken off it hears that it is no longer theirs.
-        List<StaffMember> previousStaff = staffOf(businessId, reservation.resourceIds());
+        // Staff only hear about a request once it is approved.
+        List<StaffMember> previousStaff = reservation.getStatus() == ReservationStatus.PENDING
+                ? List.of() : staffOf(businessId, reservation.resourceIds());
 
         ResourceAllocation allocation = request.resourceSelections() != null
                 ? availabilityService.allocate(businessId, service, newStart, reservation.getNumberOfParticipants(),
@@ -434,8 +470,10 @@ public class ReservationService {
                     "Reservations can only be cancelled at least " + settings.getCancellationDeadlineHours()
                             + " hours in advance. Please contact the business.");
         }
+        boolean request = reservation.getStatus() == ReservationStatus.PENDING;
         applyCancellation(reservation, reason);
-        events.publishEvent(ReservationNotificationEvent.cancelled(payloadFor(business, reservation, reason)));
+        // A withdrawn request was never on any employee's schedule.
+        events.publishEvent(ReservationNotificationEvent.cancelled(payloadFor(business, reservation, reason, !request)));
     }
 
     /** Releases the resources and gives the discount use back. */
@@ -463,7 +501,13 @@ public class ReservationService {
                 .orElseThrow(() -> ApiException.notFound("Reservation", id));
     }
 
+    /** Staff are included unless the reservation is still a request: they hear about it once approved. */
     private ReservationNotificationPayload payloadFor(Business business, Reservation reservation, String detail) {
+        return payloadFor(business, reservation, detail, reservation.getStatus() != ReservationStatus.PENDING);
+    }
+
+    private ReservationNotificationPayload payloadFor(Business business, Reservation reservation, String detail,
+                                                      boolean includeStaff) {
         Customer customer = customerService.requireForBusiness(business.getId(), reservation.getCustomerId());
         BookableService service = serviceCatalog.requireForBusiness(business.getId(), reservation.getServiceId());
         return new ReservationNotificationPayload(
@@ -473,7 +517,8 @@ public class ReservationService {
                 service.getName(), reservation.getNumberOfParticipants(),
                 assembler.resourceSummary(business.getId(), reservation),
                 reservation.getStartTime(), reservation.getEndTime(),
-                reservation.getPublicReference().toString(), detail, staffOf(business.getId(), reservation.resourceIds()));
+                reservation.getPublicReference().toString(), detail,
+                includeStaff ? staffOf(business.getId(), reservation.resourceIds()) : List.of());
     }
 
     /** The assigned employees who can log in, as message recipients. */

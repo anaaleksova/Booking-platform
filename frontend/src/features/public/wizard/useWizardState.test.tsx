@@ -33,6 +33,7 @@ function service(overrides: Partial<PublicService> = {}): PublicService {
     price: 50,
     pricePerParticipant: false,
     maxParticipants: 1,
+    approvalRequired: false,
     currency: 'EUR',
     choosableRequirements: [],
     ...overrides,

@@ -54,6 +54,7 @@ public final class IntegrationDtos {
      */
     public record ServiceInfo(Long id, String name, String description, String category, int durationMinutes,
                               BigDecimal price, boolean pricePerParticipant, int maxParticipants, String currency,
+                              boolean approvalRequired, Integer approvalFromParticipants,
                               List<ChoosableRequirement> resourceSelection) {
     }
 

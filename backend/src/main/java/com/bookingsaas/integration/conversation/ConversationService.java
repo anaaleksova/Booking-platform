@@ -117,10 +117,16 @@ public class ConversationService {
     public TurnResponse turn(Long businessId, TurnRequest request) {
         Business business = businessService.requireById(businessId);
         Extraction ex = request.extracted() == null ? Extraction.empty() : request.extracted();
+        // One message at a time per person: a later one waits and sees what this one changed.
+        store.lockPerson(businessId, request.provider(), request.externalUserId());
         ConversationTurn turn = new ConversationTurn(business, request.provider(), request.externalUserId(),
                 identities.linkedCustomer(businessId, request.provider(), request.externalUserId()));
         Conversation conversation = store.active(businessId, request.provider(), request.externalUserId())
                 .orElse(null);
+        if (conversation != null && ConversationStore.isRepeat(conversation, request)) {
+            log.info("Conversation {}: repeated message ignored", conversation.getId());
+            return ConversationDtos.nothingToSay(conversation);
+        }
         Intent intent = ex.intent();
 
         if (Boolean.TRUE.equals(ex.abort())) {
@@ -179,7 +185,7 @@ public class ConversationService {
     /** Called in the reservation's own transaction: the chat ends with the booking. */
     @Transactional
     public void completeBooking(Long businessId, Long conversationId, Reservation reservation) {
-        Conversation conversation = store.require(businessId, conversationId);
+        Conversation conversation = store.requireLocked(businessId, conversationId);
         if (conversation.getFlow() != Flow.BOOKING) {
             throw ApiException.validation("Conversation " + conversationId + " is not a booking conversation.");
         }
@@ -192,7 +198,7 @@ public class ConversationService {
 
     @Transactional
     public void completeCancellation(Long businessId, Long conversationId, Reservation reservation) {
-        Conversation conversation = store.require(businessId, conversationId);
+        Conversation conversation = store.requireLocked(businessId, conversationId);
         if (conversation.getFlow() != Flow.CANCELLATION) {
             throw ApiException.validation("Conversation " + conversationId + " is not a cancellation conversation.");
         }
@@ -210,7 +216,7 @@ public class ConversationService {
     @Transactional
     public TurnResponse actionFailed(Long businessId, Long conversationId, ActionFailedRequest request) {
         Business business = businessService.requireById(businessId);
-        Conversation conversation = store.require(businessId, conversationId);
+        Conversation conversation = store.requireLocked(businessId, conversationId);
         ConversationTurn turn = new ConversationTurn(business, conversation.getProvider(),
                 conversation.getExternalUserId(), identities.linkedCustomer(businessId, conversation.getProvider(),
                 conversation.getExternalUserId()));

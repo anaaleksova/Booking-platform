@@ -182,7 +182,7 @@ public class BusinessTemplates {
                              List<RequirementRequest> requirements) {
             serviceCatalog.createFor(businessId, new ServiceRequest(name, description, null, null, minutes,
                     SamplePrices.of(euros, currency), perPerson, maxParticipants, 0, bufferAfter,
-                    customerChooses, true, requirements));
+                    customerChooses, true, false, null, requirements));
         }
 
         private static RequirementRequest requirement(Long typeId, boolean customerCanChoose, boolean combine) {

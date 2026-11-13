@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import Avatar from '@mui/material/Avatar';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
@@ -87,6 +88,10 @@ export function BookingWizardPage() {
   // A business with one service (a restaurant's "Table reservation") has nothing to choose: start after it.
   const onlyService = services.data?.length === 1 ? services.data[0] : undefined;
   const service = services.data?.find((item) => item.id === choices.serviceId) ?? onlyService;
+  // The business approves bookings like this one first: it is sent as a request.
+  const request = Boolean(
+    service?.approvalRequired && (service.approvalFromParticipants == null || choices.people >= service.approvalFromParticipants),
+  );
   const steps = stepsFor(service, Boolean(onlyService));
   const free = Boolean(service && isFree(service));
   const step: StepKey = useMemo(() => {
@@ -212,7 +217,9 @@ export function BookingWizardPage() {
           },
         };
       case 'review':
-        return { label: submitting ? 'Confirming…' : 'Confirm reservation', onClick: confirm, disabled: submitting || !quote };
+        return request
+          ? { label: submitting ? 'Sending…' : 'Send booking request', onClick: confirm, disabled: submitting || !quote }
+          : { label: submitting ? 'Confirming…' : 'Confirm reservation', onClick: confirm, disabled: submitting || !quote };
       default:
         return null;
     }
@@ -359,6 +366,12 @@ export function BookingWizardPage() {
                 ) : (
                   <CustomerAuthPanel />
                 )
+              ) : null}
+              {step === 'review' && request ? (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  {business.data?.name ?? 'The business'} confirms bookings like this one personally. Your time is held
+                  while they do, and you will get an email as soon as it is confirmed.
+                </Alert>
               ) : null}
               {step === 'review' ? (
                 <ReviewStep

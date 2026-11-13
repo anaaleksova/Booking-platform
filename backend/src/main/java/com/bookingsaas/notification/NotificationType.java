@@ -15,7 +15,12 @@ public enum NotificationType {
     RESERVATION_RESCHEDULED_STAFF,
     RESERVATION_CANCELLED_STAFF,
     /** The reservation was given to someone else. */
-    RESERVATION_UNASSIGNED_STAFF;
+    RESERVATION_UNASSIGNED_STAFF,
+    /** A booking request, waiting for the owner's approval. */
+    RESERVATION_REQUESTED_CUSTOMER,
+    RESERVATION_REQUESTED_BUSINESS,
+    /** The owner turned the request down. */
+    RESERVATION_DECLINED_CUSTOMER;
 
     public boolean isForStaff() {
         return this == RESERVATION_CONFIRMED_STAFF || this == RESERVATION_RESCHEDULED_STAFF

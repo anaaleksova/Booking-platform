@@ -3,15 +3,19 @@ import { apiClient } from '@/api/client';
 import { queryKeys } from '@/features/queryKeys';
 import { useInvalidatingMutation } from '@/features/mutation';
 import type {
+  BulkResourceResult,
   DayInterval,
   Employee,
   FloorPlan,
   FloorPlanInput,
+  ReassignmentResult,
   Resource,
   ResourceType,
+  ScheduleConflict,
   Service,
   ServiceDeletion,
   ServiceInput,
+  StrandedBookings,
 } from '@/types/api';
 
 // --- services ------------------------------------------------------------
@@ -137,7 +141,7 @@ export function useSaveResource() {
       id === undefined
         ? (await apiClient.post<Resource>('/api/admin/resources', input)).data
         : (await apiClient.put<Resource>(`/api/admin/resources/${id}`, input)).data,
-    [queryKeys.resources, queryKeys.resourceTypes],
+    [queryKeys.resources, queryKeys.resourceTypes, queryKeys.strandedBookings],
   );
 }
 
@@ -146,7 +150,7 @@ export function useSetResourceActive() {
     async ({ id, active }: { id: number; active: boolean }) =>
       (await apiClient.patch<Resource>(`/api/admin/resources/${id}/active`, null, { params: { value: active } }))
         .data,
-    [queryKeys.resources],
+    [queryKeys.resources, queryKeys.strandedBookings],
   );
 }
 
@@ -155,6 +159,59 @@ export function useReplaceResourceHours() {
     async ({ id, intervals }: { id: number; intervals: DayInterval[] }) =>
       (await apiClient.put<DayInterval[]>(`/api/admin/resources/${id}/hours`, intervals)).data,
     [queryKeys.resources],
+  );
+}
+
+export interface BulkResourceInput {
+  resourceTypeId: number;
+  namePrefix: string;
+  firstNumber: number;
+  lastNumber: number;
+  capacity: number | null;
+  sharedSeating: boolean;
+  minPartySize: number | null;
+  active: boolean;
+  serviceIds: number[];
+  hours: DayInterval[];
+}
+
+/** "Table" 1 to 20 in one go. */
+export function useCreateResources() {
+  return useInvalidatingMutation(
+    async (input: BulkResourceInput) =>
+      (await apiClient.post<BulkResourceResult>('/api/admin/resources/bulk', input)).data,
+    [queryKeys.resources, queryKeys.resourceTypes],
+  );
+}
+
+/** Gives other resources of the same type (employees too) this one's weekly schedule. */
+export function useCopySchedule() {
+  return useInvalidatingMutation(
+    async ({ id, targetIds, includeServices }: { id: number; targetIds: number[]; includeServices: boolean }) =>
+      (await apiClient.post<number[]>(`/api/admin/resources/${id}/copy-schedule`, { targetIds, includeServices })).data,
+    [queryKeys.resources, queryKeys.employees],
+  );
+}
+
+/** Bookings not yet over that still hold the resource. */
+export async function fetchUpcomingReservations(resourceId: number) {
+  return (await apiClient.get<ScheduleConflict[]>(`/api/admin/resources/${resourceId}/upcoming-reservations`)).data;
+}
+
+/** Inactive resources (and employees) that still have upcoming bookings. */
+export function useStrandedBookings() {
+  return useQuery({
+    queryKey: queryKeys.strandedBookings,
+    queryFn: async () => (await apiClient.get<StrandedBookings[]>('/api/admin/resources/stranded-reservations')).data,
+  });
+}
+
+/** Moves a deactivated resource's upcoming bookings to free ones at the same times. */
+export function useReassignReservations() {
+  return useInvalidatingMutation(
+    async (resourceId: number) =>
+      (await apiClient.post<ReassignmentResult>(`/api/admin/resources/${resourceId}/reassign-reservations`)).data,
+    [['reservations'], ['schedule-changes'], ['analytics']],
   );
 }
 
@@ -196,7 +253,7 @@ export function useSaveEmployee() {
       await apiClient.put(`/api/admin/employees/${saved.id}/working-hours`, hours);
       return saved;
     },
-    [queryKeys.employees, queryKeys.resources, queryKeys.resourceTypes],
+    [queryKeys.employees, queryKeys.resources, queryKeys.resourceTypes, queryKeys.strandedBookings],
   );
 }
 
@@ -205,7 +262,7 @@ export function useSetEmployeeActive() {
     async ({ id, active }: { id: number; active: boolean }) =>
       (await apiClient.patch<Employee>(`/api/admin/employees/${id}/active`, null, { params: { value: active } }))
         .data,
-    [queryKeys.employees, queryKeys.resources],
+    [queryKeys.employees, queryKeys.resources, queryKeys.strandedBookings],
   );
 }
 

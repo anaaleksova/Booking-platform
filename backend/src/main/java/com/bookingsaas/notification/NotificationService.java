@@ -60,6 +60,24 @@ public class NotificationService {
         scheduleReminder(payload);
     }
 
+    /**
+     * A booking request: the customer hears it was received and is not yet
+     * confirmed, the owner that it waits for them. Staff and reminders wait
+     * for the approval, which arrives as an ordinary confirmation.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void reservationRequested(ReservationNotificationPayload payload) {
+        enqueue(NotificationType.RESERVATION_REQUESTED_CUSTOMER, payload, payload.customerEmail(), null);
+        enqueue(NotificationType.RESERVATION_REQUESTED_BUSINESS, payload,
+                businessService.notificationEmailOf(payload.businessId()), null);
+    }
+
+    /** A request turned down: only the customer is told; nobody else had it in their calendar. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void reservationDeclined(ReservationNotificationPayload payload) {
+        enqueue(NotificationType.RESERVATION_DECLINED_CUSTOMER, payload, payload.customerEmail(), null);
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void reservationCancelled(ReservationNotificationPayload payload) {
         enqueue(NotificationType.RESERVATION_CANCELLED_CUSTOMER, payload, payload.customerEmail(), null);

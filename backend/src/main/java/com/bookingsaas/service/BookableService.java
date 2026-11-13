@@ -81,6 +81,19 @@ public class BookableService extends Auditable {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** Online bookings are requests until the owner confirms them. */
+    @Column(name = "approval_required", nullable = false)
+    private boolean approvalRequired;
+
+    /** With approval on, only groups of at least this size need it; null = every booking. */
+    @Column(name = "approval_from_participants")
+    private Integer approvalFromParticipants;
+
+    /** Whether an online booking for this many people waits for the owner's approval. */
+    public boolean needsApproval(int participants) {
+        return approvalRequired && (approvalFromParticipants == null || participants >= approvalFromParticipants);
+    }
+
     public Duration duration() {
         return Duration.ofMinutes(durationMinutes);
     }

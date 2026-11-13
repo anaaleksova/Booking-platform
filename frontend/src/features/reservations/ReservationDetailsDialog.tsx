@@ -118,6 +118,7 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
   };
 
   const busy = changeStatus.isPending || reschedule.isPending;
+  const request = reservation?.status === 'PENDING';
   const started = reservation ? !dayjs(reservation.startTime).isAfter(dayjs()) : false;
 
   return (
@@ -140,6 +141,12 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
             </Stack>
           </DialogTitle>
           <DialogContent dividers>
+            {request ? (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                Booking request: the customer is waiting for {isOwner ? 'your' : "the owner's"} approval. The time is
+                held until it is approved or declined.
+              </Alert>
+            ) : null}
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
                 <Detail label="When">
@@ -242,10 +249,12 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
               <Box sx={{ mt: 3 }}>
                 <Divider sx={{ mb: 2 }} />
                 <Alert severity="warning" sx={{ mb: 2 }}>
-                  Cancelling releases the assigned resources and removes the reservation from revenue.
+                  {request
+                    ? 'Declining frees the time and tells the customer their request could not be accepted.'
+                    : 'Cancelling releases the assigned resources and removes the reservation from revenue.'}
                 </Alert>
                 <TextField
-                  label="Reason (optional)"
+                  label={request ? 'Reason (sent to the customer, optional)' : 'Reason (optional)'}
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                   fullWidth
@@ -292,11 +301,11 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
                   onClick={() =>
                     run(
                       () => changeStatus.mutateAsync({ id: reservation.id, status: 'CANCELLED', reason }),
-                      'Reservation cancelled',
+                      request ? 'Request declined' : 'Reservation cancelled',
                     )
                   }
                 >
-                  Cancel reservation
+                  {request ? 'Decline request' : 'Cancel reservation'}
                 </Button>
               </>
             ) : (
@@ -304,7 +313,7 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
                 {isOwner && (reservation.status === 'PENDING' || reservation.status === 'CONFIRMED') ? (
                   <>
                     <Button color="error" onClick={() => setCancelling(true)} disabled={busy}>
-                      Cancel
+                      {request ? 'Decline' : 'Cancel'}
                     </Button>
                     <Button onClick={startEditing} disabled={busy}>
                       Change time / resources
@@ -313,15 +322,19 @@ export function ReservationDetailsDialog({ id, onClose }: { id: number | null; o
                 ) : null}
                 <Box sx={{ flex: 1 }} />
                 <Button onClick={onClose}>Close</Button>
-                {reservation.status === 'PENDING' ? (
+                {/* Approving a request is the owner's decision. */}
+                {request && isOwner ? (
                   <Button
                     variant="contained"
                     disabled={busy}
                     onClick={() =>
-                      run(() => changeStatus.mutateAsync({ id: reservation.id, status: 'CONFIRMED' }), 'Confirmed')
+                      run(
+                        () => changeStatus.mutateAsync({ id: reservation.id, status: 'CONFIRMED' }),
+                        'Request approved — the customer has been told',
+                      )
                     }
                   >
-                    Confirm
+                    Approve
                   </Button>
                 ) : null}
                 {/* Only once it has started: until then the customer may still come. */}

@@ -156,7 +156,8 @@ public class IntegrationCatalogService {
     private static ServiceInfo toInfo(PublicServiceResponse service) {
         return new ServiceInfo(service.id(), service.name(), service.description(), service.category(),
                 service.durationMinutes(), service.price(), service.pricePerParticipant(), service.maxParticipants(),
-                service.currency(), service.choosableRequirements().stream()
+                service.currency(), service.approvalRequired(), service.approvalFromParticipants(),
+                service.choosableRequirements().stream()
                         .map(requirement -> new ChoosableRequirement(requirement.requirementId(),
                                 requirement.resourceTypeName(), requirement.quantity(),
                                 requirement.resources().stream()

@@ -22,6 +22,8 @@ public record ServiceResponse(
         int bufferAfterMinutes,
         boolean allowCustomerResourceSelection,
         boolean active,
+        boolean approvalRequired,
+        Integer approvalFromParticipants,
         List<RequirementResponse> requirements
 ) {
 
@@ -41,6 +43,7 @@ public record ServiceResponse(
                 service.getCategory(), service.getImageMediaId(), Media.urlOf(service.getImageMediaId()),
                 service.getDurationMinutes(), service.getPrice(), service.isPricePerParticipant(),
                 service.getMaxParticipants(), service.getBufferBeforeMinutes(), service.getBufferAfterMinutes(),
-                service.isAllowCustomerResourceSelection(), service.isActive(), requirements);
+                service.isAllowCustomerResourceSelection(), service.isActive(), service.isApprovalRequired(),
+                service.getApprovalFromParticipants(), requirements);
     }
 }

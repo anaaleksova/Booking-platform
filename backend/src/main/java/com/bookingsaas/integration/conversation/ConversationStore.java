@@ -8,12 +8,14 @@ import com.bookingsaas.integration.conversation.ConversationEnums.Flow;
 import com.bookingsaas.integration.conversation.ConversationEnums.State;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Optional;
 
 /** Loading, starting and saving conversations, and their JSON state. */
@@ -26,12 +28,53 @@ class ConversationStore {
 
     private final ConversationRepository repository;
     private final ObjectMapper objectMapper;
+    private final EntityManager entityManager;
     private final Clock clock;
 
-    ConversationStore(ConversationRepository repository, ObjectMapper objectMapper, Clock clock) {
+    ConversationStore(ConversationRepository repository, ObjectMapper objectMapper, EntityManager entityManager,
+                      Clock clock) {
         this.repository = repository;
         this.objectMapper = objectMapper;
+        this.entityManager = entityManager;
         this.clock = clock;
+    }
+
+    /**
+     * Waits until no other turn for this person is running, then holds them
+     * until the transaction commits. Two messages sent close together are
+     * therefore handled one after the other, the second seeing what the first
+     * left, instead of both starting from the same state and one overwriting
+     * the other.
+     */
+    void lockPerson(Long businessId, ChannelProvider provider, String externalUserId) {
+        repository.lockPerson("conversation:" + businessId + ":" + provider + ":" + externalUserId);
+    }
+
+    /** The conversation, read again once its person is locked: what a concurrent turn wrote counts. */
+    Conversation requireLocked(Long businessId, Long conversationId) {
+        Conversation conversation = require(businessId, conversationId);
+        lockPerson(businessId, conversation.getProvider(), conversation.getExternalUserId());
+        entityManager.refresh(conversation);
+        return conversation;
+    }
+
+    /**
+     * A resend: the same words as the last message, sent before that one was
+     * answered (impatient customers repeat themselves when a reply is slow).
+     * The same words sent after the answer are a new message — "yes" can
+     * answer two questions in a row.
+     */
+    static boolean isRepeat(Conversation conversation, TurnRequest request) {
+        if (request.sentAt() == null || request.message() == null || conversation.getLastMessage() == null
+                || conversation.getUpdatedAt() == null) {
+            return false;
+        }
+        return normalized(request.message()).equals(normalized(conversation.getLastMessage()))
+                && request.sentAt().isBefore(conversation.getUpdatedAt());
+    }
+
+    private static String normalized(String message) {
+        return message.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 
     /** The person's open conversation, unless it has gone stale (then it is closed). */

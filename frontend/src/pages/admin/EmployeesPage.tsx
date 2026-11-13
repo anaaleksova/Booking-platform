@@ -17,6 +17,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
@@ -34,6 +35,8 @@ import {
   useServices,
   useSetEmployeeActive,
 } from '@/features/catalog/api';
+import { CopyScheduleDialog } from '@/features/catalog/CopyScheduleDialog';
+import { StrandedChip, useDeactivation } from '@/features/catalog/ResourceBookings';
 import { mediaUrl } from '@/features/media/api';
 import { useStaffAccess } from '@/features/staff/api';
 import { StaffAccessControl } from '@/features/staff/StaffAccessControl';
@@ -68,6 +71,12 @@ export function EmployeesPage() {
   const remove = useDeleteEmployee();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [deleting, setDeleting] = useState<Employee | null>(null);
+  const [copying, setCopying] = useState<Employee | null>(null);
+  // Switching someone off first shows the bookings they still have. Their resource id identifies them.
+  const deactivation = useDeactivation((holder) => {
+    const employee = employees?.find((item) => item.resourceId === holder.resourceId);
+    return employee ? setActive.mutateAsync({ id: employee.id, active: false }) : Promise.resolve();
+  });
 
   const open = (employee?: Employee) =>
     setDraft(
@@ -92,8 +101,11 @@ export function EmployeesPage() {
     if (!draft?.name.trim()) {
       return;
     }
+    // Deactivated in the dialog: saved as they were, then switched off through the bookings check.
+    const current = employees?.find((item) => item.id === draft.id);
+    const deactivating = draft.id !== undefined && !draft.active && current?.active;
     try {
-      await save.mutateAsync({
+      const saved = await save.mutateAsync({
         id: draft.id,
         input: {
           name: draft.name.trim(),
@@ -101,13 +113,16 @@ export function EmployeesPage() {
           phone: draft.phone.trim() || undefined,
           imageMediaId: draft.imageMediaId,
           capacity: draft.capacity === '' ? null : Math.max(1, Number(draft.capacity)),
-          active: draft.active,
+          active: deactivating ? true : draft.active,
           serviceIds: draft.serviceIds,
         },
         hours: draft.ownHours ? draft.hours : [],
       });
       toast.success(draft.id ? 'Employee saved' : 'Employee added');
       setDraft(null);
+      if (deactivating) {
+        await deactivation.request({ resourceId: saved.resourceId, name: saved.name });
+      }
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -154,12 +169,17 @@ export function EmployeesPage() {
                     checked={employee.active}
                     inputProps={{ 'aria-label': `${employee.name} active` }}
                     onChange={(e) =>
-                      setActive
-                        .mutateAsync({ id: employee.id, active: e.target.checked })
-                        .catch((err) => toast.error(errorMessage(err)))
+                      e.target.checked
+                        ? setActive
+                            .mutateAsync({ id: employee.id, active: true })
+                            .catch((err) => toast.error(errorMessage(err)))
+                        : deactivation.request({ resourceId: employee.resourceId, name: employee.name })
                     }
                   />
                 </Stack>
+                {!employee.active ? (
+                  <StrandedChip holder={{ resourceId: employee.resourceId, name: employee.name }} />
+                ) : null}
                 <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" sx={{ mt: 2 }}>
                   Performs
                 </Typography>
@@ -182,6 +202,11 @@ export function EmployeesPage() {
                 </Typography>
                 <StaffAccessControl employee={employee} access={staff?.find((access) => access.employeeId === employee.id)} />
                 <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1 }}>
+                  <Tooltip title="Copy working hours to…">
+                    <IconButton onClick={() => setCopying(employee)}>
+                      <ContentCopyRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                   <Tooltip title="Edit">
                     <IconButton onClick={() => open(employee)}>
                       <EditRoundedIcon fontSize="small" />
@@ -253,6 +278,20 @@ export function EmployeesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {deactivation.dialog}
+      {copying ? (
+        <CopyScheduleDialog
+          source={{ resourceId: copying.resourceId, name: copying.name, hours: copying.workingHours }}
+          candidates={(employees ?? []).map((employee) => ({
+            resourceId: employee.resourceId,
+            name: employee.name,
+            hours: employee.workingHours,
+          }))}
+          noun="employee"
+          onClose={() => setCopying(null)}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={deleting !== null}

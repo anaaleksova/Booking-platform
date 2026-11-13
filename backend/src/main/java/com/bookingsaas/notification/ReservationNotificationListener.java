@@ -31,7 +31,9 @@ public class ReservationNotificationListener {
     public void on(ReservationNotificationEvent event) {
         try {
             switch (event.kind()) {
-                case CREATED -> notificationService.reservationConfirmed(event.payload());
+                case CREATED, APPROVED -> notificationService.reservationConfirmed(event.payload());
+                case REQUESTED -> notificationService.reservationRequested(event.payload());
+                case DECLINED -> notificationService.reservationDeclined(event.payload());
                 case CANCELLED -> {
                     notificationService.cancelPendingReminders(event.payload().reservationId());
                     notificationService.reservationCancelled(event.payload());

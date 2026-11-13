@@ -16,6 +16,14 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     Optional<Conversation> findByIdAndBusinessId(Long id, Long businessId);
 
+    /**
+     * Holds one person's chat to a single writer until the transaction ends:
+     * a PostgreSQL advisory lock on the person, so it also covers the moment
+     * before their conversation exists.
+     */
+    @Query(value = "select cast(pg_advisory_xact_lock(hashtextextended(:key, 0)) as text)", nativeQuery = true)
+    String lockPerson(@Param("key") String key);
+
     List<Conversation> findByBusinessIdAndReservationId(Long businessId, Long reservationId);
 
     /** Reservations booked through this social user's chats, linked or not. */

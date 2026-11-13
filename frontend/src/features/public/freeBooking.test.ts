@@ -10,6 +10,7 @@ function service(price: number): PublicService {
     price,
     pricePerParticipant: false,
     maxParticipants: 8,
+    approvalRequired: false,
     currency: 'EUR',
     choosableRequirements: [],
   };

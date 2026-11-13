@@ -1,8 +1,11 @@
 package com.bookingsaas.resource;
 
 import com.bookingsaas.common.domain.DayInterval;
+import com.bookingsaas.resource.dto.BulkResourceRequest;
+import com.bookingsaas.resource.dto.CopyScheduleRequest;
 import com.bookingsaas.resource.dto.ResourceRequest;
 import com.bookingsaas.resource.dto.ResourceResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -46,6 +49,19 @@ public class ResourceController {
     @ResponseStatus(HttpStatus.CREATED)
     public ResourceResponse create(@Valid @RequestBody ResourceRequest request) {
         return resourceService.create(request);
+    }
+
+    @PostMapping("/bulk")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Create numbered resources alike, e.g. Table 1 to Table 20")
+    public ResourceService.BulkResult createMany(@Valid @RequestBody BulkResourceRequest request) {
+        return resourceService.createMany(request);
+    }
+
+    @PostMapping("/{id}/copy-schedule")
+    @Operation(summary = "Give other resources of the same type this one's weekly schedule (and optionally services)")
+    public List<Long> copySchedule(@PathVariable Long id, @Valid @RequestBody CopyScheduleRequest request) {
+        return resourceService.copySchedule(id, request);
     }
 
     @PutMapping("/{id}")

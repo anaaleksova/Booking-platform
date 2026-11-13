@@ -73,7 +73,9 @@ public final class ConversationEnums {
     public enum NextAction {
         REPLY,
         CREATE_RESERVATION,
-        CANCEL_RESERVATION
+        CANCEL_RESERVATION,
+        /** The message repeats one already answered or being answered: send nothing. */
+        NONE
     }
 
     /** How a conversation ended, when it did. */

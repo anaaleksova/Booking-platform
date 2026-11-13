@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -40,6 +41,8 @@ const EMPTY: ServiceInput = {
   bufferBeforeMinutes: 0,
   bufferAfterMinutes: 0,
   allowCustomerResourceSelection: false,
+  approvalRequired: false,
+  approvalFromParticipants: null,
   active: true,
   requirements: [],
 };
@@ -77,6 +80,8 @@ export function ServiceEditorPage() {
         bufferBeforeMinutes: existing.bufferBeforeMinutes,
         bufferAfterMinutes: existing.bufferAfterMinutes,
         allowCustomerResourceSelection: existing.allowCustomerResourceSelection,
+        approvalRequired: existing.approvalRequired,
+        approvalFromParticipants: existing.approvalFromParticipants ?? null,
         active: existing.active,
         requirements: existing.requirements.map(({ resourceTypeId, quantity, required, customerCanChoose, combineResources }) => ({
           resourceTypeId,
@@ -248,6 +253,7 @@ export function ServiceEditorPage() {
                 </Grid>
               </Grid>
               <FormControlLabel control={<Switch checked={form.active} onChange={(e) => set('active', e.target.checked)} />} label="Active — customers can book it" />
+              <ApprovalSetting form={form} onChange={setForm} />
             </Stack>
           </Paper>
         </Grid>
@@ -381,5 +387,61 @@ export function ServiceEditorPage() {
         </Grid>
       </Grid>
     </>
+  );
+}
+
+/**
+ * Online bookings the owner approves first: every one, or only groups from a
+ * size. Bookings the business enters itself are never requests.
+ */
+function ApprovalSetting({ form, onChange }: { form: ServiceInput; onChange: (form: ServiceInput) => void }) {
+  const fromSize = form.approvalFromParticipants != null;
+  return (
+    <Box>
+      <FormControlLabel
+        control={
+          <Switch
+            checked={form.approvalRequired}
+            onChange={(e) => onChange({ ...form, approvalRequired: e.target.checked })}
+          />
+        }
+        label="I approve online bookings first"
+      />
+      <Typography variant="body2" color="text.secondary" sx={{ ml: 6, mt: -0.5 }}>
+        Customers send a request that holds the time; they are told it is confirmed once you approve it.
+      </Typography>
+      {form.approvalRequired ? (
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} sx={{ ml: 6, mt: 1.5 }}>
+          <TextField
+            select
+            size="small"
+            label="Applies to"
+            value={fromSize ? 'groups' : 'all'}
+            onChange={(e) =>
+              onChange({
+                ...form,
+                approvalFromParticipants: e.target.value === 'groups' ? Math.min(Math.max(2, form.maxParticipants), 500) : null,
+              })
+            }
+            sx={{ minWidth: 200 }}
+          >
+            <MenuItem value="all">Every online booking</MenuItem>
+            <MenuItem value="groups">Larger groups only</MenuItem>
+          </TextField>
+          {fromSize ? (
+            <TextField
+              size="small"
+              type="number"
+              label="Groups of"
+              value={form.approvalFromParticipants ?? ''}
+              onChange={(e) => onChange({ ...form, approvalFromParticipants: Math.max(1, Number(e.target.value) || 1) })}
+              InputProps={{ endAdornment: <InputAdornment position="end">or more</InputAdornment> }}
+              inputProps={{ min: 1 }}
+              sx={{ maxWidth: 180 }}
+            />
+          ) : null}
+        </Stack>
+      ) : null}
+    </Box>
   );
 }

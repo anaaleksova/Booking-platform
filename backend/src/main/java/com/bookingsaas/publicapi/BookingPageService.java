@@ -100,7 +100,7 @@ public class BookingPageService {
         return new PublicServiceResponse(service.getId(), service.getName(), service.getDescription(),
                 service.getCategory(), Media.urlOf(service.getImageMediaId()), service.getDurationMinutes(),
                 service.getPrice(), service.isPricePerParticipant(), service.getMaxParticipants(),
-                business.getCurrency(), choosable);
+                business.getCurrency(), service.isApprovalRequired(), service.getApprovalFromParticipants(), choosable);
     }
 
     /**

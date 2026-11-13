@@ -253,5 +253,7 @@ public class ServiceCatalogService {
         service.setBufferAfterMinutes(request.bufferAfterMinutes());
         service.setAllowCustomerResourceSelection(request.allowCustomerResourceSelection());
         service.setActive(request.active());
+        service.setApprovalRequired(Boolean.TRUE.equals(request.approvalRequired()));
+        service.setApprovalFromParticipants(service.isApprovalRequired() ? request.approvalFromParticipants() : null);
     }
 }

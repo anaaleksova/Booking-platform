@@ -12,6 +12,8 @@ export const queryKeys = {
   /** Under 'schedule-changes': they list clashing bookings, so reservation changes refresh them. */
   blockedTimes: ['schedule-changes', 'blocked-times'] as const,
   specialHours: ['schedule-changes', 'special-hours'] as const,
+  /** Inactive resources still holding bookings; refreshed with reservation changes like the rest. */
+  strandedBookings: ['schedule-changes', 'stranded'] as const,
   ownCalendar: ['staff', 'me'] as const,
   gallery: ['business', 'gallery'] as const,
   /** Not under 'business': saving the business details must not refetch (and reset) an open homepage editor. */

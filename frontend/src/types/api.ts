@@ -202,6 +202,24 @@ export interface SpecialDay extends SpecialHours {
   conflicts: ScheduleConflict[];
 }
 
+/** An inactive resource that still has upcoming bookings. */
+export interface StrandedBookings {
+  resourceId: number;
+  reservations: number;
+}
+
+/** Bookings moved off a deactivated resource, and those nothing else was free for. */
+export interface ReassignmentResult {
+  reassigned: ScheduleConflict[];
+  failed: Array<{ booking: ScheduleConflict; reason: string }>;
+}
+
+export interface BulkResourceResult {
+  created: Resource[];
+  /** Names a resource of the type already had. */
+  skipped: string[];
+}
+
 /** The signed-in staff member's own employee record. */
 export interface OwnCalendar {
   employeeId: number;
@@ -330,6 +348,10 @@ export interface Service {
   bufferAfterMinutes: number;
   allowCustomerResourceSelection: boolean;
   active: boolean;
+  /** Online bookings are requests the owner approves. */
+  approvalRequired: boolean;
+  /** With approval on, only groups of at least this size need it; null = every booking. */
+  approvalFromParticipants?: number | null;
   requirements: Requirement[];
 }
 
@@ -346,6 +368,8 @@ export interface ServiceInput {
   bufferAfterMinutes: number;
   allowCustomerResourceSelection: boolean;
   active: boolean;
+  approvalRequired: boolean;
+  approvalFromParticipants?: number | null;
   requirements: Array<Pick<Requirement, 'resourceTypeId' | 'quantity' | 'required' | 'customerCanChoose' | 'combineResources'>>;
 }
 
@@ -753,6 +777,10 @@ export interface PublicService {
   pricePerParticipant: boolean;
   maxParticipants: number;
   currency: string;
+  /** Online bookings are requests the business confirms. */
+  approvalRequired: boolean;
+  /** With approval on, the group size from which it applies; null = always. */
+  approvalFromParticipants?: number | null;
   choosableRequirements: ChoosableRequirement[];
 }
 

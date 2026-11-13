@@ -29,9 +29,11 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
+import PlaylistAddRoundedIcon from '@mui/icons-material/PlaylistAddRounded';
 import { errorMessage } from '@/api/client';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ImageUpload } from '@/components/ImageUpload';
@@ -48,6 +50,9 @@ import {
   useServices,
   useSetResourceActive,
 } from '@/features/catalog/api';
+import { BulkResourcesDialog } from '@/features/catalog/BulkResourcesDialog';
+import { CopyScheduleDialog } from '@/features/catalog/CopyScheduleDialog';
+import { StrandedChip, useDeactivation } from '@/features/catalog/ResourceBookings';
 import type { DayInterval, Resource } from '@/types/api';
 import { formatCapacity } from '@/utils/format';
 
@@ -81,6 +86,10 @@ export function ResourcesPage() {
   const [tab, setTab] = useState<number | 'all'>('all');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [deleting, setDeleting] = useState<Resource | null>(null);
+  const [addingMany, setAddingMany] = useState(false);
+  const [copying, setCopying] = useState<Resource | null>(null);
+  // Switching a resource off first shows the bookings it still has.
+  const deactivation = useDeactivation((holder) => setActive.mutateAsync({ id: holder.resourceId, active: false }));
 
   const thingTypes = useMemo(() => (types ?? []).filter((type) => !type.employeeType), [types]);
   const things = useMemo(() => (resources ?? []).filter((resource) => !resource.employeeManaged), [resources]);
@@ -124,6 +133,8 @@ export function ResourcesPage() {
     if (!draft || draft.resourceTypeId === '' || !draft.name.trim()) {
       return;
     }
+    // Deactivated in the dialog: saved as it was, then switched off through the bookings check.
+    const deactivating = draft.id !== undefined && !draft.active && resources?.find((r) => r.id === draft.id)?.active;
     try {
       const saved = await save.mutateAsync({
         id: draft.id,
@@ -134,7 +145,7 @@ export function ResourcesPage() {
           capacity: draft.capacity === '' ? null : Math.max(1, Number(draft.capacity)),
           sharedSeating: draft.capacity !== '' && draft.shared,
           minPartySize: draft.capacity === '' || draft.shared || draft.minPartySize === '' ? null : Math.max(1, Number(draft.minPartySize)),
-          active: draft.active,
+          active: deactivating ? true : draft.active,
           imageMediaId: draft.imageMediaId,
           serviceIds: draft.serviceIds,
         },
@@ -142,6 +153,9 @@ export function ResourcesPage() {
       await saveHours.mutateAsync({ id: saved.id, intervals: draft.ownHours ? draft.hours : [] });
       toast.success(draft.id ? 'Resource saved' : 'Resource created');
       setDraft(null);
+      if (deactivating) {
+        await deactivation.request({ resourceId: saved.id, name: saved.name });
+      }
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -153,9 +167,14 @@ export function ResourcesPage() {
         title="Resources"
         description="The rooms, tables, machines and equipment that reservations hold."
         action={
-          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => open()} disabled={thingTypes.length === 0}>
-            New resource
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button startIcon={<PlaylistAddRoundedIcon />} onClick={() => setAddingMany(true)} disabled={thingTypes.length === 0}>
+              Add several
+            </Button>
+            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => open()} disabled={thingTypes.length === 0}>
+              New resource
+            </Button>
+          </Stack>
         }
       />
 
@@ -206,6 +225,7 @@ export function ResourcesPage() {
                         {resource.description}
                       </Typography>
                     ) : null}
+                    {!resource.active ? <StrandedChip holder={{ resourceId: resource.id, name: resource.name }} /> : null}
                   </TableCell>
                   <TableCell>{resource.resourceTypeName}</TableCell>
                   <TableCell align="center">
@@ -243,13 +263,20 @@ export function ResourcesPage() {
                       checked={resource.active}
                       inputProps={{ 'aria-label': `${resource.name} active` }}
                       onChange={(e) =>
-                        setActive
-                          .mutateAsync({ id: resource.id, active: e.target.checked })
-                          .catch((err) => toast.error(errorMessage(err)))
+                        e.target.checked
+                          ? setActive
+                              .mutateAsync({ id: resource.id, active: true })
+                              .catch((err) => toast.error(errorMessage(err)))
+                          : deactivation.request({ resourceId: resource.id, name: resource.name })
                       }
                     />
                   </TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    <Tooltip title="Copy hours to…">
+                      <IconButton onClick={() => setCopying(resource)}>
+                        <ContentCopyRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Edit">
                       <IconButton onClick={() => open(resource)}>
                         <EditRoundedIcon fontSize="small" />
@@ -332,6 +359,25 @@ export function ResourcesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {deactivation.dialog}
+      {addingMany ? (
+        <BulkResourcesDialog
+          types={thingTypes}
+          initialTypeId={tab === 'all' ? undefined : tab}
+          onClose={() => setAddingMany(false)}
+        />
+      ) : null}
+      {copying ? (
+        <CopyScheduleDialog
+          source={{ resourceId: copying.id, name: copying.name, hours: copying.hours }}
+          candidates={things
+            .filter((resource) => resource.resourceTypeId === copying.resourceTypeId)
+            .map((resource) => ({ resourceId: resource.id, name: resource.name, hours: resource.hours }))}
+          noun="resource"
+          onClose={() => setCopying(null)}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={deleting !== null}

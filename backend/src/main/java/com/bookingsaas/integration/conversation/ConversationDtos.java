@@ -19,6 +19,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,6 +34,16 @@ import java.util.List;
  */
 public final class ConversationDtos {
 
+    /**
+     * The answer to a message that repeats one already answered or being
+     * answered: nothing is to be sent.
+     */
+    static TurnResponse nothingToSay(Conversation conversation) {
+        return new TurnResponse(conversation.getId(), conversation.getFlow().name(), conversation.getState().name(),
+                NextAction.NONE, Ask.NOTHING, List.of(), List.of(), List.of(), null, null, List.of(), null, null,
+                null, null, List.of());
+    }
+
     private ConversationDtos() {
     }
 
@@ -43,7 +54,9 @@ public final class ConversationDtos {
             @Size(max = 160) String displayName,
             @Size(max = 2000) String message,
             @Valid Extraction extracted,
-            @Size(max = 128) String executionId
+            @Size(max = 128) String executionId,
+            /* When the customer sent it (the channel's own timestamp); lets a resent message be recognised. */
+            Instant sentAt
     ) {
     }
 

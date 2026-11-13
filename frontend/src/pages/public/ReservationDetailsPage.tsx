@@ -8,6 +8,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import HourglassTopRoundedIcon from '@mui/icons-material/HourglassTopRounded';
 import { errorMessage } from '@/api/client';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { StatusChip } from '@/components/StatusChip';
@@ -61,7 +62,16 @@ export function ReservationDetailsPage() {
   return (
     <BusinessShell business={business.data} footer={false}>
       <Container maxWidth="sm" sx={{ py: { xs: 3, md: 6 } }}>
-      {justBooked && data.status !== 'CANCELLED' ? (
+      {justBooked && data.status === 'PENDING' ? (
+        <Stack alignItems="center" spacing={1} sx={{ mb: 3, textAlign: 'center' }}>
+          <HourglassTopRoundedIcon color="warning" sx={{ fontSize: 56 }} />
+          <Typography variant="h4">Request sent!</Typography>
+          <Typography color="text.secondary">
+            {business.data?.name ?? 'The business'} will confirm it shortly, and you will get an email when they do.
+            Your time is held until then.
+          </Typography>
+        </Stack>
+      ) : justBooked && data.status !== 'CANCELLED' ? (
         <Stack alignItems="center" spacing={1} sx={{ mb: 3, textAlign: 'center' }}>
           <CheckCircleRoundedIcon color="success" sx={{ fontSize: 56 }} />
           <Typography variant="h4">You're booked!</Typography>
@@ -82,6 +92,11 @@ export function ReservationDetailsPage() {
           <StatusChip status={data.status} size="medium" />
         </Stack>
 
+        {!justBooked && data.status === 'PENDING' ? (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Waiting for {business.data?.name ?? 'the business'} to confirm this booking request.
+          </Alert>
+        ) : null}
         <Stack spacing={1.5} sx={{ mt: 3 }}>
           <Row label="Date" value={formatLocalDate(data.localStartTime)} />
           <Row label="Time" value={`${formatWindow(data)} (${data.timezone})`} />

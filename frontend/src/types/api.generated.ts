@@ -836,6 +836,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/resources/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create numbered resources alike, e.g. Table 1 to Table 20 */
+        post: operations["createMany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/resources/stranded-reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inactive resources that still have upcoming bookings, with how many */
+        get: operations["stranded"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/resources/{id}": {
         parameters: {
             query?: never;
@@ -868,6 +902,23 @@ export interface paths {
         patch: operations["setActive_1"];
         trace?: never;
     };
+    "/api/admin/resources/{id}/copy-schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Give other resources of the same type this one's weekly schedule (and optionally services) */
+        post: operations["copySchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/resources/{id}/hours": {
         parameters: {
             query?: never;
@@ -877,6 +928,40 @@ export interface paths {
         };
         get?: never;
         put: operations["replaceHours"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/resources/{id}/reassign-reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Give a deactivated resource's upcoming bookings to free resources at the same times */
+        post: operations["reassign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/resources/{id}/upcoming-reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bookings not yet over that hold this resource */
+        get: operations["upcoming_1"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2092,6 +2177,23 @@ export interface components {
             /** Format: date-time */
             startTime?: string;
         };
+        BulkResourceRequest: {
+            active: boolean;
+            /** Format: int32 */
+            capacity?: number;
+            /** Format: int32 */
+            firstNumber: number;
+            hours?: components["schemas"]["DayInterval"][];
+            /** Format: int32 */
+            lastNumber: number;
+            /** Format: int32 */
+            minPartySize?: number;
+            namePrefix: string;
+            /** Format: int64 */
+            resourceTypeId: number;
+            serviceIds?: number[];
+            sharedSeating?: boolean;
+        };
         BusinessResponse: {
             accentColor?: string;
             active?: boolean;
@@ -2306,6 +2408,10 @@ export interface components {
             resourceNames?: string[];
             state?: string;
             summary?: components["schemas"]["ConversationDtosSummary"];
+        };
+        CopyScheduleRequest: {
+            includeServices?: boolean;
+            targetIds: number[];
         };
         CurrentUserResponse: {
             activeBusiness?: components["schemas"]["CurrentUserResponseMembershipResponse"];
@@ -2862,6 +2968,9 @@ export interface components {
             resourceTypeName?: string;
         };
         IntegrationDtosServiceInfo: {
+            /** Format: int32 */
+            approvalFromParticipants?: number;
+            approvalRequired?: boolean;
             category?: string;
             currency?: string;
             description?: string;
@@ -3111,6 +3220,9 @@ export interface components {
             resourceTypeName?: string;
         };
         PublicServiceResponse: {
+            /** Format: int32 */
+            approvalFromParticipants?: number;
+            approvalRequired?: boolean;
             category?: string;
             choosableRequirements?: components["schemas"]["PublicServiceResponseChoosableRequirement"][];
             currency?: string;
@@ -3262,6 +3374,14 @@ export interface components {
             email: string;
             newPassword: string;
         };
+        ResourceBookingsServiceFailedReassignment: {
+            booking?: components["schemas"]["ScheduleConflict"];
+            reason?: string;
+        };
+        ResourceBookingsServiceReassignmentResult: {
+            failed?: components["schemas"]["ResourceBookingsServiceFailedReassignment"][];
+            reassigned?: components["schemas"]["ScheduleConflict"][];
+        };
         ResourceRequest: {
             active: boolean;
             /** Format: int32 */
@@ -3302,6 +3422,10 @@ export interface components {
             /** Format: int64 */
             requirementId: number;
             resourceIds: number[];
+        };
+        ResourceServiceBulkResult: {
+            created?: components["schemas"]["ResourceResponse"][];
+            skipped?: string[];
         };
         ResourceTypeRequest: {
             active: boolean;
@@ -3494,6 +3618,9 @@ export interface components {
             active: boolean;
             allowCustomerResourceSelection: boolean;
             /** Format: int32 */
+            approvalFromParticipants?: number;
+            approvalRequired?: boolean;
+            /** Format: int32 */
             bufferAfterMinutes: number;
             /** Format: int32 */
             bufferBeforeMinutes: number;
@@ -3522,6 +3649,9 @@ export interface components {
         ServiceResponse: {
             active?: boolean;
             allowCustomerResourceSelection?: boolean;
+            /** Format: int32 */
+            approvalFromParticipants?: number;
+            approvalRequired?: boolean;
             /** Format: int32 */
             bufferAfterMinutes?: number;
             /** Format: int32 */
@@ -3766,6 +3896,12 @@ export interface components {
             reason?: string;
             /** @enum {string} */
             status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW";
+        };
+        StrandedBookings: {
+            /** Format: int64 */
+            reservations?: number;
+            /** Format: int64 */
+            resourceId?: number;
         };
         TeamContent: {
             eyebrow?: string;
@@ -5573,6 +5709,50 @@ export interface operations {
             };
         };
     };
+    createMany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkResourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ResourceServiceBulkResult"];
+                };
+            };
+        };
+    };
+    stranded: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StrandedBookings"][];
+                };
+            };
+        };
+    };
     get_1: {
         parameters: {
             query?: never;
@@ -5665,6 +5845,32 @@ export interface operations {
             };
         };
     };
+    copySchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": number[];
+                };
+            };
+        };
+    };
     replaceHours: {
         parameters: {
             query?: never;
@@ -5687,6 +5893,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["DayInterval"][];
+                };
+            };
+        };
+    };
+    reassign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ResourceBookingsServiceReassignmentResult"];
+                };
+            };
+        };
+    };
+    upcoming_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ScheduleConflict"][];
                 };
             };
         };

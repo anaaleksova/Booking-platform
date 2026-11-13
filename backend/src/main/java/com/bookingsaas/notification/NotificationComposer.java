@@ -59,6 +59,11 @@ public class NotificationComposer {
                     + payload.customerName() + ", " + shortWhen(payload);
             case RESERVATION_UNASSIGNED_STAFF -> "Removed from your schedule: " + payload.serviceName() + " — "
                     + payload.customerName() + ", " + shortWhen(payload);
+            case RESERVATION_REQUESTED_CUSTOMER -> "We received your booking request at " + payload.businessName();
+            case RESERVATION_REQUESTED_BUSINESS -> "Booking request to approve: " + payload.serviceName() + " — "
+                    + payload.customerName() + ", " + shortWhen(payload) + viaChannel(payload);
+            case RESERVATION_DECLINED_CUSTOMER -> "Your booking request at " + payload.businessName()
+                    + " could not be accepted";
         };
     }
 
@@ -101,6 +106,12 @@ public class NotificationComposer {
             case RESERVATION_CANCELLED_STAFF -> "One of your appointments has been cancelled.\n\n";
             case RESERVATION_UNASSIGNED_STAFF -> "This appointment has been given to someone else, "
                     + "so it is no longer on your schedule.\n\n";
+            case RESERVATION_REQUESTED_CUSTOMER -> "Hello " + payload.customerName() + ",\n\nThank you for your request. "
+                    + payload.businessName() + " will confirm it shortly, and you will get an email when they do.\n\n";
+            case RESERVATION_REQUESTED_BUSINESS -> "A booking request is waiting for your approval. "
+                    + "The time is held until you confirm or decline it.\n\n";
+            case RESERVATION_DECLINED_CUSTOMER -> "Hello " + payload.customerName() + ",\n\nUnfortunately "
+                    + payload.businessName() + " cannot accept your booking request.\n\n";
         });
 
         for (String[] row : rows(type, payload)) {
@@ -357,6 +368,9 @@ public class NotificationComposer {
             case RESERVATION_CANCELLED_STAFF -> "Appointment cancelled";
             case RESERVATION_UNASSIGNED_STAFF -> "No longer on your schedule";
             case RESERVATION_REMINDER_CUSTOMER -> "See you soon";
+            case RESERVATION_REQUESTED_CUSTOMER -> "Request received";
+            case RESERVATION_REQUESTED_BUSINESS -> "Booking request to approve";
+            case RESERVATION_DECLINED_CUSTOMER -> "Request not accepted";
         };
     }
 
@@ -432,6 +446,7 @@ public class NotificationComposer {
         return type != NotificationType.RESERVATION_CONFIRMED_BUSINESS
                 && type != NotificationType.RESERVATION_CANCELLED_BUSINESS
                 && type != NotificationType.RESERVATION_RESCHEDULED_BUSINESS
+                && type != NotificationType.RESERVATION_REQUESTED_BUSINESS
                 && !type.isForStaff();
     }
 

@@ -60,6 +60,13 @@ public class IntegrationEventListener {
                 enqueue(payload, IntegrationEventTypes.RESERVATION_CREATED, now);
                 scheduleReminder(payload, now);
             }
+            // A request gets its reminder only once it is approved.
+            case REQUESTED -> enqueue(payload, IntegrationEventTypes.RESERVATION_REQUESTED, now);
+            case APPROVED -> {
+                enqueue(payload, IntegrationEventTypes.RESERVATION_APPROVED, now);
+                scheduleReminder(payload, now);
+            }
+            case DECLINED -> enqueue(payload, IntegrationEventTypes.RESERVATION_DECLINED, now);
             case CANCELLED -> {
                 dropPendingReminders(payload.reservationId());
                 enqueue(payload, IntegrationEventTypes.RESERVATION_CANCELLED, now);

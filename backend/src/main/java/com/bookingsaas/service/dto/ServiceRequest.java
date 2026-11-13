@@ -27,6 +27,10 @@ public record ServiceRequest(
         @NotNull @Min(0) @Max(480) Integer bufferAfterMinutes,
         @NotNull Boolean allowCustomerResourceSelection,
         @NotNull Boolean active,
+        /* Online bookings wait for the owner's approval. Null = no. */
+        Boolean approvalRequired,
+        /* With approval on: only groups of at least this size need it. Null = every booking. */
+        @Min(value = 1, message = "must be at least 1") @Max(500) Integer approvalFromParticipants,
         /* The complete list — replaces whatever the service required before. */
         @NotNull @Size(max = 20) List<@Valid @NotNull RequirementRequest> requirements
 ) {

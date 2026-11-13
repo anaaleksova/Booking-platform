@@ -51,6 +51,7 @@ const SERVICE = (combinable = false): PublicService => ({
   price: 0,
   pricePerParticipant: false,
   maxParticipants: 12,
+  approvalRequired: false,
   currency: 'EUR',
   choosableRequirements: [requirement(combinable)],
 });

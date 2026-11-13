@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import Button from '@mui/material/Button';
@@ -30,6 +31,7 @@ import { StatusChip } from '@/components/StatusChip';
 import { EmptyState, ErrorState, TableLoadingRows } from '@/components/states';
 import { useServices } from '@/features/catalog/api';
 import { useReservations } from '@/features/reservations/api';
+import { REQUEST_HORIZON_DAYS } from '@/features/reservations/PendingRequestsAlert';
 import { NewReservationDialog } from '@/features/reservations/NewReservationDialog';
 import { ReservationDetailsDialog } from '@/features/reservations/ReservationDetailsDialog';
 import { WeekCalendar } from '@/features/reservations/WeekCalendar';
@@ -43,11 +45,18 @@ type View = 'list' | 'calendar';
 const PAGE_SIZES = [10, 25, 50];
 
 export function ReservationsPage() {
+  // ?status=PENDING (from the dashboard): every request still ahead, however far.
+  const [searchParams] = useSearchParams();
+  const linkedStatus = searchParams.get('status') === 'PENDING' ? 'PENDING' : '';
   const [view, setView] = useState<View>('list');
   const [from, setFrom] = useState(dayjs().format('YYYY-MM-DD'));
-  const [to, setTo] = useState(dayjs().add(13, 'day').format('YYYY-MM-DD'));
+  const [to, setTo] = useState(
+    dayjs()
+      .add(linkedStatus ? REQUEST_HORIZON_DAYS : 13, 'day')
+      .format('YYYY-MM-DD'),
+  );
   const [weekStart, setWeekStart] = useState(dayjs().startOf('isoWeek'));
-  const [status, setStatus] = useState<ReservationStatus | ''>('');
+  const [status, setStatus] = useState<ReservationStatus | ''>(linkedStatus);
   const [serviceId, setServiceId] = useState<number | ''>('');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);

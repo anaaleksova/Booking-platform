@@ -51,6 +51,22 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long>,
                                           @Param("now") Instant now,
                                           @Param("statuses") Collection<ReservationStatus> statuses);
 
+    /**
+     * Per inactive resource, how many bookings not yet over still hold it:
+     * bookings left on something that is no longer scheduled.
+     */
+    @Query("""
+           select new com.bookingsaas.reservation.StrandedBookings(held.resourceId, count(distinct r.id))
+           from Reservation r join r.resources held, Resource res
+           where res.id = held.resourceId and res.active = false
+             and r.businessId = :businessId and r.status in :statuses and r.endTime > :now
+             and held.occupying = true
+           group by held.resourceId
+           """)
+    List<StrandedBookings> countStranded(@Param("businessId") Long businessId,
+                                         @Param("now") Instant now,
+                                         @Param("statuses") Collection<ReservationStatus> statuses);
+
     /** Bookings not yet over whose appointment touches {@code [from, to)}. */
     @EntityGraph(attributePaths = "resources")
     @Query("""

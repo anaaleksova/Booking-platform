@@ -16,6 +16,12 @@ public record ReservationNotificationEvent(Kind kind, ReservationNotificationPay
 
     public enum Kind {
         CREATED,
+        /** Made by the customer as a request the owner must approve: it holds the slot, nothing is confirmed. */
+        REQUESTED,
+        /** A request the owner confirmed: from here on, exactly like a new confirmed reservation. */
+        APPROVED,
+        /** A request the owner turned down. */
+        DECLINED,
         CANCELLED,
         RESCHEDULED,
         /** Same time, different employee: only the staff concerned hear about it. */
@@ -28,6 +34,18 @@ public record ReservationNotificationEvent(Kind kind, ReservationNotificationPay
 
     public static ReservationNotificationEvent created(ReservationNotificationPayload payload) {
         return new ReservationNotificationEvent(Kind.CREATED, payload, null);
+    }
+
+    public static ReservationNotificationEvent requested(ReservationNotificationPayload payload) {
+        return new ReservationNotificationEvent(Kind.REQUESTED, payload, null);
+    }
+
+    public static ReservationNotificationEvent approved(ReservationNotificationPayload payload) {
+        return new ReservationNotificationEvent(Kind.APPROVED, payload, null);
+    }
+
+    public static ReservationNotificationEvent declined(ReservationNotificationPayload payload) {
+        return new ReservationNotificationEvent(Kind.DECLINED, payload, null);
     }
 
     public static ReservationNotificationEvent cancelled(ReservationNotificationPayload payload) {

@@ -6,6 +6,8 @@ import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
 import com.bookingsaas.common.security.CurrentTenant;
 import com.bookingsaas.media.MediaService;
+import com.bookingsaas.resource.dto.BulkResourceRequest;
+import com.bookingsaas.resource.dto.CopyScheduleRequest;
 import com.bookingsaas.resource.dto.ResourceRequest;
 import com.bookingsaas.resource.dto.ResourceResponse;
 import org.springframework.context.ApplicationEventPublisher;
@@ -13,8 +15,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -243,6 +247,83 @@ public class ResourceService {
         Resource saved = resourceRepository.save(resource);
         replaceServicesOf(businessId, saved.getId(), request.serviceIds());
         return toResponse(businessId, saved);
+    }
+
+    /** "Table" 1–20: the result, and the names skipped because a resource of the type already has them. */
+    public record BulkResult(List<ResourceResponse> created, List<String> skipped) {
+    }
+
+    @Transactional
+    public BulkResult createMany(BulkResourceRequest request) {
+        currentTenant.requireOwner();
+        Long businessId = currentTenant.businessId();
+        requireNonEmployeeType(businessId, request.resourceTypeId());
+        int first = request.firstNumber();
+        int last = request.lastNumber();
+        if (last < first) {
+            throw ApiException.validation("The last number must not be below the first.");
+        }
+        if (last - first + 1 > BulkResourceRequest.MAX) {
+            throw ApiException.validation("Up to " + BulkResourceRequest.MAX + " resources can be added at once.");
+        }
+        DayInterval.validate(request.hours());
+
+        Set<String> taken = resourceRepository.findByBusinessIdOrderByNameAsc(businessId).stream()
+                .filter(resource -> resource.getResourceTypeId().equals(request.resourceTypeId()))
+                .map(resource -> resource.getName().trim().toLowerCase())
+                .collect(Collectors.toSet());
+        List<ResourceResponse> created = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        for (int number = first; number <= last; number++) {
+            String name = request.namePrefix().trim() + " " + number;
+            if (!taken.add(name.toLowerCase())) {
+                skipped.add(name);
+                continue;
+            }
+            ResourceResponse resource = createFor(businessId, new ResourceRequest(request.resourceTypeId(), name,
+                    null, request.capacity(), request.active(), request.sharedSeating(), request.minPartySize(), null,
+                    request.serviceIds()));
+            if (request.hours() != null && !request.hours().isEmpty()) {
+                replaceHoursOf(businessId, resource.id(), request.hours());
+                resource = toResponse(businessId, requireForBusiness(businessId, resource.id()));
+            }
+            created.add(resource);
+        }
+        events.publishEvent(new SetupAreaEdited(businessId, SetupAreaEdited.Area.RESOURCES));
+        return new BulkResult(created, skipped);
+    }
+
+    /**
+     * Gives other resources of the same type this one's weekly schedule — and,
+     * when asked, the services it serves. Works for employees too, whose
+     * working hours are their resource's schedule.
+     *
+     * @return the ids of the resources changed
+     */
+    @Transactional
+    public List<Long> copySchedule(Long sourceId, CopyScheduleRequest request) {
+        currentTenant.requireOwner();
+        Long businessId = currentTenant.businessId();
+        Resource source = requireForBusiness(businessId, sourceId);
+        List<DayInterval> hours = hoursDto(sourceId);
+        List<Long> services = serviceIdsOf(sourceId);
+        List<Long> changed = new ArrayList<>();
+        for (Long targetId : new LinkedHashSet<>(request.targetIds())) {
+            if (targetId == null || targetId.equals(sourceId)) {
+                continue;
+            }
+            Resource target = requireForBusiness(businessId, targetId);
+            if (!target.getResourceTypeId().equals(source.getResourceTypeId())) {
+                throw ApiException.validation(target.getName() + " is a different kind of resource from "
+                        + source.getName() + ".");
+            }
+            replaceHoursOf(businessId, targetId, hours);
+            if (Boolean.TRUE.equals(request.includeServices())) {
+                replaceServicesOf(businessId, targetId, services);
+            }
+            changed.add(targetId);
+        }
+        return changed;
     }
 
     @Transactional
