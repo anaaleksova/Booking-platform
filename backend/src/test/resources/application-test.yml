@@ -21,6 +21,7 @@ app:
     app-id: "1000000000000001"
     app-secret: test-meta-app-secret
     token-key: IQ/fG68oB1TXlxr7ZyekAJRpE85cPk/SFJwE0qmQgqY=
+    public-base-url: https://public.example.test
   rate-limit:
     # Every test request comes from one address. RateLimitIT switches it on.
     enabled: false

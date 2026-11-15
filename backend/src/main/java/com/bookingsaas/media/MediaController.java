@@ -40,6 +40,17 @@ public class MediaController {
                 media.getSizeBytes());
     }
 
+    /** The same image as a JPEG, for Instagram, which accepts nothing else. */
+    @GetMapping("/api/public/media/{id}.jpg")
+    public ResponseEntity<byte[]> serveJpeg(@PathVariable UUID id) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_JPEG)
+                .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
+                .header("X-Content-Type-Options", "nosniff")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .body(mediaService.jpegOf(id));
+    }
+
     /** The bytes behind an id never change, so browsers may cache them for a year. */
     @GetMapping("/api/public/media/{id}")
     public ResponseEntity<byte[]> serve(@PathVariable UUID id) {

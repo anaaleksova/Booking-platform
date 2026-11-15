@@ -14,6 +14,22 @@ public interface MetaGraphClient {
     /** The Pages the person granted the app, each with its own access token. */
     List<MetaPage> pages(String userToken);
 
+    /** A photo post on the Page; Meta fetches the image from {@code imageUrl}. */
+    PublishedPost postPagePhoto(String pageId, String pageToken, String imageUrl, String caption);
+
+    /** A text-only post on the Page. */
+    PublishedPost postPageText(String pageId, String pageToken, String message);
+
+    /**
+     * An image post on the Instagram account: a media container, waited on
+     * until Meta has fetched the image, then published. Instagram takes JPEG only.
+     */
+    PublishedPost postInstagramImage(String instagramAccountId, String pageToken, String imageUrl, String caption);
+
+    /** @param permalink the public link, when Meta returned one */
+    record PublishedPost(String id, String permalink) {
+    }
+
     /**
      * @param instagramAccountId the linked Instagram professional account, or null
      */

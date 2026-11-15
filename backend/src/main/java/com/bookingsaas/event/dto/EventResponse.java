@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -27,14 +28,16 @@ public record EventResponse(
         LocalDate showFrom,
         LocalDate showUntil,
         Long serviceId,
-        String state
+        String state,
+        Set<String> sharedOn
 ) {
 
-    public static EventResponse from(BusinessEvent event, Instant now, ZoneId zone) {
+    /** @param sharedOn the platforms (FACEBOOK, INSTAGRAM) it has been posted on */
+    public static EventResponse from(BusinessEvent event, Instant now, ZoneId zone, Set<String> sharedOn) {
         return new EventResponse(event.getId(), event.getTitle(), event.getDescription(), event.getPerformer(),
                 event.getImageMediaId(), Media.urlOf(event.getImageMediaId()), event.getDate(),
                 event.getStartTime(), event.getEndTime(), event.getShowFrom(), event.getShowUntil(),
-                event.getServiceId(), stateOf(event, now, zone));
+                event.getServiceId(), stateOf(event, now, zone), sharedOn);
     }
 
     private static String stateOf(BusinessEvent event, Instant now, ZoneId zone) {

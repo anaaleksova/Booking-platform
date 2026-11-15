@@ -6,6 +6,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Objects;
@@ -60,6 +66,43 @@ public class MediaService {
     @Transactional(readOnly = true)
     public Media require(UUID id) {
         return repository.findById(id).orElseThrow(() -> ApiException.notFound("Image", id));
+    }
+
+    /** Whether {@link #jpegOf} can serve this image: WebP needs a decoder Java does not ship. */
+    public static boolean convertibleToJpeg(String contentType) {
+        return !ImageType.WEBP.contentType().equals(contentType);
+    }
+
+    /**
+     * The image as a JPEG — what Instagram insists on. PNG and GIF (its first
+     * frame) are flattened onto white, since JPEG has no transparency.
+     */
+    @Transactional(readOnly = true)
+    public byte[] jpegOf(UUID id) {
+        Media media = require(id);
+        if (ImageType.JPEG.contentType().equals(media.getContentType())) {
+            return media.getData();
+        }
+        if (!convertibleToJpeg(media.getContentType())) {
+            throw ApiException.validation("WebP images cannot be converted to JPEG.");
+        }
+        try {
+            BufferedImage source = ImageIO.read(new ByteArrayInputStream(media.getData()));
+            if (source == null) {
+                throw ApiException.validation("The image could not be read.");
+            }
+            BufferedImage flat = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = flat.createGraphics();
+            graphics.setColor(Color.WHITE);
+            graphics.fillRect(0, 0, flat.getWidth(), flat.getHeight());
+            graphics.drawImage(source, 0, 0, null);
+            graphics.dispose();
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ImageIO.write(flat, "jpg", out);
+            return out.toByteArray();
+        } catch (IOException ex) {
+            throw ApiException.validation("The image could not be converted to JPEG.");
+        }
     }
 
     /**

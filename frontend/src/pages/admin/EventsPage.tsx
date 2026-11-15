@@ -25,6 +25,9 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import CelebrationRoundedIcon from '@mui/icons-material/CelebrationRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import FacebookRoundedIcon from '@mui/icons-material/FacebookRounded';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import ShareRoundedIcon from '@mui/icons-material/ShareRounded';
 import { errorMessage } from '@/api/client';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ImageUpload } from '@/components/ImageUpload';
@@ -34,6 +37,8 @@ import { useToast } from '@/components/ToastProvider';
 import { useBusiness } from '@/features/business/api';
 import { useServices } from '@/features/catalog/api';
 import { useDeleteEvent, useEvents, useSaveEvent } from '@/features/events/api';
+import { ShareEventDialog } from '@/features/events/ShareEventDialog';
+import { useIntegrations } from '@/features/integrations/api';
 import { mediaUrl } from '@/features/media/api';
 import { offersEvents } from '@/features/onboarding/businessTypes';
 import type { BusinessEvent, EventInput, EventState } from '@/types/api';
@@ -72,7 +77,10 @@ export function EventsPage() {
   const remove = useDeleteEvent();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [deleting, setDeleting] = useState<BusinessEvent | null>(null);
+  const [sharing, setSharing] = useState<{ event: BusinessEvent; justCreated: boolean } | null>(null);
   const { data: business } = useBusiness();
+  const { data: integrations } = useIntegrations();
+  const pageConnected = integrations?.meta.connected ?? false;
 
   // Events are for restaurants and bars; the menu hides them from everyone else.
   if (business && !offersEvents(business.businessType)) {
@@ -85,7 +93,7 @@ export function EventsPage() {
     }
     const { id, imageUrl: _preview, ...input } = draft;
     try {
-      await save.mutateAsync({
+      const saved = await save.mutateAsync({
         id,
         input: {
           ...input,
@@ -96,13 +104,17 @@ export function EventsPage() {
       });
       toast.success(id ? 'Event saved' : 'Event created');
       setDraft(null);
+      // A new event is the moment to announce it.
+      if (!id && pageConnected) {
+        setSharing({ event: saved, justCreated: true });
+      }
     } catch (err) {
       toast.error(errorMessage(err));
     }
   };
 
   const edit = (event: BusinessEvent) => {
-    const { state: _state, ...editable } = event;
+    const { state: _state, sharedOn: _sharedOn, ...editable } = event;
     setDraft(editable);
   };
 
@@ -174,9 +186,26 @@ export function EventsPage() {
                     {event.serviceId ? (services?.find((s) => s.id === event.serviceId)?.name ?? '—') : 'Announcement only'}
                   </TableCell>
                   <TableCell>
-                    <Chip size="small" variant="outlined" color={STATE_COLORS[event.state]} label={EVENT_STATE_LABELS[event.state]} />
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Chip size="small" variant="outlined" color={STATE_COLORS[event.state]} label={EVENT_STATE_LABELS[event.state]} />
+                      {event.sharedOn.includes('FACEBOOK') ? (
+                        <Tooltip title="Posted on Facebook">
+                          <FacebookRoundedIcon fontSize="small" sx={{ color: '#1877F2' }} />
+                        </Tooltip>
+                      ) : null}
+                      {event.sharedOn.includes('INSTAGRAM') ? (
+                        <Tooltip title="Posted on Instagram">
+                          <InstagramIcon fontSize="small" sx={{ color: '#C13584' }} />
+                        </Tooltip>
+                      ) : null}
+                    </Stack>
                   </TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    <Tooltip title="Share on Facebook / Instagram">
+                      <IconButton onClick={() => setSharing({ event, justCreated: false })}>
+                        <ShareRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Edit">
                       <IconButton onClick={() => edit(event)}>
                         <EditRoundedIcon fontSize="small" />
@@ -295,6 +324,12 @@ export function EventsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ShareEventDialog
+        event={sharing?.event ?? null}
+        intro={sharing?.justCreated ? 'Your event is on your booking page. Announce it on Facebook and Instagram too?' : undefined}
+        onClose={() => setSharing(null)}
+      />
 
       <ConfirmDialog
         open={deleting !== null}

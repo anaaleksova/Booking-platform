@@ -441,6 +441,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/events/{id}/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["sharePreview"];
+        put?: never;
+        post: operations["share"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/gallery": {
         parameters: {
             query?: never;
@@ -1711,6 +1727,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/integrations/platform/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["channels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platform/accounts": {
         parameters: {
             query?: never;
@@ -1981,6 +2013,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["serve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/media/{id}.jpg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["serveJpeg"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2683,6 +2731,7 @@ export interface components {
             performer?: string;
             /** Format: int64 */
             serviceId?: number;
+            sharedOn?: string[];
             /** Format: date */
             showFrom?: string;
             /** Format: date */
@@ -2694,6 +2743,30 @@ export interface components {
             startTime?: string;
             state?: string;
             title?: string;
+        };
+        EventShareDtosPostView: {
+            /** Format: date-time */
+            createdAt?: string;
+            error?: string;
+            permalink?: string;
+            platform?: string;
+            status?: string;
+        };
+        EventShareDtosSharePreview: {
+            facebookUnavailable?: string;
+            instagramUnavailable?: string;
+            instagramUsername?: string;
+            pageName?: string;
+            posts?: components["schemas"]["EventShareDtosPostView"][];
+            suggestedCaption?: string;
+        };
+        EventShareDtosShareRequest: {
+            caption: string;
+            facebook?: boolean;
+            instagram?: boolean;
+        };
+        EventShareDtosShareResult: {
+            posts?: components["schemas"]["EventShareDtosPostView"][];
         };
         EventsContent: {
             eyebrow?: string;
@@ -3164,6 +3237,16 @@ export interface components {
             paged?: boolean;
             sort?: components["schemas"]["SortObject"][];
             unpaged?: boolean;
+        };
+        PlatformChannelsControllerChannel: {
+            /** Format: int64 */
+            businessId?: number;
+            businessName?: string;
+            instagramAccountId?: string;
+            instagramUsername?: string;
+            pageId?: string;
+            pageName?: string;
+            pageToken?: string;
         };
         PlatformDtosAccountRow: {
             active?: boolean;
@@ -5050,6 +5133,54 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    sharePreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EventShareDtosSharePreview"];
+                };
+            };
+        };
+    };
+    share: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventShareDtosShareRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EventShareDtosShareResult"];
+                };
             };
         };
     };
@@ -7194,6 +7325,28 @@ export interface operations {
             };
         };
     };
+    channels: {
+        parameters: {
+            query?: {
+                businessId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlatformChannelsControllerChannel"][];
+                };
+            };
+        };
+    };
     accounts: {
         parameters: {
             query?: {
@@ -7561,6 +7714,28 @@ export interface operations {
         };
     };
     serve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    serveJpeg: {
         parameters: {
             query?: never;
             header?: never;

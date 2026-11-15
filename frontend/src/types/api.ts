@@ -566,10 +566,37 @@ export interface BusinessEvent {
   showUntil: string;
   serviceId?: number | null;
   state: EventState;
+  /** Where it has been posted. */
+  sharedOn: SocialPlatform[];
+}
+
+export type SocialPlatform = 'FACEBOOK' | 'INSTAGRAM';
+
+export interface EventSocialPost {
+  platform: SocialPlatform;
+  status: 'POSTED' | 'FAILED';
+  permalink?: string | null;
+  /** Meta's reason, in words the owner can act on. */
+  error?: string | null;
+  createdAt: string;
+}
+
+/** What the share dialog needs; an "unavailable" text explains why a platform cannot be chosen. */
+export interface EventSharePreview {
+  pageName?: string | null;
+  instagramUsername?: string | null;
+  facebookUnavailable?: string | null;
+  instagramUnavailable?: string | null;
+  suggestedCaption: string;
+  posts: EventSocialPost[];
+}
+
+export interface EventShareResult {
+  posts: EventSocialPost[];
 }
 
 /** Empty show dates take the defaults: a week before, until the day itself. */
-export type EventInput = Omit<BusinessEvent, 'id' | 'imageUrl' | 'state' | 'showFrom' | 'showUntil'> & {
+export type EventInput = Omit<BusinessEvent, 'id' | 'imageUrl' | 'state' | 'showFrom' | 'showUntil' | 'sharedOn'> & {
   showFrom: string | null;
   showUntil: string | null;
 };

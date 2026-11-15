@@ -609,9 +609,11 @@ Admin → Integrations shows recent deliveries.
    - `INTEGRATIONS_PLATFORM_WEBHOOK_SECRET`: any random string. It signs the
      booking events of connected businesses.
 
-   A business that runs its own n8n can still use a per-business API token
-   and its own webhook under Admin → Integrations → n8n. That setup applies
-   only until the business connects with Facebook.
+   Owners see only *Connect with Facebook* on Admin → Integrations. The
+   per-business API tokens and n8n webhook (`/api/admin/integrations/tokens`,
+   `/api/admin/integrations/n8n`) still exist in the API for a business that
+   runs its own n8n, but they are not shown in the UI. They apply only until
+   the business connects with Facebook.
 
 3. **Configure n8n** with environment variables, in a `.env` file next to
    `docker-compose.yml`. Then recreate the container with
@@ -687,6 +689,16 @@ Admin → Integrations shows recent deliveries.
      encrypted (`META_APP_ID`, `META_TOKEN_KEY`, `META_LOGIN_CONFIG_ID` and
      `META_REDIRECT_URI` are described in `.env.example`). Within 20 seconds
      the pollers start answering that Page.
+   - **Sharing events:** restaurants and bars can post an event to the
+     connected Page and Instagram account from Admin → Events. A share dialog
+     opens after a new event is created, and there is a Share button on every
+     event. The backend posts directly through the Graph API with the Page's
+     token, so no n8n is involved. Meta fetches the picture from
+     `<META_PUBLIC_BASE_URL>/api/public/media/<id>.jpg`; Instagram accepts
+     JPEG only, so PNG and GIF are converted and WebP cannot be posted to
+     Instagram. Posting needs `pages_manage_posts` (Facebook) and
+     `instagram_content_publish` (Instagram) in the Facebook Login
+     configuration.
 
 **Meta's messaging window:** businesses can freely message a user within 24
 hours of that user's last message. Reminders and notices usually fall outside

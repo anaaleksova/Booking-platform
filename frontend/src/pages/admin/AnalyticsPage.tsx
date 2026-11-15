@@ -2,11 +2,6 @@ import { useState } from 'react';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { ChartCard, ColumnChart, RankedBars, TrendChart } from '@/components/charts';
 import { DateRangeFilter, presetRange, type RangePreset } from '@/components/DateRangeFilter';
@@ -23,6 +18,7 @@ import {
   type DateRange,
 } from '@/features/analytics/api';
 import { useBusiness } from '@/features/business/api';
+import { ResourceUtilizationCard } from '@/features/analytics/ResourceUtilizationCard';
 import type { Granularity } from '@/types/api';
 import {
   formatLocalDate,
@@ -189,40 +185,7 @@ export function AnalyticsPage() {
         </Grid>
 
         <Grid item xs={12} lg={7}>
-          <ChartCard title="Resource utilization" subtitle="Booked time as a share of each resource's available hours">
-            {resources.data ? (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Resource</TableCell>
-                    <TableCell align="right">Reservations</TableCell>
-                    <TableCell align="right">Booked</TableCell>
-                    <TableCell sx={{ width: '40%' }}>Utilization</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {resources.data.map((resource) => (
-                    <TableRow key={resource.resourceId}>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600}>{resource.resourceName}</Typography>
-                        <Typography variant="caption" color="text.secondary">{resource.resourceTypeName}</Typography>
-                      </TableCell>
-                      <TableCell align="right">{resource.reservations}</TableCell>
-                      <TableCell align="right">{Math.round(resource.bookedMinutes / 60)} h</TableCell>
-                      <TableCell>
-                        <RankedBars
-                          max={1}
-                          items={[{ key: resource.resourceId, label: '', value: resource.utilization, display: formatPercent(resource.utilization) }]}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <LoadingState />
-            )}
-          </ChartCard>
+          <ResourceUtilizationCard resources={resources.data} range={range} />
         </Grid>
         <Grid item xs={12} lg={5}>
           <ChartCard title="Top customers" subtitle="By amount spent in this range">

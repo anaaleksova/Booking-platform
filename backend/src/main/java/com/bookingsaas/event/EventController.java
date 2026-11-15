@@ -2,6 +2,10 @@ package com.bookingsaas.event;
 
 import com.bookingsaas.event.dto.EventRequest;
 import com.bookingsaas.event.dto.EventResponse;
+import com.bookingsaas.event.share.EventShareDtos.SharePreview;
+import com.bookingsaas.event.share.EventShareDtos.ShareRequest;
+import com.bookingsaas.event.share.EventShareDtos.ShareResult;
+import com.bookingsaas.event.share.EventShareService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,9 +28,11 @@ import java.util.List;
 public class EventController {
 
     private final EventService eventService;
+    private final EventShareService shareService;
 
-    public EventController(EventService eventService) {
+    public EventController(EventService eventService, EventShareService shareService) {
         this.eventService = eventService;
+        this.shareService = shareService;
     }
 
     @GetMapping
@@ -54,5 +60,16 @@ public class EventController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         eventService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** What sharing on Facebook / Instagram would post, and what already went out. */
+    @GetMapping("/{id}/share")
+    public SharePreview sharePreview(@PathVariable Long id) {
+        return shareService.preview(id);
+    }
+
+    @PostMapping("/{id}/share")
+    public ShareResult share(@PathVariable Long id, @Valid @RequestBody ShareRequest request) {
+        return shareService.share(id, request);
     }
 }

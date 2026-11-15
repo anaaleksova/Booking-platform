@@ -3,8 +3,10 @@ package com.bookingsaas.integration.meta;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The platform's Meta app. One app serves every business: each owner signs in
@@ -20,8 +22,10 @@ public class MetaSettings {
     private final List<String> scopes;
     private final String frontendUrl;
     private final String redirectUri;
+    private final String publicBaseUrl;
 
-    public MetaSettings(@Value("${app.meta.app-id:}") String appId,
+    public MetaSettings(@Value("${app.meta.public-base-url:}") String publicBaseUrl,
+                        @Value("${app.meta.app-id:}") String appId,
                         @Value("${app.meta.app-secret:}") String appSecret,
                         @Value("${app.meta.graph-version:v21.0}") String graphVersion,
                         @Value("${app.meta.login-config-id:}") String loginConfigId,
@@ -35,6 +39,28 @@ public class MetaSettings {
         this.scopes = Arrays.stream(scopes.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
         this.frontendUrl = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
         this.redirectUri = redirectUri.trim();
+        this.publicBaseUrl = publicBaseUrl.trim().replaceAll("/+$", "");
+    }
+
+    /**
+     * The https address of this API as Meta's servers reach it, for the
+     * pictures they fetch when posting. When not set, the origin of an https
+     * {@code META_REDIRECT_URI} (the same tunnel locally); empty when neither.
+     */
+    public Optional<String> publicBaseUrl() {
+        if (!publicBaseUrl.isEmpty()) {
+            return Optional.of(publicBaseUrl);
+        }
+        if (redirectUri.startsWith("https://")) {
+            URI uri = URI.create(redirectUri);
+            return Optional.of("https://" + uri.getRawAuthority());
+        }
+        return Optional.empty();
+    }
+
+    /** The customer-facing site, for booking links in posts. */
+    public String frontendUrl() {
+        return frontendUrl;
     }
 
     public boolean hasApp() {

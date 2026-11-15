@@ -107,3 +107,5 @@ databaseChangeLog:
       file: db/changelog/changes/031-booking-approval.sql
   - include:
       file: db/changelog/changes/032-meta-connection.sql
+  - include:
+      file: db/changelog/changes/033-event-social-posts.sql

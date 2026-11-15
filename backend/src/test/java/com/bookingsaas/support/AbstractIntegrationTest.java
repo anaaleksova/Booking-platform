@@ -132,7 +132,7 @@ public abstract class AbstractIntegrationTest {
         doAnswer(invocation -> inviteLinks.put(invocation.getArgument(0), invocation.getArgument(3)))
                 .when(staffInviteSender).send(anyString(), anyString(), anyString(), anyString());
         jdbcTemplate.execute("""
-                TRUNCATE meta_connect_session, meta_connection, platform_activity, business_event,staff_invitation,integration_event, integration_idempotency, integration_conversation, customer_external_identity,
+                TRUNCATE event_social_post, meta_connect_session, meta_connection, platform_activity, business_event,staff_invitation,integration_event, integration_idempotency, integration_conversation, customer_external_identity,
                          integration_token, integration, password_reset, pending_signup, notification, floor_plan_decor, floor_plan_item, floor_plan, gallery_image, media, reservation_resource, reservation, discount_service, discount,
                          blocked_time, resource_service, service_resource_requirement, service,
                          employee, resource_hours, resource, resource_type, customer, business_hours,

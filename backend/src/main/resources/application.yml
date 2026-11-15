@@ -165,6 +165,9 @@ app:
     # Empty = FRONTEND_URL/admin/integrations. A Live Meta app needs https; locally
     # use https://<tunnel to :8080>/api/public/meta/return.
     redirect-uri: ${META_REDIRECT_URI:}
+    # The https address of this API as Meta's servers reach it (they fetch event
+    # pictures from it when posting). Empty = the origin of an https META_REDIRECT_URI.
+    public-base-url: ${META_PUBLIC_BASE_URL:}
     scopes: ${META_LOGIN_SCOPES:pages_show_list,pages_manage_metadata,pages_read_engagement,pages_messaging,instagram_basic,instagram_manage_messages,business_management,pages_manage_posts,instagram_content_publish}
     # Base64 of 32 random bytes; encrypts stored Page tokens. Changing it
     # means every business has to connect again.

@@ -10,6 +10,7 @@ import com.bookingsaas.common.security.CurrentTenant;
 import com.bookingsaas.event.dto.EventRequest;
 import com.bookingsaas.event.dto.EventResponse;
 import com.bookingsaas.event.dto.PublicEventResponse;
+import com.bookingsaas.event.share.EventShareService;
 import com.bookingsaas.media.Media;
 import com.bookingsaas.media.MediaService;
 import com.bookingsaas.service.BookableService;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -41,6 +43,7 @@ public class EventService {
     private final BusinessService businessService;
     private final MediaService mediaService;
     private final CurrentTenant currentTenant;
+    private final EventShareService shareService;
     private final Clock clock;
 
     public EventService(BusinessEventRepository repository,
@@ -49,7 +52,9 @@ public class EventService {
                         BusinessService businessService,
                         MediaService mediaService,
                         CurrentTenant currentTenant,
+                        EventShareService shareService,
                         Clock clock) {
+        this.shareService = shareService;
         this.repository = repository;
         this.serviceCatalog = serviceCatalog;
         this.availabilityService = availabilityService;
@@ -143,15 +148,17 @@ public class EventService {
         Long businessId = currentTenant.businessId();
         ZoneId zone = businessService.zoneOf(businessId);
         Instant now = clock.instant();
+        Map<Long, Set<String>> shared = shareService.sharedOn(businessId);
         return repository.findByBusinessIdOrderByDateDescStartTimeDesc(businessId).stream()
-                .map(event -> EventResponse.from(event, now, zone))
+                .map(event -> EventResponse.from(event, now, zone, shared.getOrDefault(event.getId(), Set.of())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public EventResponse get(Long id) {
         Long businessId = currentTenant.businessId();
-        return EventResponse.from(require(businessId, id), clock.instant(), businessService.zoneOf(businessId));
+        return EventResponse.from(require(businessId, id), clock.instant(), businessService.zoneOf(businessId),
+                shareService.sharedOn(businessId).getOrDefault(id, Set.of()));
     }
 
     @Transactional
@@ -162,7 +169,8 @@ public class EventService {
         BusinessEvent event = new BusinessEvent();
         event.setBusinessId(businessId);
         apply(businessId, event, request);
-        return EventResponse.from(repository.save(event), clock.instant(), businessService.zoneOf(businessId));
+        return EventResponse.from(repository.save(event), clock.instant(), businessService.zoneOf(businessId),
+                Set.of());
     }
 
     @Transactional
@@ -175,7 +183,8 @@ public class EventService {
         apply(businessId, event, request);
         BusinessEvent saved = repository.save(event);
         mediaService.discardIfReplaced(businessId, previousImage, saved.getImageMediaId());
-        return EventResponse.from(saved, clock.instant(), businessService.zoneOf(businessId));
+        return EventResponse.from(saved, clock.instant(), businessService.zoneOf(businessId),
+                shareService.sharedOn(businessId).getOrDefault(id, Set.of()));
     }
 
     private void requireEventsOffered(Long businessId) {

@@ -65,6 +65,8 @@ export type Contract = [
   Assert<Fits<Schemas['QuoteResponse'], Api.PriceQuote>>,
   Assert<Fits<Schemas['DiscountResponse'], Api.Discount>>,
   Assert<Fits<Schemas['EventResponse'], Api.BusinessEvent>>,
+  Assert<Fits<Schemas['EventShareDtosSharePreview'], Api.EventSharePreview>>,
+  Assert<Fits<Schemas['EventShareDtosShareResult'], Api.EventShareResult>>,
   Assert<Fits<Schemas['PublicEventResponse'], Api.PublicEvent>>,
   Assert<Fits<Schemas['AnalyticsDtosRevenuePeriods'], Api.RevenuePeriods>>,
   Assert<Fits<Schemas['AnalyticsDtosRevenueReport'], Api.RevenueReport>>,

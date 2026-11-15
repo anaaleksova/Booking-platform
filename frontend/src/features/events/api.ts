@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { queryKeys } from '@/features/queryKeys';
 import { useInvalidatingMutation } from '@/features/mutation';
-import type { BusinessEvent, EventInput } from '@/types/api';
+import type { BusinessEvent, EventInput, EventSharePreview, EventShareResult } from '@/types/api';
 
 export function useEvents() {
   return useQuery({
@@ -17,6 +17,23 @@ export function useSaveEvent() {
       id === undefined
         ? (await apiClient.post<BusinessEvent>('/api/admin/events', input)).data
         : (await apiClient.put<BusinessEvent>(`/api/admin/events/${id}`, input)).data,
+    [queryKeys.events],
+  );
+}
+
+/** What sharing would post, and what already went out. Fetched when the dialog opens. */
+export function useEventSharePreview(id: number | null) {
+  return useQuery({
+    queryKey: [...queryKeys.events, id, 'share'],
+    queryFn: async () => (await apiClient.get<EventSharePreview>(`/api/admin/events/${id}/share`)).data,
+    enabled: id !== null,
+  });
+}
+
+export function useShareEvent() {
+  return useInvalidatingMutation(
+    async ({ id, input }: { id: number; input: { facebook: boolean; instagram: boolean; caption: string } }) =>
+      (await apiClient.post<EventShareResult>(`/api/admin/events/${id}/share`, input)).data,
     [queryKeys.events],
   );
 }
