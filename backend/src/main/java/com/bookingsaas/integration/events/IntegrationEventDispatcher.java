@@ -1,8 +1,8 @@
 package com.bookingsaas.integration.events;
 
 import com.bookingsaas.integration.Integration;
-import com.bookingsaas.integration.IntegrationProvider;
-import com.bookingsaas.integration.IntegrationRepository;
+import com.bookingsaas.integration.PlatformAutomation;
+import com.bookingsaas.integration.PlatformAutomation.WebhookTarget;
 import com.bookingsaas.reservation.ReservationRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,7 +30,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Delivers queued events to the business's n8n webhook.
+ * Delivers queued events to the business's n8n webhook — the platform's own
+ * n8n for a business connected with Facebook (see {@link PlatformAutomation}).
  *
  * <p>Each delivery is a small signed JSON document naming the event and the
  * reservation; the workflow fetches the details it needs through the
@@ -50,7 +51,7 @@ public class IntegrationEventDispatcher {
     private static final Duration LEASE = Duration.ofMinutes(10);
 
     private final IntegrationEventRepository repository;
-    private final IntegrationRepository integrations;
+    private final PlatformAutomation platformAutomation;
     private final ReservationRepository reservations;
     private final ObjectMapper objectMapper;
     private final Clock clock;
@@ -65,7 +66,7 @@ public class IntegrationEventDispatcher {
             .build();
 
     public IntegrationEventDispatcher(IntegrationEventRepository repository,
-                                      IntegrationRepository integrations,
+                                      PlatformAutomation platformAutomation,
                                       ReservationRepository reservations,
                                       ObjectMapper objectMapper,
                                       Clock clock,
@@ -73,7 +74,7 @@ public class IntegrationEventDispatcher {
                                       PlatformTransactionManager transactionManager) {
         this.transaction = new TransactionTemplate(transactionManager);
         this.repository = repository;
-        this.integrations = integrations;
+        this.platformAutomation = platformAutomation;
         this.reservations = reservations;
         this.objectMapper = objectMapper;
         this.clock = clock;
@@ -113,10 +114,8 @@ public class IntegrationEventDispatcher {
     }
 
     void dispatch(IntegrationEvent event) {
-        Optional<Integration> n8n = integrations.findByBusinessIdAndProvider(event.getBusinessId(),
-                IntegrationProvider.N8N).filter(integration -> integration.isConnected()
-                && integration.getWebhookUrl() != null);
-        if (n8n.isEmpty()) {
+        Optional<WebhookTarget> target = platformAutomation.webhookFor(event.getBusinessId());
+        if (target.isEmpty()) {
             event.markSkipped("n8n is not connected");
             repository.save(event);
             return;
@@ -127,7 +126,7 @@ public class IntegrationEventDispatcher {
             return;
         }
 
-        DeliveryResult result = post(n8n.get(), event.getEventType(), event.getDeliveryId(), payload(event));
+        DeliveryResult result = post(target.get(), event.getEventType(), event.getDeliveryId(), payload(event));
         if (result.delivered()) {
             event.markDelivered(clock.instant(), result.httpStatus());
             log.info("Delivered {} for reservation {} (delivery {})", event.getEventType(), event.getReservationId(),
@@ -148,7 +147,8 @@ public class IntegrationEventDispatcher {
         body.put("deliveryId", deliveryId);
         body.put("occurredAt", clock.instant());
         body.put("businessId", integration.getBusinessId());
-        return post(integration, IntegrationEventTypes.INTEGRATION_TEST, deliveryId, body);
+        return post(new WebhookTarget(integration.getWebhookUrl(), integration.getSigningSecret()),
+                IntegrationEventTypes.INTEGRATION_TEST, deliveryId, body);
     }
 
     private Map<String, Object> payload(IntegrationEvent event) {
@@ -162,11 +162,11 @@ public class IntegrationEventDispatcher {
         return body;
     }
 
-    private DeliveryResult post(Integration integration, String eventType, UUID deliveryId, Map<String, Object> body) {
+    private DeliveryResult post(WebhookTarget target, String eventType, UUID deliveryId, Map<String, Object> body) {
         try {
             String json = objectMapper.writeValueAsString(body);
             long timestamp = clock.instant().getEpochSecond();
-            HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(integration.getWebhookUrl()))
+            HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(target.url()))
                     .timeout(TIMEOUT)
                     .header("Content-Type", "application/json")
                     .header("User-Agent", "booking-platform-webhooks")
@@ -174,9 +174,9 @@ public class IntegrationEventDispatcher {
                     .header(WebhookSigner.DELIVERY_HEADER, deliveryId.toString())
                     .header(WebhookSigner.TIMESTAMP_HEADER, String.valueOf(timestamp))
                     .POST(HttpRequest.BodyPublishers.ofString(json));
-            if (integration.getSigningSecret() != null) {
+            if (target.signingSecret() != null) {
                 request.header(WebhookSigner.SIGNATURE_HEADER,
-                        WebhookSigner.sign(integration.getSigningSecret(), timestamp, json));
+                        WebhookSigner.sign(target.signingSecret(), timestamp, json));
             }
             HttpResponse<String> response = http.send(request.build(), HttpResponse.BodyHandlers.ofString());
             int status = response.statusCode();

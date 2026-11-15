@@ -22,6 +22,7 @@ import com.bookingsaas.integration.auth.IntegrationTokenService;
 import com.bookingsaas.integration.events.IntegrationEvent;
 import com.bookingsaas.integration.events.IntegrationEventDispatcher;
 import com.bookingsaas.integration.events.WebhookSigner;
+import com.bookingsaas.integration.meta.MetaConnectService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,6 +52,7 @@ public class IntegrationAdminService {
     private final IntegrationTokenService tokens;
     private final IntegrationEventDispatcher dispatcher;
     private final CurrentTenant currentTenant;
+    private final MetaConnectService meta;
     private final String publicApiUrl;
     private final boolean blockPrivateWebhooks;
 
@@ -58,12 +60,14 @@ public class IntegrationAdminService {
                                    IntegrationTokenService tokens,
                                    IntegrationEventDispatcher dispatcher,
                                    CurrentTenant currentTenant,
+                                   MetaConnectService meta,
                                    @Value("${app.integrations.public-api-url:http://localhost:8080}") String publicApiUrl,
                                    @Value("${app.integrations.block-private-webhooks:false}") boolean blockPrivateWebhooks) {
         this.integrations = integrations;
         this.tokens = tokens;
         this.dispatcher = dispatcher;
         this.currentTenant = currentTenant;
+        this.meta = meta;
         this.publicApiUrl = publicApiUrl;
         this.blockPrivateWebhooks = blockPrivateWebhooks;
     }
@@ -73,11 +77,12 @@ public class IntegrationAdminService {
         currentTenant.requireOwner();
         Long businessId = currentTenant.businessId();
         Integration n8n = find(businessId, IntegrationProvider.N8N);
+        boolean oauthAvailable = meta.available();
         List<ChannelView> channels = List.of(IntegrationProvider.INSTAGRAM, IntegrationProvider.FACEBOOK).stream()
-                .map(provider -> channelView(provider, find(businessId, provider)))
+                .map(provider -> channelView(provider, find(businessId, provider), oauthAvailable))
                 .toList();
         String base = publicApiUrl.endsWith("/") ? publicApiUrl.substring(0, publicApiUrl.length() - 1) : publicApiUrl;
-        return new Overview(businessId, base + "/api/integrations", n8nView(n8n), channels,
+        return new Overview(businessId, base + "/api/integrations", n8nView(n8n), meta.view(businessId), channels,
                 tokens.list(businessId).stream().map(IntegrationAdminService::tokenView).toList(),
                 dispatcher.recent(businessId, RECENT_EVENTS).stream().map(IntegrationAdminService::eventView).toList(),
                 Arrays.asList(IntegrationPermission.values()));
@@ -126,15 +131,18 @@ public class IntegrationAdminService {
     }
 
     /**
-     * Records which Instagram/Facebook account the business receives messages
-     * on. For the MVP the id is entered by hand; the access token for sending
-     * lives in n8n's credential store, never here.
+     * Records by hand which Instagram/Facebook account the business receives
+     * messages on — the fallback to "Connect with Facebook", which fills these
+     * in itself.
      */
     @Transactional
     public ChannelView updateChannel(IntegrationProvider provider, UpdateChannelRequest request) {
         currentTenant.requireOwner();
         if (provider == IntegrationProvider.N8N) {
             throw ApiException.validation("Use the n8n settings for n8n.");
+        }
+        if (meta.view(currentTenant.businessId()).connected()) {
+            throw ApiException.validation("Your Facebook Page is connected by signing in; disconnect it to enter ids by hand.");
         }
         String accountId = request.externalAccountId() == null || request.externalAccountId().isBlank()
                 ? null : request.externalAccountId().trim();
@@ -147,7 +155,7 @@ public class IntegrationAdminService {
                 ? null : request.displayName().trim());
         channel.setStatus(request.enabled() ? IntegrationStatus.CONNECTED
                 : accountId == null ? IntegrationStatus.NOT_CONNECTED : IntegrationStatus.DISABLED);
-        return channelView(provider, integrations.save(channel));
+        return channelView(provider, integrations.save(channel), meta.available());
     }
 
     @Transactional
@@ -215,11 +223,11 @@ public class IntegrationAdminService {
         return new N8nView(n8n.getStatus().name(), n8n.getWebhookUrl(), n8n.getSigningSecret(), n8n.getUpdatedAt());
     }
 
-    private static ChannelView channelView(IntegrationProvider provider, Integration channel) {
+    private static ChannelView channelView(IntegrationProvider provider, Integration channel, boolean oauthAvailable) {
         return channel == null
-                ? new ChannelView(provider.name(), IntegrationStatus.NOT_CONNECTED.name(), null, null, false)
+                ? new ChannelView(provider.name(), IntegrationStatus.NOT_CONNECTED.name(), null, null, oauthAvailable)
                 : new ChannelView(provider.name(), channel.getStatus().name(), channel.getExternalAccountId(),
-                        channel.getDisplayName(), false);
+                        channel.getDisplayName(), oauthAvailable);
     }
 
     private static TokenView tokenView(IntegrationToken token) {

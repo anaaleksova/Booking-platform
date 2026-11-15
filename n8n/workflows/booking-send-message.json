@@ -94,7 +94,7 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
       "position": [
-        220,
+        660,
         0
       ]
     },
@@ -102,8 +102,7 @@
       "parameters": {
         "method": "POST",
         "url": "=https://graph.facebook.com/{{ $env.META_GRAPH_VERSION || 'v21.0' }}/me/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
+        "authentication": "none",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify(Object.assign({ recipient: { id: $json.recipientId }, message: { text: String($json.text).slice(0, 1900) } }, $json.tag ? { messaging_type: 'MESSAGE_TAG', tag: $json.tag } : { messaging_type: 'RESPONSE' })) }}",
@@ -115,6 +114,15 @@
             }
           },
           "timeout": 15000
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{ $json.pageToken }}"
+            }
+          ]
         }
       },
       "id": "send-03",
@@ -122,15 +130,9 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        460,
+        900,
         -120
       ],
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "bkMetaPageToken1",
-          "name": "Meta Page Access Token"
-        }
-      },
       "onError": "continueRegularOutput",
       "alwaysOutputData": true
     },
@@ -138,8 +140,7 @@
       "parameters": {
         "method": "POST",
         "url": "=https://graph.facebook.com/{{ $env.META_GRAPH_VERSION || 'v21.0' }}/me/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
+        "authentication": "none",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify(Object.assign({ recipient: { id: $json.recipientId }, message: { text: String($json.text).slice(0, 1900) } }, $json.tag ? { messaging_type: 'MESSAGE_TAG', tag: $json.tag } : { messaging_type: 'RESPONSE' })) }}",
@@ -151,6 +152,15 @@
             }
           },
           "timeout": 15000
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{ $json.pageToken }}"
+            }
+          ]
         }
       },
       "id": "send-04",
@@ -158,15 +168,9 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        460,
+        900,
         60
       ],
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "bkMetaPageToken1",
-          "name": "Meta Page Access Token"
-        }
-      },
       "onError": "continueRegularOutput",
       "alwaysOutputData": true
     },
@@ -179,7 +183,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
+        1140,
         -30
       ]
     },
@@ -192,8 +196,61 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        460,
+        900,
         240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BOOKING_API_URL }}/platform/channels?businessId={{ $json.businessId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "send-10",
+      "name": "Find Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// The message, plus the Page it goes out from. Without a connected Page, Instagram and\n// Messenger messages cannot be sent: they leave by the switch's fallback and are only logged.\nconst message = $('When called by another workflow').first().json;\nconst page = (($input.first().json.body) || [])[0];\nif (!page && message.provider !== 'TEST') {\n  console.log('No connected Facebook Page for business', message.businessId, '- message not sent');\n  return [{ json: { ...message, provider: 'NO_PAGE' } }];\n}\nreturn [{ json: { ...message, pageId: page?.pageId ?? null, pageToken: page?.pageToken ?? null } }];\n"
+      },
+      "id": "send-11",
+      "name": "Prepare send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
       ]
     }
   ],
@@ -249,6 +306,28 @@
       "main": [
         [
           {
+            "node": "Find Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Page": {
+      "main": [
+        [
+          {
+            "node": "Prepare send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare send": {
+      "main": [
+        [
+          {
             "node": "Channel",
             "type": "main",
             "index": 0
@@ -264,7 +343,7 @@
   },
   "pinData": {},
   "meta": {
-    "description": "Sends a text to a customer on Instagram or Facebook Messenger with the page access token from the 'Meta Page Access Token' credential. TEST messages are only logged."
+    "description": "Sends a text to a customer on Instagram or Facebook Messenger as the business's own connected Page (its token comes from the platform). TEST messages are only logged."
   },
   "tags": []
 }

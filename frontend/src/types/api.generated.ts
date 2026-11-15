@@ -523,6 +523,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/integrations/meta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["disconnect"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/integrations/meta/choose-page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["choosePage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/integrations/meta/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/integrations/meta/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/integrations/n8n": {
         parameters: {
             query?: never;
@@ -2386,6 +2450,8 @@ export interface components {
             message?: string;
             /** @enum {string} */
             provider: "INSTAGRAM" | "FACEBOOK" | "TEST";
+            /** Format: date-time */
+            sentAt?: string;
         };
         ConversationDtosTurnResponse: {
             action?: components["schemas"]["ConversationDtosAction"];
@@ -2398,7 +2464,7 @@ export interface components {
             flow?: string;
             missingFields?: string[];
             /** @enum {string} */
-            nextAction?: "REPLY" | "CREATE_RESERVATION" | "CANCEL_RESERVATION";
+            nextAction?: "REPLY" | "CREATE_RESERVATION" | "CANCEL_RESERVATION" | "NONE";
             options?: components["schemas"]["ConversationDtosOption"][];
             /** @enum {string} */
             outcome?: "RESERVATION_CREATED" | "RESERVATION_CANCELLED" | "BOOKING_ABANDONED" | "CANCELLATION_ABORTED" | "NO_UPCOMING_RESERVATIONS" | "CANCELLATION_NOT_ALLOWED" | "CANCELLATION_FAILED";
@@ -2760,6 +2826,7 @@ export interface components {
             /** Format: int64 */
             businessId?: number;
             channels?: components["schemas"]["IntegrationAdminDtosChannelView"][];
+            meta?: components["schemas"]["MetaConnectDtosMetaView"];
             n8n?: components["schemas"]["IntegrationAdminDtosN8nView"];
             recentEvents?: components["schemas"]["IntegrationAdminDtosEventView"][];
             tokens?: components["schemas"]["IntegrationAdminDtosTokenView"][];
@@ -3003,6 +3070,41 @@ export interface components {
             /** Format: int32 */
             sizeBytes?: number;
             url?: string;
+        };
+        MetaConnectDtosChoosePageRequest: {
+            pageId: string;
+            /** Format: uuid */
+            sessionId: string;
+        };
+        MetaConnectDtosCompleteRequest: {
+            code: string;
+            state: string;
+        };
+        MetaConnectDtosCompleteResponse: {
+            connection?: components["schemas"]["MetaConnectDtosMetaView"];
+            needsPageChoice?: boolean;
+            pages?: components["schemas"]["MetaConnectDtosPageChoice"][];
+            /** Format: uuid */
+            sessionId?: string;
+        };
+        MetaConnectDtosMetaView: {
+            available?: boolean;
+            connected?: boolean;
+            /** Format: date-time */
+            connectedAt?: string;
+            instagramAccountId?: string;
+            instagramUsername?: string;
+            pageId?: string;
+            pageName?: string;
+        };
+        MetaConnectDtosPageChoice: {
+            connectedElsewhere?: boolean;
+            id?: string;
+            instagramUsername?: string;
+            name?: string;
+        };
+        MetaConnectDtosStartResponse: {
+            authorizeUrl?: string;
         };
         OnboardingResponse: {
             /** @enum {string} */
@@ -5107,6 +5209,94 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["IntegrationAdminDtosChannelView"];
+                };
+            };
+        };
+    };
+    disconnect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MetaConnectDtosMetaView"];
+                };
+            };
+        };
+    };
+    choosePage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetaConnectDtosChoosePageRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MetaConnectDtosMetaView"];
+                };
+            };
+        };
+    };
+    complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetaConnectDtosCompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MetaConnectDtosCompleteResponse"];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MetaConnectDtosStartResponse"];
                 };
             };
         };

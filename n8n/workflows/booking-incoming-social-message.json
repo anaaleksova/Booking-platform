@@ -118,7 +118,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const sources = $('Read Meta messages').all();\nreturn $input.all().map((item, index) => ({ json: {\n  provider: sources[index].json.provider,\n  recipientId: sources[index].json.recipientId,\n  text: item.json.reply,\n} }));\n"
+        "jsCode": "const sources = $('Match business').all();\nreturn $input.all().map((item, index) => ({ json: {\n  businessId: sources[index].json.businessId,\n  provider: sources[index].json.provider,\n  recipientId: sources[index].json.recipientId,\n  text: item.json.reply,\n} }));\n"
       },
       "id": "incoming-08",
       "name": "Reply to sender",
@@ -168,7 +168,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body || {};\nif (!body.message) {\n  return [{ json: { provider: 'TEST', externalUserId: 'invalid', text: '' , invalid: true } }];\n}\nreturn [{ json: { provider: 'TEST', externalUserId: String(body.userId || 'test-user'), displayName: body.name || null, text: String(body.message) } }];\n"
+        "jsCode": "const body = $input.first().json.body || {};\nif (!body.message) {\n  return [{ json: { provider: 'TEST', externalUserId: 'invalid', text: '' , invalid: true } }];\n}\n// Which business to chat with: \"businessId\" in the body, else BOOKING_TEST_BUSINESS_ID, else 1.\nconst businessId = Number(body.businessId || $env.BOOKING_TEST_BUSINESS_ID || 1);\nreturn [{ json: { businessId, provider: 'TEST', externalUserId: String(body.userId || 'test-user'), displayName: body.name || null, text: String(body.message) } }];\n"
       },
       "id": "incoming-11",
       "name": "Read test message",
@@ -214,6 +214,53 @@
         660,
         340
       ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BOOKING_API_URL }}/platform/channels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "social-20",
+      "name": "Connected Pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        330,
+        260
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Each message goes to the business whose Page (or Instagram account) it was sent to.\nconst pages = $('Connected Pages').all().map(item => item.json);\nconst out = [];\nfor (const item of $('Read Meta messages').all()) {\n  const m = item.json;\n  const page = pages.find(p => p.pageId === m.pageId || p.instagramAccountId === m.pageId);\n  if (!page) { console.log('Message for a Page no business connected:', m.pageId); continue; }\n  out.push({ json: { ...m, businessId: page.businessId } });\n}\nreturn out;\n"
+      },
+      "id": "social-21",
+      "name": "Match business",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        550,
+        260
+      ]
     }
   ],
   "connections": {
@@ -254,7 +301,7 @@
       "main": [
         [
           {
-            "node": "Conversation turn",
+            "node": "Connected Pages",
             "type": "main",
             "index": 0
           }
@@ -310,6 +357,28 @@
         [
           {
             "node": "Return reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Connected Pages": {
+      "main": [
+        [
+          {
+            "node": "Match business",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match business": {
+      "main": [
+        [
+          {
+            "node": "Conversation turn",
             "type": "main",
             "index": 0
           }

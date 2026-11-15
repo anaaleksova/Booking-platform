@@ -25,11 +25,20 @@ public class IntegrationAccess {
     /** The principal, once it is known to act for this business with this permission. */
     public IntegrationPrincipal require(Long businessId, IntegrationPermission permission) {
         IntegrationPrincipal principal = principal();
-        if (!principal.businessId().equals(businessId)) {
+        if (!principal.actsFor(businessId)) {
             throw ApiException.accessDenied("This token does not give access to business " + businessId + ".");
         }
         if (!principal.may(permission)) {
             throw ApiException.accessDenied("This token does not have the " + permission + " permission.");
+        }
+        return principal;
+    }
+
+    /** The platform's own n8n; a business's token is refused. */
+    public IntegrationPrincipal requirePlatform() {
+        IntegrationPrincipal principal = principal();
+        if (!principal.platform()) {
+            throw ApiException.accessDenied("Only the platform's automation may do this.");
         }
         return principal;
     }

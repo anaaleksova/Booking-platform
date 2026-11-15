@@ -880,10 +880,38 @@ export interface IntegrationEventDelivery {
   createdAt: string;
 }
 
+/** The Facebook Page (and its Instagram) connected by signing in with Meta. */
+export interface MetaConnection {
+  /** The platform's Meta app is set up, so the Connect button works. */
+  available: boolean;
+  connected: boolean;
+  pageId?: string | null;
+  pageName?: string | null;
+  instagramAccountId?: string | null;
+  instagramUsername?: string | null;
+  connectedAt?: string | null;
+}
+
+export interface MetaPageChoice {
+  id: string;
+  name: string;
+  instagramUsername?: string | null;
+  /** Already connected to another business; it cannot be picked. */
+  connectedElsewhere: boolean;
+}
+
+export interface MetaConnectResult {
+  needsPageChoice: boolean;
+  connection?: MetaConnection | null;
+  sessionId?: string | null;
+  pages?: MetaPageChoice[] | null;
+}
+
 export interface IntegrationsOverview {
   businessId: number;
   apiBaseUrl: string;
   n8n: N8nConnection;
+  meta: MetaConnection;
   channels: ChannelConnection[];
   tokens: IntegrationToken[];
   recentEvents: IntegrationEventDelivery[];

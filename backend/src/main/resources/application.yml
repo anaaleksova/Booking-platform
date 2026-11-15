@@ -145,6 +145,30 @@ app:
     dispatch-interval-ms: ${INTEGRATION_DISPATCH_INTERVAL_MS:10000}
     # Set true in production: stops tenants pointing webhooks at internal addresses.
     block-private-webhooks: ${INTEGRATIONS_BLOCK_PRIVATE_WEBHOOKS:false}
+    # The platform's own n8n, which answers the chats of every business that
+    # connected with Facebook. Its token acts for any business: keep it secret.
+    platform:
+      token: ${INTEGRATIONS_PLATFORM_TOKEN:}
+      # Where those businesses' booking events go, e.g. http://localhost:5678/webhook/booking-events
+      webhook-url: ${INTEGRATIONS_PLATFORM_WEBHOOK_URL:}
+      # n8n checks deliveries with this (its BOOKING_WEBHOOK_SECRET).
+      signing-secret: ${INTEGRATIONS_PLATFORM_WEBHOOK_SECRET:}
+  # "Connect with Facebook" on Admin -> Integrations. Off until the app id,
+  # app secret and token key are all set.
+  meta:
+    app-id: ${META_APP_ID:}
+    app-secret: ${META_APP_SECRET:}
+    graph-version: ${META_GRAPH_VERSION:v21.0}
+    # A "Facebook Login for Business" configuration; when set, Meta takes the
+    # permissions from it and the scopes below are not sent.
+    login-config-id: ${META_LOGIN_CONFIG_ID:}
+    # Empty = FRONTEND_URL/admin/integrations. A Live Meta app needs https; locally
+    # use https://<tunnel to :8080>/api/public/meta/return.
+    redirect-uri: ${META_REDIRECT_URI:}
+    scopes: ${META_LOGIN_SCOPES:pages_show_list,pages_manage_metadata,pages_read_engagement,pages_messaging,instagram_basic,instagram_manage_messages,business_management,pages_manage_posts,instagram_content_publish}
+    # Base64 of 32 random bytes; encrypts stored Page tokens. Changing it
+    # means every business has to connect again.
+    token-key: ${META_TOKEN_KEY:}
 
 logging:
   level:

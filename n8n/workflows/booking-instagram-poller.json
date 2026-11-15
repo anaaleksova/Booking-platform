@@ -4,7 +4,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## BOOKING - Instagram Inbox Poller\nFallback for when Meta does not deliver the `messages` webhook: every 20 seconds it reads the Page's Instagram conversations and hands each new customer message to **Instagram Reply** without waiting, so a slow model reply never makes the next poll pick the same message up again.\nUses the **Meta Page Access Token** credential. Unpublish this workflow once the webhook in **Incoming Social Message** works, or customers get two replies.",
+        "content": "## BOOKING - Instagram Inbox Poller\nFallback for when Meta does not deliver the `messages` webhook: every 20 seconds it reads the Instagram conversations of **every Page connected with Facebook** (Admin → Integrations), using each Page's own token from the platform, and hands each new customer message to **Instagram Reply** without waiting.\nUses the **Booking Platform API** credential with the platform token. Unpublish it once the webhook in **Incoming Social Message** works, or customers get two replies.",
         "width": 560,
         "height": 220
       },
@@ -39,42 +39,8 @@
     },
     {
       "parameters": {
-        "url": "=https://graph.facebook.com/{{ $env.META_GRAPH_VERSION || 'v21.0' }}/me",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "fields",
-              "value": "instagram_business_account"
-            }
-          ]
-        },
-        "options": {
-          "timeout": 15000
-        }
-      },
-      "id": "poll-03",
-      "name": "Get Instagram account",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        220,
-        0
-      ],
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "bkMetaPageToken1",
-          "name": "Meta Page Access Token"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "url": "=https://graph.facebook.com/{{ $env.META_GRAPH_VERSION || 'v21.0' }}/me/conversations",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
+        "url": "=https://graph.facebook.com/{{ $env.META_GRAPH_VERSION || 'v21.0' }}/{{ $json.pageId }}/conversations",
+        "authentication": "none",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
@@ -89,11 +55,21 @@
             {
               "name": "limit",
               "value": "10"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $json.pageToken }}"
             }
           ]
         },
         "options": {
-          "timeout": 15000
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         }
       },
       "id": "poll-04",
@@ -104,16 +80,11 @@
         440,
         0
       ],
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "bkMetaPageToken1",
-          "name": "Meta Page Access Token"
-        }
-      }
+      "alwaysOutputData": false
     },
     {
       "parameters": {
-        "jsCode": "\n// Turns new customer DMs into conversation turns. Seen message ids live in the workflow's\n// static data; the first run only records what is already there, so old DMs are not answered.\nconst own = $('Get Instagram account').first().json.instagram_business_account?.id;\nconst conversations = $input.first().json.data || [];\nconst store = $getWorkflowStaticData('global');\nconst firstRun = !store.seen;\nstore.seen = store.seen || {};\nconst cutoff = Date.now() - 15 * 60 * 1000;\n// Several messages from one person in this poll (\"hi\", \"massage\", \"tomorrow 5pm\") become one\n// turn, so they are understood together and answered once instead of racing each other.\nconst bySender = new Map();\nfor (const conversation of conversations) {\n  const messages = [...(conversation.messages?.data || [])].reverse();   // oldest first\n  for (const m of messages) {\n    if (store.seen[m.id]) continue;\n    store.seen[m.id] = Date.now();\n    if (firstRun || !own) continue;\n    if (!m.message || !m.from?.id || m.from.id === own) continue;      // our own replies\n    if (new Date(m.created_time).getTime() < cutoff) continue;\n    const earlier = bySender.get(m.from.id);\n    if (earlier) {\n      // The same words twice in a row are one message.\n      if (earlier.lastText !== m.message) earlier.text += '\\n' + m.message;\n      earlier.lastText = m.message;\n      earlier.mid = m.id;\n      earlier.sentAt = m.created_time;\n    } else {\n      bySender.set(m.from.id, { provider: 'INSTAGRAM', externalUserId: m.from.id, recipientId: m.from.id, displayName: m.from.username || null, text: m.message, lastText: m.message, mid: m.id, sentAt: m.created_time });\n    }\n  }\n}\nconst out = [...bySender.values()].map(({ lastText, ...json }) => ({ json }));\nconst ids = Object.keys(store.seen);\nif (ids.length > 1000) ids.sort((a, b) => store.seen[a] - store.seen[b]).slice(0, ids.length - 500).forEach(id => delete store.seen[id]);\nreturn out;\n"
+        "jsCode": "\n// Turns new Instagram messages into conversation turns, for every connected Page. Seen message\n// ids live in the workflow's static data; the first poll of a Page only records what is\n// already there, so old messages are not answered when a business connects.\nconst pages = $('Pages with Instagram').all().map(item => item.json);\nconst store = $getWorkflowStaticData('global');\nstore.seen = store.seen || {};\nstore.pages = store.pages || {};\nconst cutoff = Date.now() - 15 * 60 * 1000;\nconst out = [];\n$input.all().forEach((item, index) => {\n  const page = pages[index];\n  const response = item.json;\n  if (!page) return;\n  if (response.statusCode !== 200) {\n    // Usually a token Meta revoked: the owner has to connect again.\n    console.log('Instagram poll failed for business', page.businessId, response.statusCode,\n      JSON.stringify(response.body?.error ?? {}));\n    return;\n  }\n  const own = page.instagramAccountId;   // our own replies are skipped\n  const firstRun = !store.pages[page.pageId];\n  store.pages[page.pageId] = Date.now();\n  // Several messages from one person in this poll (\"hi\", \"massage\", \"tomorrow 5pm\") become one\n  // turn, so they are understood together and answered once instead of racing each other.\n  const bySender = new Map();\n  for (const conversation of response.body?.data || []) {\n    const messages = [...(conversation.messages?.data || [])].reverse();   // oldest first\n    for (const m of messages) {\n      if (store.seen[m.id]) continue;\n      store.seen[m.id] = Date.now();\n      if (firstRun) continue;\n      if (!m.message || !m.from?.id || m.from.id === own) continue;\n      if (new Date(m.created_time).getTime() < cutoff) continue;\n      const earlier = bySender.get(m.from.id);\n      if (earlier) {\n        // The same words twice in a row are one message.\n        if (earlier.lastText !== m.message) earlier.text += '\\n' + m.message;\n        earlier.lastText = m.message;\n        earlier.mid = m.id;\n        earlier.sentAt = m.created_time;\n      } else {\n        bySender.set(m.from.id, { businessId: page.businessId, provider: 'INSTAGRAM', externalUserId: m.from.id,\n          recipientId: m.from.id, displayName: m.from.username || null, text: m.message, lastText: m.message,\n          mid: m.id, sentAt: m.created_time });\n      }\n    }\n  }\n  for (const { lastText, ...json } of bySender.values()) out.push({ json });\n});\nconst ids = Object.keys(store.seen);\nif (ids.length > 2000) ids.sort((a, b) => store.seen[a] - store.seen[b]).slice(0, ids.length - 1000).forEach(id => delete store.seen[id]);\nreturn out;\n"
       },
       "id": "poll-05",
       "name": "Read new messages",
@@ -145,6 +116,52 @@
         880,
         0
       ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BOOKING_API_URL }}/platform/channels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "inst-10",
+      "name": "Connected Pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only Pages with a linked Instagram account have Instagram chats.\nreturn $input.all().filter(item => item.json.instagramAccountId);\n"
+      },
+      "id": "inst-11",
+      "name": "Pages with Instagram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        330,
+        160
+      ]
     }
   ],
   "connections": {
@@ -152,18 +169,7 @@
       "main": [
         [
           {
-            "node": "Get Instagram account",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Instagram account": {
-      "main": [
-        [
-          {
-            "node": "Get conversations",
+            "node": "Connected Pages",
             "type": "main",
             "index": 0
           }
@@ -186,6 +192,28 @@
         [
           {
             "node": "Answer in background",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Connected Pages": {
+      "main": [
+        [
+          {
+            "node": "Pages with Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pages with Instagram": {
+      "main": [
+        [
+          {
+            "node": "Get conversations",
             "type": "main",
             "index": 0
           }

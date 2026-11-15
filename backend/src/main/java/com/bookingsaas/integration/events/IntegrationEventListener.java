@@ -2,9 +2,7 @@ package com.bookingsaas.integration.events;
 
 import com.bookingsaas.business.BusinessService;
 import com.bookingsaas.business.BusinessSettings;
-import com.bookingsaas.integration.Integration;
-import com.bookingsaas.integration.IntegrationProvider;
-import com.bookingsaas.integration.IntegrationRepository;
+import com.bookingsaas.integration.PlatformAutomation;
 import com.bookingsaas.notification.ReservationNotificationEvent;
 import com.bookingsaas.notification.ReservationNotificationPayload;
 import org.slf4j.Logger;
@@ -31,16 +29,16 @@ public class IntegrationEventListener {
     private static final Logger log = LoggerFactory.getLogger(IntegrationEventListener.class);
 
     private final IntegrationEventRepository repository;
-    private final IntegrationRepository integrations;
+    private final PlatformAutomation platformAutomation;
     private final BusinessService businessService;
     private final Clock clock;
 
     public IntegrationEventListener(IntegrationEventRepository repository,
-                                    IntegrationRepository integrations,
+                                    PlatformAutomation platformAutomation,
                                     BusinessService businessService,
                                     Clock clock) {
         this.repository = repository;
-        this.integrations = integrations;
+        this.platformAutomation = platformAutomation;
         this.businessService = businessService;
         this.clock = clock;
     }
@@ -48,10 +46,7 @@ public class IntegrationEventListener {
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void on(ReservationNotificationEvent event) {
         ReservationNotificationPayload payload = event.payload();
-        boolean connected = integrations.findByBusinessIdAndProvider(payload.businessId(), IntegrationProvider.N8N)
-                .filter(Integration::isConnected)
-                .isPresent();
-        if (!connected) {
+        if (platformAutomation.webhookFor(payload.businessId()).isEmpty()) {
             return;
         }
         Instant now = clock.instant();

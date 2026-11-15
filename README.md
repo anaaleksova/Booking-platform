@@ -598,13 +598,20 @@ Admin → Integrations shows recent deliveries.
    The editor is at <http://localhost:5678>. Create the owner account the first
    time. Workflows are mounted read-only at `/workflows` in the container.
 
-2. **Platform side:** sign in as the business owner, open **Admin →
-   Integrations** and:
-   - Create an **API token** with all permissions, and copy it (it is shown once).
-   - Under **n8n**, enter `http://localhost:5678/webhook/booking-events`,
-     switch on *Send events to n8n* and save. Copy the **signing secret**.
-     If the backend runs in Docker too (`--profile full`), use
-     `http://n8n:5678/webhook/booking-events` instead.
+2. **Platform side.** One n8n serves every business that connected its
+   Facebook Page (Admin → Integrations → *Connect with Facebook*). Set in the
+   backend's `.env`:
+   - `INTEGRATIONS_PLATFORM_TOKEN`: a long random token (see `.env.example`).
+     It acts for any business, so keep it secret.
+   - `INTEGRATIONS_PLATFORM_WEBHOOK_URL`: `http://localhost:5678/webhook/booking-events`
+     (`http://n8n:5678/webhook/booking-events` when the backend runs in Docker
+     too, with `--profile full`).
+   - `INTEGRATIONS_PLATFORM_WEBHOOK_SECRET`: any random string. It signs the
+     booking events of connected businesses.
+
+   A business that runs its own n8n can still use a per-business API token
+   and its own webhook under Admin → Integrations → n8n. That setup applies
+   only until the business connects with Facebook.
 
 3. **Configure n8n** with environment variables, in a `.env` file next to
    `docker-compose.yml`. Then recreate the container with
@@ -613,7 +620,8 @@ Admin → Integrations shows recent deliveries.
    | Variable | Value |
    |---|---|
    | `BOOKING_API_URL` | `http://host.docker.internal:8080/api/integrations` (default; `http://backend:8080/api/integrations` with `--profile full`) |
-   | `BOOKING_WEBHOOK_SECRET` | The signing secret from step 2 |
+   | `BOOKING_WEBHOOK_SECRET` | The same value as `INTEGRATIONS_PLATFORM_WEBHOOK_SECRET` |
+   | `BOOKING_TEST_BUSINESS_ID` | Optional: the business the test chat talks to when the request names none (default 1) |
    | `META_VERIFY_TOKEN` | Any string; the same value goes into the Meta app's webhook settings |
    | `META_APP_SECRET` | The Meta app secret (checks the `X-Hub-Signature-256` signature on incoming messages) |
    | `ANTHROPIC_BASE_URL` | Optional; only for a proxy in front of the Claude API |
@@ -621,10 +629,13 @@ Admin → Integrations shows recent deliveries.
 
 4. **Credentials** (n8n → *Credentials* → *Add credential*). Keep these exact
    names, because the workflows refer to them:
-   - **Booking Platform API**, type *Header Auth*: name `Authorization`, value `Bearer bkp_…`.
+   - **Booking Platform API**, type *Header Auth*: name `Authorization`, value
+     `Bearer <INTEGRATIONS_PLATFORM_TOKEN>`.
    - **Anthropic account**, type *Anthropic*: your Claude API key.
-   - **Meta Page Access Token**, type *Query Auth*: name `access_token`, value
-     the Page access token (needed only for real Instagram/Messenger sending).
+
+   No Meta credential is needed. Each Page's access token comes from the
+   platform (`GET /api/integrations/platform/channels`, platform token only),
+   so replies always go out as the business's own Page.
 
 5. **Import the workflows:**
    ```bash
@@ -642,11 +653,11 @@ Admin → Integrations shows recent deliveries.
    | BOOKING - Incoming Social Message | Meta webhook (`/webhook/social/meta`, GET verify + POST messages) and a test chat (`/webhook/social/test`) |
    | BOOKING - Conversation Turn | Context → Claude (understand) → turn → create/cancel → Claude (reply) |
    | BOOKING - Create Reservation / Cancel Reservation | One API call each, with idempotency and error mapping |
-   | BOOKING - Send Message | Sends through the Graph API (`/me/messages`); TEST messages are only logged |
+   | BOOKING - Send Message | Sends through the Graph API as the business's connected Page; TEST messages are only logged |
    | BOOKING - Reservation Events | Verifies the signature, drops duplicate deliveries, routes the event |
    | BOOKING - Confirmation / Reminder / Cancellation Notice | Message the customer on their chat channel. A booking or cancellation the customer made in that chat is not announced twice. |
    | BOOKING - Privacy Policy | Serves the privacy policy page Meta requires for the app (`/webhook/privacy`) |
-   | BOOKING - Instagram Inbox Poller / Messenger Inbox Poller | For when Meta does not deliver the `messages` webhook: every 20 seconds each reads the Page's Instagram or Messenger conversations and answers new messages through **BOOKING - Instagram Reply** (despite its name, it replies on either channel). Publish only the pollers whose channel has no working webhook, or customers get two replies. Messenger needs the `pages_messaging` permission on the Page token. |
+   | BOOKING - Instagram Inbox Poller / Messenger Inbox Poller | For when Meta does not deliver the `messages` webhook: every 20 seconds each reads the Instagram or Messenger conversations of every connected Page, with that Page's own token, and answers new messages through **BOOKING - Instagram Reply** (despite its name, it replies on either channel). Publish only the pollers whose channel has no working webhook, or customers get two replies. Messenger needs the `pages_messaging` permission on the Page token. |
 
    Both Claude calls use `claude-opus-5-5` at low effort, with
    `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`). If a model
@@ -658,7 +669,7 @@ Admin → Integrations shows recent deliveries.
    ```bash
    curl -X POST http://localhost:5678/webhook/social/test \
         -H "Content-Type: application/json" \
-        -d '{"userId":"tester-1","message":"Hi, I want to book a couples massage tomorrow"}'
+        -d '{"businessId":1,"userId":"tester-1","message":"Hi, I want to book a couples massage tomorrow"}'
    ```
    The reply comes back in the response. Keep sending messages with the same
    `userId` ("2", "17:30", "Ana, +389 70 123 456", "yes"). The reservation then
@@ -671,10 +682,11 @@ Admin → Integrations shows recent deliveries.
      the verify token from step 3, and subscribe to `messages`.
    - Meta needs a public HTTPS URL. Locally, use a tunnel (for example
      `ngrok http 5678`) and set `N8N_WEBHOOK_URL` to it.
-   - Enter the account or Page id in Admin → Integrations → Instagram/Facebook
-     and switch on *Take bookings here*.
-   - "Connect with Meta" (OAuth) is not built yet. The model stores the
-     connection per provider so it can be added later.
+   - Each business then clicks **Connect with Facebook** in Admin →
+     Integrations and picks its Page. The platform stores the Page token
+     encrypted (`META_APP_ID`, `META_TOKEN_KEY`, `META_LOGIN_CONFIG_ID` and
+     `META_REDIRECT_URI` are described in `.env.example`). Within 20 seconds
+     the pollers start answering that Page.
 
 **Meta's messaging window:** businesses can freely message a user within 24
 hours of that user's last message. Reminders and notices usually fall outside

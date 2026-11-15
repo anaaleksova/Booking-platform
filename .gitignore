@@ -25,6 +25,9 @@ yarn-error.log*
 *.swp
 .DS_Store
 
+# Graphify knowledge graph (local only)
+graphify-out/
+
 # Test output
 backend/**/surefire-reports/
 frontend/test-results/

@@ -3,6 +3,7 @@ package com.bookingsaas.integration.auth;
 import com.bookingsaas.business.Business;
 import com.bookingsaas.business.BusinessRepository;
 import com.bookingsaas.common.error.ApiException;
+import com.bookingsaas.integration.PlatformAutomation;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,12 +33,14 @@ public class IntegrationTokenService {
     private final IntegrationTokenRepository repository;
     private final BusinessRepository businessRepository;
     private final Clock clock;
+    private final PlatformAutomation platformAutomation;
 
     public IntegrationTokenService(IntegrationTokenRepository repository, BusinessRepository businessRepository,
-                                   Clock clock) {
+                                   Clock clock, PlatformAutomation platformAutomation) {
         this.repository = repository;
         this.businessRepository = businessRepository;
         this.clock = clock;
+        this.platformAutomation = platformAutomation;
     }
 
     /** A new token and, once only, its secret value. */
@@ -69,6 +72,9 @@ public class IntegrationTokenService {
      */
     @Transactional
     public Optional<IntegrationPrincipal> authenticate(String presented) {
+        if (platformAutomation.isPlatformToken(presented)) {
+            return Optional.of(IntegrationPrincipal.platformAutomation());
+        }
         if (presented == null || !presented.startsWith(TOKEN_PREFIX)) {
             return Optional.empty();
         }

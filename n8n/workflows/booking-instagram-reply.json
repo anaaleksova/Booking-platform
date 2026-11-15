@@ -49,7 +49,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst source = $('When called by the poller').first().json;\nreturn [{ json: { provider: source.provider, recipientId: source.recipientId, text: $input.first().json.reply } }];\n"
+        "jsCode": "\nconst source = $('When called by the poller').first().json;\nreturn [{ json: { businessId: source.businessId, provider: source.provider, recipientId: source.recipientId, text: $input.first().json.reply } }];\n"
       },
       "id": "reply-04",
       "name": "Reply to sender",

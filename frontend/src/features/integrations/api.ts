@@ -8,6 +8,8 @@ import type {
   IntegrationPermission,
   IntegrationToken,
   IntegrationsOverview,
+  MetaConnection,
+  MetaConnectResult,
   N8nConnection,
   WebhookTestResult,
 } from '@/types/api';
@@ -49,6 +51,38 @@ export function useSaveChannel() {
       provider: ChannelConnection['provider'];
       input: { externalAccountId: string | null; displayName: string | null; enabled: boolean };
     }) => (await apiClient.put<ChannelConnection>(`/api/admin/integrations/channels/${provider.toLowerCase()}`, input)).data,
+    [queryKeys.integrations],
+  );
+}
+
+/** Where to send the browser: Meta's login dialog. */
+export function useStartMetaConnect() {
+  return useMutation({
+    mutationFn: async () =>
+      (await apiClient.post<{ authorizeUrl: string }>('/api/admin/integrations/meta/start')).data.authorizeUrl,
+  });
+}
+
+/** Hands the code Meta sent back to the API. */
+export function useCompleteMetaConnect() {
+  return useInvalidatingMutation(
+    async (input: { code: string; state: string }) =>
+      (await apiClient.post<MetaConnectResult>('/api/admin/integrations/meta/complete', input)).data,
+    [queryKeys.integrations],
+  );
+}
+
+export function useChooseMetaPage() {
+  return useInvalidatingMutation(
+    async (input: { sessionId: string; pageId: string }) =>
+      (await apiClient.post<MetaConnection>('/api/admin/integrations/meta/choose-page', input)).data,
+    [queryKeys.integrations],
+  );
+}
+
+export function useDisconnectMeta() {
+  return useInvalidatingMutation(
+    async (_: void) => (await apiClient.delete<MetaConnection>('/api/admin/integrations/meta')).data,
     [queryKeys.integrations],
   );
 }

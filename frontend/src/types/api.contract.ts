@@ -77,6 +77,8 @@ export type Contract = [
   Assert<Fits<Schemas['GalleryImageResponse'], Api.GalleryImage>>,
   Assert<Fits<Schemas['MediaControllerUploadResponse'], Api.UploadedMedia>>,
   Assert<Fits<Schemas['IntegrationAdminDtosOverview'], Api.IntegrationsOverview>>,
+  Assert<Fits<Schemas['MetaConnectDtosCompleteResponse'], Api.MetaConnectResult>>,
+  Assert<Fits<Schemas['MetaConnectDtosMetaView'], Api.MetaConnection>>,
   Assert<Fits<Schemas['PlatformDtosOverview'], Api.PlatformOverview>>,
   Assert<Fits<Schemas['PlatformDtosBusinessRow'], Api.PlatformBusiness>>,
   Assert<Fits<Schemas['PlatformDtosAccountRow'], Api.PlatformAccount>>,

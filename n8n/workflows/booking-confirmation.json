@@ -15,45 +15,16 @@
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{ $env.BOOKING_API_URL }}/me",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": true,
-              "neverError": true
-            }
-          },
-          "timeout": 15000
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Workflow-Execution-Id",
-              "value": "={{ $execution.id }}"
-            }
-          ]
-        }
+        "jsCode": "\n// The platform's n8n answers for every business: the caller says which one. Same shape as the\n// old GET /me response, so the steps after this one are unchanged.\nconst businessId = $('When called by another workflow').first().json.businessId;\nreturn [{ json: businessId\n  ? { statusCode: 200, body: { businessId } }\n  : { statusCode: 400, body: { message: 'No businessId was passed to this workflow' } } }];\n"
       },
       "id": "confirmation-02",
       "name": "Who am I",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         220,
         0
-      ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "bkApiCredential1",
-          "name": "Booking Platform API"
-        }
-      },
-      "onError": "continueRegularOutput",
-      "alwaysOutputData": true
+      ]
     },
     {
       "parameters": {
@@ -99,7 +70,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const response = $input.first().json;\nif (response.statusCode !== 200) {\n  console.log('Could not load reservation', response.statusCode);\n  return [{ json: { send: false, reason: 'reservation not available' } }];\n}\nconst r = response.body;\nconst approved = $('When called by another workflow').first().json.event === 'reservation.approved';\n// A request still waiting for the owner is not confirmed yet.\nif (r.status === 'PENDING') return [{ json: { send: false, reason: 'awaiting approval', reservationId: r.id } }];\n// Message the customer where they talk to the business; TEST identities are only logged.\nconst channel = (r.channels || [])[0];\nif (!channel) return [{ json: { send: false, reason: 'customer has no chat channel', reservationId: r.id } }];\nconst day = new Date(r.date + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });\nconst price = new Intl.NumberFormat('en-GB', { style: 'currency', currency: r.currency }).format(r.finalPrice);\nconst people = r.numberOfParticipants === 1 ? '1 person' : `${r.numberOfParticipants} people`;\n\nif (!approved && r.source === channel.provider || (r.source === 'API' && channel.provider === 'TEST')) {\n  return [{ json: { send: false, reason: 'already confirmed in the chat', reservationId: r.id } }];\n}\nconst text = [\n  approved ? 'Good news, your booking request is confirmed! ✅' : 'Reservation confirmed!',\n  '',\n  r.serviceName,\n  `${day} at ${r.start}`,\n  people,\n  price,\n].filter(line => line !== null).join('\\n');\nreturn [{ json: { send: true, provider: channel.provider, recipientId: channel.externalUserId, text } }];\n"
+        "jsCode": "const response = $input.first().json;\nif (response.statusCode !== 200) {\n  console.log('Could not load reservation', response.statusCode);\n  return [{ json: { send: false, reason: 'reservation not available' } }];\n}\nconst r = response.body;\nconst approved = $('When called by another workflow').first().json.event === 'reservation.approved';\n// A request still waiting for the owner is not confirmed yet.\nif (r.status === 'PENDING') return [{ json: { send: false, reason: 'awaiting approval', reservationId: r.id } }];\n// Message the customer where they talk to the business; TEST identities are only logged.\nconst channel = (r.channels || [])[0];\nif (!channel) return [{ json: { send: false, reason: 'customer has no chat channel', reservationId: r.id } }];\nconst day = new Date(r.date + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });\nconst price = new Intl.NumberFormat('en-GB', { style: 'currency', currency: r.currency }).format(r.finalPrice);\nconst people = r.numberOfParticipants === 1 ? '1 person' : `${r.numberOfParticipants} people`;\n\nif (!approved && r.source === channel.provider || (r.source === 'API' && channel.provider === 'TEST')) {\n  return [{ json: { send: false, reason: 'already confirmed in the chat', reservationId: r.id } }];\n}\nconst text = [\n  approved ? 'Good news, your booking request is confirmed! ✅' : 'Reservation confirmed!',\n  '',\n  r.serviceName,\n  `${day} at ${r.start}`,\n  people,\n  price,\n].filter(line => line !== null).join('\\n');\nreturn [{ json: { send: true, businessId: $('When called by another workflow').first().json.businessId, provider: channel.provider, recipientId: channel.externalUserId, text } }];\n"
       },
       "id": "confirmation-04",
       "name": "Compose message",

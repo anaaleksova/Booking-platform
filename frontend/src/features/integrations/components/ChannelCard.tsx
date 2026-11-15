@@ -51,13 +51,13 @@ export function ChannelCard({ channel }: { channel: ChannelConnection }) {
         <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
           {name}
         </Typography>
-        <Chip size="small" variant="outlined" label="Connect with Meta — coming soon" />
+        <Chip size="small" variant="outlined" label="Manual" />
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         {channel.provider === 'INSTAGRAM'
           ? 'The Instagram professional account whose direct messages n8n answers.'
           : 'The Facebook Page whose Messenger conversations n8n answers.'}{' '}
-        Until the Meta sign-in is available, enter the id from Meta&apos;s developer dashboard.
+        Enter the id from Meta&apos;s developer dashboard.
       </Typography>
       <Grid container spacing={1.5}>
         <Grid item xs={12} sm={6}>

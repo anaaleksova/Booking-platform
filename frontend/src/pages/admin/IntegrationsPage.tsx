@@ -11,6 +11,7 @@ import { useIntegrations } from '@/features/integrations/api';
 import { ChannelCard } from '@/features/integrations/components/ChannelCard';
 import { DeliveriesCard } from '@/features/integrations/components/DeliveriesCard';
 import { CopyField, StatusTile } from '@/features/integrations/components/IntegrationFields';
+import { MetaConnectCard } from '@/features/integrations/components/MetaConnectCard';
 import { N8nCard } from '@/features/integrations/components/N8nCard';
 import { TokensCard } from '@/features/integrations/components/TokensCard';
 
@@ -66,17 +67,32 @@ export function IntegrationsPage() {
             <CopyField label="Integration API base URL" value={data.apiBaseUrl} />
             <CopyField label="Business ID" value={String(data.businessId)} />
             <Alert severity="info" variant="outlined" sx={{ mt: 1 }}>
-              The access tokens for sending Instagram and Facebook messages are stored in n8n&apos;s credentials,
-              never in the platform.
+              {data.meta.connected
+                ? 'The platform answers your Instagram and Messenger chats; your Page’s access is kept encrypted and never shown here.'
+                : 'Connect with Facebook below and the platform answers your chats — you only need your own n8n for custom automations.'}
             </Alert>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={6}>
-          {instagram ? <ChannelCard channel={instagram} /> : null}
+        <Grid item xs={12}>
+          <MetaConnectCard meta={data.meta} />
         </Grid>
-        <Grid item xs={12} md={6}>
-          {facebook ? <ChannelCard channel={facebook} /> : null}
-        </Grid>
+        {data.meta.connected ? null : (
+          <>
+            {data.meta.available ? (
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Or enter the ids by hand (advanced)
+                </Typography>
+              </Grid>
+            ) : null}
+            <Grid item xs={12} md={6}>
+              {instagram ? <ChannelCard channel={instagram} /> : null}
+            </Grid>
+            <Grid item xs={12} md={6}>
+              {facebook ? <ChannelCard channel={facebook} /> : null}
+            </Grid>
+          </>
+        )}
 
         <Grid item xs={12}>
           <TokensCard tokens={data.tokens} availablePermissions={data.availablePermissions} />

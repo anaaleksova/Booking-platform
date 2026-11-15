@@ -1,6 +1,7 @@
 package com.bookingsaas.integration.admin;
 
 import com.bookingsaas.integration.auth.IntegrationPermission;
+import com.bookingsaas.integration.meta.MetaConnectDtos.MetaView;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -20,7 +21,7 @@ public final class IntegrationAdminDtos {
     /**
      * @param apiBaseUrl what n8n's credential points at, e.g. http://localhost:8080/api/integrations
      */
-    public record Overview(Long businessId, String apiBaseUrl, N8nView n8n, List<ChannelView> channels,
+    public record Overview(Long businessId, String apiBaseUrl, N8nView n8n, MetaView meta, List<ChannelView> channels,
                            List<TokenView> tokens, List<EventView> recentEvents,
                            List<IntegrationPermission> availablePermissions) {
     }
@@ -30,8 +31,10 @@ public final class IntegrationAdminDtos {
     }
 
     /**
-     * A social channel. For the MVP the page or account id is entered by hand;
-     * OAuth will fill it in later.
+     * A social channel. "Connect with Facebook" fills in the page or account
+     * id; without it, the id is entered by hand.
+     *
+     * @param oauthAvailable the platform's Meta app is set up, so owners can connect by signing in
      */
     public record ChannelView(String provider, String status, String externalAccountId, String displayName,
                               boolean oauthAvailable) {

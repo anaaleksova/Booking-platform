@@ -12,6 +12,15 @@ app:
     # Events are still written; the timer that delivers them stays off, so
     # tests that claim events themselves are not racing it.
     events-enabled: false
+    platform:
+      token: test-platform-token-0123456789abcdefghij
+      webhook-url: http://localhost:5678/webhook/booking-events
+      signing-secret: test-platform-signing-secret
+  meta:
+    # A made-up app: MetaConnectIT stands in for the Graph API.
+    app-id: "1000000000000001"
+    app-secret: test-meta-app-secret
+    token-key: IQ/fG68oB1TXlxr7ZyekAJRpE85cPk/SFJwE0qmQgqY=
   rate-limit:
     # Every test request comes from one address. RateLimitIT switches it on.
     enabled: false

@@ -250,7 +250,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: { reservationId: $('Verify signature').first().json.event.reservationId, event: $('Verify signature').first().json.event.event } }];\n"
+        "jsCode": "return [{ json: { businessId: $('Verify signature').first().json.event.businessId, reservationId: $('Verify signature').first().json.event.reservationId, event: $('Verify signature').first().json.event.event } }];\n"
       },
       "id": "events-09",
       "name": "Send confirmation input",
@@ -282,7 +282,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: { reservationId: $('Verify signature').first().json.event.reservationId, event: $('Verify signature').first().json.event.event } }];\n"
+        "jsCode": "return [{ json: { businessId: $('Verify signature').first().json.event.businessId, reservationId: $('Verify signature').first().json.event.reservationId, event: $('Verify signature').first().json.event.event } }];\n"
       },
       "id": "events-11",
       "name": "Send cancellation notice input",
@@ -314,7 +314,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: { reservationId: $('Verify signature').first().json.event.reservationId, event: $('Verify signature').first().json.event.event } }];\n"
+        "jsCode": "return [{ json: { businessId: $('Verify signature').first().json.event.businessId, reservationId: $('Verify signature').first().json.event.reservationId, event: $('Verify signature').first().json.event.event } }];\n"
       },
       "id": "events-13",
       "name": "Send reminder input",

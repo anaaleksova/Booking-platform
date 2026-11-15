@@ -4,7 +4,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## BOOKING - Messenger Inbox Poller\nThe Facebook Messenger twin of **Instagram Inbox Poller**: every 20 seconds it reads the Page's Messenger conversations and hands each new customer message to **Instagram Reply** (which answers on whichever channel the message came from) without waiting.\nUses the **Meta Page Access Token** credential, which needs the `pages_messaging` permission. Unpublish this workflow if the Messenger webhook in **Incoming Social Message** starts working, or customers get two replies.",
+        "content": "## BOOKING - Messenger Inbox Poller\nFallback for when Meta does not deliver the `messages` webhook: every 20 seconds it reads the Messenger conversations of **every Page connected with Facebook** (Admin → Integrations), using each Page's own token from the platform, and hands each new customer message to **Instagram Reply** without waiting.\nUses the **Booking Platform API** credential with the platform token. Unpublish it once the webhook in **Incoming Social Message** works, or customers get two replies.",
         "width": 560,
         "height": 220
       },
@@ -39,42 +39,8 @@
     },
     {
       "parameters": {
-        "url": "=https://graph.facebook.com/{{ $env.META_GRAPH_VERSION || 'v21.0' }}/me",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "fields",
-              "value": "id,name"
-            }
-          ]
-        },
-        "options": {
-          "timeout": 15000
-        }
-      },
-      "id": "mpoll-03",
-      "name": "Get Page",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        220,
-        0
-      ],
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "bkMetaPageToken1",
-          "name": "Meta Page Access Token"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "url": "=https://graph.facebook.com/{{ $env.META_GRAPH_VERSION || 'v21.0' }}/me/conversations",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
+        "url": "=https://graph.facebook.com/{{ $env.META_GRAPH_VERSION || 'v21.0' }}/{{ $json.pageId }}/conversations",
+        "authentication": "none",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
@@ -89,11 +55,21 @@
             {
               "name": "limit",
               "value": "10"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $json.pageToken }}"
             }
           ]
         },
         "options": {
-          "timeout": 15000
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         }
       },
       "id": "mpoll-04",
@@ -104,16 +80,11 @@
         440,
         0
       ],
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "bkMetaPageToken1",
-          "name": "Meta Page Access Token"
-        }
-      }
+      "alwaysOutputData": false
     },
     {
       "parameters": {
-        "jsCode": "\n// Turns new Messenger messages into conversation turns. Seen message ids live in the workflow's\n// static data; the first run only records what is already there, so old DMs are not answered.\nconst own = $('Get Page').first().json.id;   // the Page itself: its own replies are skipped\nconst conversations = $input.first().json.data || [];\nconst store = $getWorkflowStaticData('global');\nconst firstRun = !store.seen;\nstore.seen = store.seen || {};\nconst cutoff = Date.now() - 15 * 60 * 1000;\n// Several messages from one person in this poll (\"hi\", \"massage\", \"tomorrow 5pm\") become one\n// turn, so they are understood together and answered once instead of racing each other.\nconst bySender = new Map();\nfor (const conversation of conversations) {\n  const messages = [...(conversation.messages?.data || [])].reverse();   // oldest first\n  for (const m of messages) {\n    if (store.seen[m.id]) continue;\n    store.seen[m.id] = Date.now();\n    if (firstRun || !own) continue;\n    if (!m.message || !m.from?.id || m.from.id === own) continue;      // our own replies\n    if (new Date(m.created_time).getTime() < cutoff) continue;\n    const earlier = bySender.get(m.from.id);\n    if (earlier) {\n      // The same words twice in a row are one message.\n      if (earlier.lastText !== m.message) earlier.text += '\\n' + m.message;\n      earlier.lastText = m.message;\n      earlier.mid = m.id;\n      earlier.sentAt = m.created_time;\n    } else {\n      bySender.set(m.from.id, { provider: 'FACEBOOK', externalUserId: m.from.id, recipientId: m.from.id, displayName: m.from.name || null, text: m.message, lastText: m.message, mid: m.id, sentAt: m.created_time });\n    }\n  }\n}\nconst out = [...bySender.values()].map(({ lastText, ...json }) => ({ json }));\nconst ids = Object.keys(store.seen);\nif (ids.length > 1000) ids.sort((a, b) => store.seen[a] - store.seen[b]).slice(0, ids.length - 500).forEach(id => delete store.seen[id]);\nreturn out;\n"
+        "jsCode": "\n// Turns new Messenger messages into conversation turns, for every connected Page. Seen message\n// ids live in the workflow's static data; the first poll of a Page only records what is\n// already there, so old messages are not answered when a business connects.\nconst pages = $('Connected Pages').all().map(item => item.json);\nconst store = $getWorkflowStaticData('global');\nstore.seen = store.seen || {};\nstore.pages = store.pages || {};\nconst cutoff = Date.now() - 15 * 60 * 1000;\nconst out = [];\n$input.all().forEach((item, index) => {\n  const page = pages[index];\n  const response = item.json;\n  if (!page) return;\n  if (response.statusCode !== 200) {\n    // Usually a token Meta revoked: the owner has to connect again.\n    console.log('Messenger poll failed for business', page.businessId, response.statusCode,\n      JSON.stringify(response.body?.error ?? {}));\n    return;\n  }\n  const own = page.pageId;   // our own replies are skipped\n  const firstRun = !store.pages[page.pageId];\n  store.pages[page.pageId] = Date.now();\n  // Several messages from one person in this poll (\"hi\", \"massage\", \"tomorrow 5pm\") become one\n  // turn, so they are understood together and answered once instead of racing each other.\n  const bySender = new Map();\n  for (const conversation of response.body?.data || []) {\n    const messages = [...(conversation.messages?.data || [])].reverse();   // oldest first\n    for (const m of messages) {\n      if (store.seen[m.id]) continue;\n      store.seen[m.id] = Date.now();\n      if (firstRun) continue;\n      if (!m.message || !m.from?.id || m.from.id === own) continue;\n      if (new Date(m.created_time).getTime() < cutoff) continue;\n      const earlier = bySender.get(m.from.id);\n      if (earlier) {\n        // The same words twice in a row are one message.\n        if (earlier.lastText !== m.message) earlier.text += '\\n' + m.message;\n        earlier.lastText = m.message;\n        earlier.mid = m.id;\n        earlier.sentAt = m.created_time;\n      } else {\n        bySender.set(m.from.id, { businessId: page.businessId, provider: 'FACEBOOK', externalUserId: m.from.id,\n          recipientId: m.from.id, displayName: m.from.name || null, text: m.message, lastText: m.message,\n          mid: m.id, sentAt: m.created_time });\n      }\n    }\n  }\n  for (const { lastText, ...json } of bySender.values()) out.push({ json });\n});\nconst ids = Object.keys(store.seen);\nif (ids.length > 2000) ids.sort((a, b) => store.seen[a] - store.seen[b]).slice(0, ids.length - 1000).forEach(id => delete store.seen[id]);\nreturn out;\n"
       },
       "id": "mpoll-05",
       "name": "Read new messages",
@@ -145,6 +116,39 @@
         880,
         0
       ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.BOOKING_API_URL }}/platform/channels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Workflow-Execution-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "mess-10",
+      "name": "Connected Pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bkApiCredential1",
+          "name": "Booking Platform API"
+        }
+      }
     }
   ],
   "connections": {
@@ -152,18 +156,7 @@
       "main": [
         [
           {
-            "node": "Get Page",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Page": {
-      "main": [
-        [
-          {
-            "node": "Get conversations",
+            "node": "Connected Pages",
             "type": "main",
             "index": 0
           }
@@ -186,6 +179,17 @@
         [
           {
             "node": "Answer in background",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Connected Pages": {
+      "main": [
+        [
+          {
+            "node": "Get conversations",
             "type": "main",
             "index": 0
           }
