@@ -87,8 +87,13 @@ export const FloorPlanScene = forwardRef<
      */
     fill?: boolean;
     onBackgroundPointerDown?: () => void;
+    /** Editor only: a picture of the real place, stretched over the floor to trace over. */
+    backdrop?: { url: string; opacity: number } | null;
   }
->(function FloorPlanScene({ aspectRatio, children, label, zoom = 1, minWidth = 0, fill = false, onBackgroundPointerDown }, ref) {
+>(function FloorPlanScene(
+  { aspectRatio, children, label, zoom = 1, minWidth = 0, fill = false, onBackgroundPointerDown, backdrop },
+  ref,
+) {
   const theme = useTheme();
   const id = useId().replace(/:/g, '');
   const height = viewHeight(aspectRatio);
@@ -181,6 +186,17 @@ export const FloorPlanScene = forwardRef<
             strokeWidth={1.5}
             onPointerDown={onBackgroundPointerDown}
           />
+          {backdrop ? (
+            <image
+              href={backdrop.url}
+              width={VIEW_WIDTH}
+              height={height}
+              preserveAspectRatio="none"
+              opacity={backdrop.opacity}
+              pointerEvents="none"
+              aria-hidden
+            />
+          ) : null}
           {children}
         </Box>
       </Box>

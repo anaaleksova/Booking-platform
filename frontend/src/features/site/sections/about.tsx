@@ -36,7 +36,7 @@ export function AboutCentered({ section }: SectionProps<AboutSection>) {
     return null;
   }
   return (
-    <SectionBody maxWidth="md" sx={{ py: { xs: 6, md: 8 }, textAlign: 'center' }}>
+    <SectionBody maxWidth="md" sx={{ py: { xs: 4, md: 5 }, textAlign: 'center' }}>
       <SectionHeading section={section} eyebrow={eyebrow} title={title} align="center" />
       <Body text={text} />
     </SectionBody>

@@ -66,18 +66,20 @@ export function BookingWizardPage() {
   // Booking needs an account, and the details follow whoever is signed in:
   // whenever the account changes (or signs out), start again from that
   // account's name and email, so nothing typed for another person carries over.
-  // The customer can still edit the name afterwards.
+  // The phone is the one typed at the account's last booking, if any.
+  // The customer can still edit the name and phone afterwards.
   // Keyed on the fields rather than the object, which is new after every session check.
   const accountEmail = user?.email;
   const accountName = user?.fullName;
+  const accountPhone = user?.phone ?? '';
   useEffect(() => {
     if (accountEmail === undefined || accountName === undefined) {
       setCustomer(EMPTY_CUSTOMER);
       return;
     }
     const [first = '', ...rest] = accountName.trim().split(/\s+/);
-    setCustomer({ ...EMPTY_CUSTOMER, email: accountEmail, firstName: first, lastName: rest.join(' ') });
-  }, [accountEmail, accountName]);
+    setCustomer({ ...EMPTY_CUSTOMER, email: accountEmail, firstName: first, lastName: rest.join(' '), phone: accountPhone });
+  }, [accountEmail, accountName, accountPhone]);
   const [showErrors, setShowErrors] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [appliedCode, setAppliedCode] = useState('');

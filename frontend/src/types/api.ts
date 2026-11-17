@@ -28,6 +28,8 @@ export interface CurrentUser {
   platformAdmin?: boolean;
   /** The active business was entered as platform administrator (not a membership). */
   platformView?: boolean;
+  /** The phone last typed when booking; fills in the next booking form. */
+  phone?: string | null;
 }
 
 // --- platform administration ---------------------------------------------------
@@ -276,6 +278,9 @@ export interface FloorPlan {
   aspectRatio: number;
   items: FloorPlanSpot[];
   decor: FloorPlanDecor[];
+  /** A picture of the place to trace over in the editor; customers never see it. */
+  backgroundMediaId?: string | null;
+  backgroundUrl?: string | null;
 }
 
 /** One floor as saved; no id for a new floor. Floors are saved all together, in order. */
@@ -285,6 +290,7 @@ export interface FloorPlanInput {
   aspectRatio: number;
   items: FloorPlanSpot[];
   decor: FloorPlanDecor[];
+  backgroundMediaId?: string | null;
 }
 
 export interface Resource {

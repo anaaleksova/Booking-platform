@@ -114,10 +114,13 @@ export function AuthShell({
   title,
   subtitle,
   children,
+  wide = false,
 }: {
   title: string;
   subtitle: string;
   children: React.ReactNode;
+  /** Room for a longer form, with fields side by side on larger screens. */
+  wide?: boolean;
 }) {
   return (
     <Box
@@ -129,7 +132,7 @@ export function AuthShell({
         background: 'linear-gradient(160deg, #eef2ff 0%, #f6f7fb 45%, #f2fbf7 100%)',
       }}
     >
-      <Card sx={{ width: '100%', maxWidth: 460 }}>
+      <Card sx={{ width: '100%', maxWidth: wide ? 760 : 460 }}>
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           <Stack spacing={1} sx={{ mb: 3 }}>
             <Typography variant="h5">{title}</Typography>

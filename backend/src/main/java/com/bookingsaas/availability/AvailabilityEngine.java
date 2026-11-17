@@ -236,7 +236,12 @@ public class AvailabilityEngine {
             return option.allocations().isEmpty() ? List.of() : option.allocations().get(0).resources();
         }
         List<ResourceSpec> ordered = option.candidateIds().stream().map(id -> asSeen(ctx, option, id)).toList();
-        List<ResourceSpec> fit = bestFit(ordered, option.requirement().quantity(), ctx.participants());
+        // The group's own first: a shared resource, with others at it, only when no private one fits.
+        List<ResourceSpec> fit = bestFit(ordered.stream().filter(resource -> !resource.shared()).toList(),
+                option.requirement().quantity(), ctx.participants());
+        if (fit == null) {
+            fit = bestFit(ordered, option.requirement().quantity(), ctx.participants());
+        }
         // Only an optional requirement reaches here unsatisfied: skip it.
         return fit == null ? List.of() : fit;
     }

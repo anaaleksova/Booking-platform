@@ -18,6 +18,7 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * A map of the place for one resource type — where each table, desk or court
@@ -52,6 +53,10 @@ public class FloorPlan extends Auditable {
     /** Width divided by height. */
     @Column(name = "aspect_ratio", nullable = false, precision = 5, scale = 3)
     private BigDecimal aspectRatio = new BigDecimal("1.6");
+
+    /** A picture of the real place, traced over in the editor; never shown to customers. */
+    @Column(name = "background_media_id")
+    private UUID backgroundMediaId;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "floor_plan_id", nullable = false)

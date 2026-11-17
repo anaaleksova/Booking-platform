@@ -66,7 +66,9 @@ function renderDesigner() {
 const sectionNames = () =>
   within(screen.getByRole('list')).getAllByRole('listitem').map((item) => within(item).getAllByText(/Hero|Services|Contact/)[0].textContent);
 
-describe('SiteDesigner', () => {
+// The whole designer with its live preview renders in each test: a few seconds
+// alone, more when the full suite runs in parallel, so the default 5 s is too tight.
+describe('SiteDesigner', { timeout: 20_000 }, () => {
   let api: ReturnType<typeof fakeApi> | undefined;
   afterEach(() => api?.restore());
 

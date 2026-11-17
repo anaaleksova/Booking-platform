@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Resource } from '@/types/api';
-import { draftsFrom, floorNamesProblem, keepInside, newSpot, nextFloorName, reshaped, turned, type FloorDraft } from './editorModel';
+import { aspectOf, draftsFrom, floorNamesProblem, keepInside, newSpot, nextFloorName, reshaped, turned, type FloorDraft } from './editorModel';
 
 const resource = (id: number, capacity: number | null) => ({ id, capacity }) as Resource;
-const draft = (key: number, name: string): FloorDraft => ({ key, name, aspectRatio: 1.6, items: [], decor: [] });
+const draft = (key: number, name: string): FloorDraft => ({ key, name, aspectRatio: 1.6, items: [], decor: [], background: null });
 
 describe('keepInside', () => {
   it('keeps the whole box on the plan', () => {
@@ -52,7 +52,28 @@ describe('reshaped', () => {
 describe('floors', () => {
   it('a business without plans starts with one empty floor', () => {
     let key = 0;
-    expect(draftsFrom([], () => key++)).toEqual([{ key: 0, name: 'Main floor', aspectRatio: 1.6, items: [], decor: [] }]);
+    expect(draftsFrom([], () => key++)).toEqual([
+      { key: 0, name: 'Main floor', aspectRatio: 1.6, items: [], decor: [], background: null },
+    ]);
+  });
+
+  it('keeps the picture a saved floor is traced over', () => {
+    let key = 0;
+    const [withPicture, without] = draftsFrom(
+      [
+        { id: 1, resourceTypeId: 1, name: 'Ground', aspectRatio: 1.5, items: [], decor: [], backgroundMediaId: 'abc', backgroundUrl: '/api/public/media/abc' },
+        { id: 2, resourceTypeId: 1, name: 'Roof', aspectRatio: 1.5, items: [], decor: [] },
+      ],
+      () => key++,
+    );
+    expect(withPicture.background).toEqual({ mediaId: 'abc', url: '/api/public/media/abc' });
+    expect(without.background).toBeNull();
+  });
+
+  it('gives the room the picture’s shape, within what a floor allows', () => {
+    expect(aspectOf(1600, 1000)).toBe(1.6);
+    expect(aspectOf(1000, 1500)).toBe(0.667);
+    expect(aspectOf(5000, 500)).toBe(4);
   });
 
   it('names a new floor after the next free number', () => {

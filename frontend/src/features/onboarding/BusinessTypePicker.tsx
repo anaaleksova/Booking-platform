@@ -25,7 +25,7 @@ export function BusinessTypePicker({ value, onChange, error }: BusinessTypePicke
       <Box
         role="radiogroup"
         aria-labelledby="business-type-label"
-        sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1 }}
+        sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1 }}
       >
         {BUSINESS_TYPES.map((info) => {
           const selected = info.type === value;

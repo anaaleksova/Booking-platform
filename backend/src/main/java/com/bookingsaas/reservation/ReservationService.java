@@ -1,5 +1,6 @@
 package com.bookingsaas.reservation;
 
+import com.bookingsaas.auth.AccountPhones;
 import com.bookingsaas.availability.AvailabilityService;
 import com.bookingsaas.availability.ResourceAllocation;
 import com.bookingsaas.availability.dto.SlotResponse;
@@ -9,6 +10,7 @@ import com.bookingsaas.business.BusinessSettings;
 import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.error.ErrorCode;
 import com.bookingsaas.common.security.CurrentTenant;
+import com.bookingsaas.common.validation.Phones;
 import com.bookingsaas.customer.Customer;
 import com.bookingsaas.customer.CustomerService;
 import com.bookingsaas.discount.DiscountService;
@@ -83,6 +85,7 @@ public class ReservationService {
     private final ApplicationEventPublisher events;
     private final CurrentTenant currentTenant;
     private final Clock clock;
+    private final AccountPhones accountPhones;
 
     public ReservationService(ReservationRepository repository,
                               ReservationViewAssembler assembler,
@@ -96,7 +99,9 @@ public class ReservationService {
                               EmployeeService employeeService,
                               ApplicationEventPublisher events,
                               CurrentTenant currentTenant,
-                              Clock clock) {
+                              Clock clock,
+                              AccountPhones accountPhones) {
+        this.accountPhones = accountPhones;
         this.repository = repository;
         this.assembler = assembler;
         this.access = access;
@@ -133,6 +138,9 @@ public class ReservationService {
         String email = currentTenant.user().email();
         Customer customer = customerService.findOrCreate(businessId, request.customer().firstName(),
                 request.customer().lastName(), email, request.customer().phone());
+        // In the international form when it can be read, so it fills in a form at any business.
+        accountPhones.remember(currentTenant.userId(),
+                Phones.normalize(request.customer().phone(), Phones.regionOf(business.getPhone())));
 
         Reservation reservation = build(business, service, customer, participants, allocation, quote,
                 ReservationSource.WEB, request.notes(), null, null, initialStatus(service, participants));

@@ -2534,6 +2534,7 @@ export interface components {
             fullName?: string;
             /** Format: int64 */
             id?: number;
+            phone?: string;
             platformAdmin?: boolean;
             platformView?: boolean;
         };
@@ -2785,6 +2786,8 @@ export interface components {
         };
         FloorPlanDtosFloorPlanRequest: {
             aspectRatio: number;
+            /** Format: uuid */
+            backgroundMediaId?: string;
             decor?: components["schemas"]["FloorPlanDtosDecor"][];
             /** Format: int64 */
             id?: number;
@@ -2793,6 +2796,9 @@ export interface components {
         };
         FloorPlanDtosFloorPlanResponse: {
             aspectRatio?: number;
+            /** Format: uuid */
+            backgroundMediaId?: string;
+            backgroundUrl?: string;
             decor?: components["schemas"]["FloorPlanDtosDecor"][];
             /** Format: int64 */
             id?: number;

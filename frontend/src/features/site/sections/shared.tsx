@@ -39,7 +39,7 @@ export function headingId(section: Section): string {
 /** The usual vertical rhythm and width of a section's content. */
 export function SectionBody({ children, maxWidth = 'lg', sx }: { children: ReactNode; maxWidth?: ContainerProps['maxWidth']; sx?: BoxProps['sx'] }) {
   return (
-    <Box sx={[{ py: { xs: 6, md: 10 } }, ...(Array.isArray(sx) ? sx : [sx])]}>
+    <Box sx={[{ py: { xs: 4, md: 6 } }, ...(Array.isArray(sx) ? sx : [sx])]}>
       <Container maxWidth={maxWidth}>{children}</Container>
     </Box>
   );
@@ -69,7 +69,7 @@ export function SectionHeading({
       <Stack
         spacing={1}
         sx={{
-          mb: { xs: 4, md: 5 },
+          mb: { xs: 3, md: 4 },
           alignItems: align ? (align === 'center' ? 'center' : 'flex-start') : 'var(--site-heading-items, center)',
           textAlign: align ?? 'var(--site-heading-align, center)',
         }}

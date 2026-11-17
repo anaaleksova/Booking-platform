@@ -66,6 +66,36 @@ class SharedSeatingTest {
     }
 
     @Test
+    void with_no_preference_a_group_gets_a_table_of_its_own_before_a_shared_one() {
+        var ctx = context().sharedTable(1, 4).resource(2, TABLE, 4).requires(100, TABLE, 1).participants(3).build();
+
+        assertThat(engine.allocate(ctx, at("10:00"), Map.of()).resourceIds()).containsExactly(2L);
+    }
+
+    @Test
+    void with_no_preference_the_shared_table_is_used_when_no_own_table_is_free() {
+        var ctx = context().sharedTable(1, 4).resource(2, TABLE, 4).requires(100, TABLE, 1).participants(3)
+                .busy(2, "10:00", "11:00").build();
+
+        assertThat(engine.allocate(ctx, at("10:00"), Map.of()).resources())
+                .containsExactly(new AllocatedResource(100L, 1L, 3));
+    }
+
+    @Test
+    void with_no_preference_six_get_two_tables_of_their_own_before_the_shared_one() {
+        // The restaurant floor: 2, 2, 4, 4 to themselves and a shared eight.
+        var ctx = context().resource(1, TABLE, 2).resource(2, TABLE, 2).resource(3, TABLE, 4)
+                .resource(4, TABLE, 4).sharedTable(5, 8)
+                .requiresCombined(100, TABLE, 1, true).participants(6).build();
+
+        List<Long> held = engine.allocate(ctx, at("10:00"), Map.of()).resourceIds();
+
+        assertThat(held).hasSize(2).doesNotContain(5L);
+        // The shared table can still be picked on purpose.
+        assertThat(engine.allocate(ctx, at("10:00"), Map.of(100L, List.of(5L))).resourceIds()).containsExactly(5L);
+    }
+
+    @Test
     void a_private_booking_still_takes_the_whole_shared_table() {
         var ctx = context().sharedTable(1, 8).requires(100, TABLE, 1).participants(1)
                 .busy(1, "10:00", "11:00").build();

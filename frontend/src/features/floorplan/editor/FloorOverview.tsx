@@ -14,6 +14,7 @@ import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import type { Ref } from 'react';
 import type { ResourceType } from '@/types/api';
+import { BackgroundControls, type BackdropView } from './BackgroundControls';
 import { DECOR_KINDS } from './decorKinds';
 import { ROOM_SHAPES, type FloorDraft } from './editorModel';
 import type { FloorDrafts } from './useFloorDrafts';
@@ -29,6 +30,8 @@ export function FloorOverview({
   resourceCount,
   nameRef,
   onDeleteFloor,
+  backdropView,
+  onBackdropViewChange,
 }: {
   type: ResourceType;
   floor: FloorDraft;
@@ -36,10 +39,22 @@ export function FloorOverview({
   resourceCount: number;
   nameRef: Ref<HTMLInputElement>;
   onDeleteFloor: (floor: FloorDraft) => void;
+  backdropView: BackdropView;
+  onBackdropViewChange: (view: BackdropView) => void;
 }) {
   const { floors, floorIndex, aspectRatio, unplaced, elsewhere, floorOf } = drafts;
+  const preset = ROOM_SHAPES.some((shape) => shape.value === aspectRatio);
   return (
     <>
+      <BackgroundControls
+        background={floor.background}
+        view={backdropView}
+        onViewChange={onBackdropViewChange}
+        onChange={drafts.setBackground}
+      />
+
+      <Divider />
+
       <section>
         <Typography variant="subtitle2" fontWeight={700} gutterBottom>
           This floor
@@ -59,11 +74,14 @@ export function FloorOverview({
           select
           size="small"
           label="Room shape"
-          value={ROOM_SHAPES.some((shape) => shape.value === aspectRatio) ? aspectRatio : ''}
+          value={aspectRatio}
           onChange={(event) => drafts.changeAspect(Number(event.target.value))}
           fullWidth
           sx={{ mt: 2 }}
         >
+          {preset ? null : (
+            <MenuItem value={aspectRatio}>{floor.background ? 'Same as the plan image' : 'Custom'}</MenuItem>
+          )}
           {ROOM_SHAPES.map((shape) => (
             <MenuItem key={shape.value} value={shape.value}>
               {shape.label}

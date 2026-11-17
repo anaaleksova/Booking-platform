@@ -25,6 +25,12 @@ export type Piece = FloorPlanDecor & { key: number };
 export type Selection = { type: 'table'; id: number } | { type: 'decor'; key: number } | null;
 export type Target = NonNullable<Selection>;
 
+/** An uploaded picture of the place, shown faintly behind the floor to trace over. */
+export interface Background {
+  mediaId: string;
+  url: string;
+}
+
 /** One floor being edited; {@code id} is absent until it has been saved. */
 export interface FloorDraft {
   key: number;
@@ -33,6 +39,12 @@ export interface FloorDraft {
   aspectRatio: number;
   items: FloorPlanSpot[];
   decor: Piece[];
+  background: Background | null;
+}
+
+/** The room shape closest to a picture's width over height, within what a floor allows. */
+export function aspectOf(width: number, height: number): number {
+  return Math.round(clamp(width / height, 0.25, 4) * 1000) / 1000;
 }
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -61,7 +73,7 @@ export const keepPieceInside = (piece: Piece) => keepInside(piece, PIECE_SIZE.mi
 /** The drafts for the saved plans, or one empty floor to start from. */
 export function draftsFrom(plans: FloorPlan[], nextKey: () => number): FloorDraft[] {
   if (!plans.length) {
-    return [{ key: nextKey(), name: 'Main floor', aspectRatio: 1.6, items: [], decor: [] }];
+    return [{ key: nextKey(), name: 'Main floor', aspectRatio: 1.6, items: [], decor: [], background: null }];
   }
   return plans.map((plan) => ({
     key: nextKey(),
@@ -70,6 +82,8 @@ export function draftsFrom(plans: FloorPlan[], nextKey: () => number): FloorDraf
     aspectRatio: Number(plan.aspectRatio),
     items: plan.items.map(numericBox),
     decor: plan.decor.map((piece) => ({ ...numericBox(piece), key: nextKey() })),
+    background:
+      plan.backgroundMediaId && plan.backgroundUrl ? { mediaId: plan.backgroundMediaId, url: plan.backgroundUrl } : null,
   }));
 }
 

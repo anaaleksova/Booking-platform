@@ -59,6 +59,9 @@ public final class AllocationFinder {
      * here:
      *
      * <ol>
+     *   <li>tables of the group's own: a shared table, where strangers may sit
+     *       too, only when no private tables seat the group — six people get
+     *       4 + 2 to themselves before the shared eight-seat table;</li>
      *   <li>fewer resources: one big enough room beats two small ones;</li>
      *   <li>less spare capacity: 4 + 2 for six beats 4 + 4;</li>
      *   <li>the preference order of the resources used (smallest, least busy
@@ -66,7 +69,8 @@ public final class AllocationFinder {
      * </ol>
      */
     static final Comparator<Allocation> RANKING = Comparator
-            .comparingInt((Allocation allocation) -> allocation.resources().size())
+            .comparing(Allocation::usesShared)
+            .thenComparingInt((Allocation allocation) -> allocation.resources().size())
             .thenComparingLong(Allocation::excess)
             .thenComparingInt(Allocation::preferenceScore);
 
@@ -89,6 +93,11 @@ public final class AllocationFinder {
 
         public List<Long> resourceIds() {
             return resources.stream().map(ResourceSpec::id).toList();
+        }
+
+        /** Whether the group would sit at a shared table, with others. */
+        public boolean usesShared() {
+            return resources.stream().anyMatch(ResourceSpec::shared);
         }
     }
 
@@ -163,8 +172,15 @@ public final class AllocationFinder {
 
     // --- search ------------------------------------------------------------
 
-    /** Interchangeable resources: same capacity, same area, in preference order. */
-    private record CapacityClass(long capacity, List<ResourceSpec> members) {
+    /**
+     * Interchangeable resources: same capacity, same area, all shared or all
+     * private, in preference order. A shared and a private table of the same
+     * size are not interchangeable: the private one is preferred.
+     */
+    private record CapacityClass(long capacity, boolean shared, List<ResourceSpec> members) {
+    }
+
+    private record ClassKey(long capacity, boolean shared) {
     }
 
     /**
@@ -187,14 +203,18 @@ public final class AllocationFinder {
 
         AreaSearch(List<ResourceSpec> area, int minResources, int participants, int limit,
                    Map<Long, Integer> rank, PriorityQueue<Allocation> best, int[] steps) {
-            Map<Long, List<ResourceSpec>> byCapacity = new LinkedHashMap<>();
+            Map<ClassKey, List<ResourceSpec>> byCapacity = new LinkedHashMap<>();
             area.stream()
                     .filter(resource -> resource.effectiveCapacity() > 0)
-                    .forEach(resource -> byCapacity.computeIfAbsent(resource.effectiveCapacity(),
+                    .forEach(resource -> byCapacity.computeIfAbsent(
+                            new ClassKey(resource.effectiveCapacity(), resource.shared()),
                             key -> new ArrayList<>()).add(resource));
+            // Largest first; at equal size the private class first, so it is tried first.
             this.classes = byCapacity.entrySet().stream()
-                    .map(entry -> new CapacityClass(entry.getKey(), entry.getValue()))
-                    .sorted(Comparator.comparingLong(CapacityClass::capacity).reversed())
+                    .map(entry -> new CapacityClass(entry.getKey().capacity(), entry.getKey().shared(),
+                            entry.getValue()))
+                    .sorted(Comparator.comparingLong(CapacityClass::capacity).reversed()
+                            .thenComparing(CapacityClass::shared))
                     .toList();
             int n = classes.size();
             this.suffixCapacity = new long[n + 1];
@@ -235,8 +255,10 @@ public final class AllocationFinder {
                     || used + suffixCount[index] < minResources) {
                 return;
             }
-            // Already wasting more than every kept option, with more still to add: no better here.
-            if (best.size() == limit && used + 1 > best.peek().resources().size()) {
+            // Every option from here uses more resources than the worst kept one, so it ranks
+            // below it — unless that one is at a shared table, which a private option here
+            // would beat whatever its size.
+            if (best.size() == limit && !best.peek().usesShared() && used + 1 > best.peek().resources().size()) {
                 return;
             }
 

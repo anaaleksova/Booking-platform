@@ -26,6 +26,7 @@ public class AuthenticatedUser implements UserDetails {
     private final List<BusinessMembership> memberships;
     private final BusinessMembership activeMembership;
     private final boolean platformAdmin;
+    private final String phone;
 
     public AuthenticatedUser(Long userId,
                              String email,
@@ -34,7 +35,8 @@ public class AuthenticatedUser implements UserDetails {
                              boolean active,
                              List<BusinessMembership> memberships,
                              BusinessMembership activeMembership,
-                             boolean platformAdmin) {
+                             boolean platformAdmin,
+                             String phone) {
         this.userId = userId;
         this.email = email;
         this.fullName = fullName;
@@ -43,12 +45,18 @@ public class AuthenticatedUser implements UserDetails {
         this.memberships = List.copyOf(memberships);
         this.activeMembership = activeMembership;
         this.platformAdmin = platformAdmin;
+        this.phone = phone;
     }
 
     /** Returns a copy of this principal scoped to a different membership. */
     public AuthenticatedUser withActiveMembership(BusinessMembership membership) {
         return new AuthenticatedUser(userId, email, fullName, passwordHash, active, memberships, membership,
-                platformAdmin);
+                platformAdmin, phone);
+    }
+
+    /** The phone last typed when booking, to fill in the next booking form; null if none yet. */
+    public String phone() {
+        return phone;
     }
 
     /** Runs the platform (see {@link PlatformAdmins}). */

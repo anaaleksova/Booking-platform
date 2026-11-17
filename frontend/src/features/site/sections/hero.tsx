@@ -283,7 +283,7 @@ export function HeroSplit({ section }: SectionProps<HeroSection>) {
   const shape = useImageShape();
   const { eyebrow, title, subtitle, buttons, cover, coverAlt, images } = useHeroContent(section);
   return (
-    <Box sx={{ py: { xs: 6, md: 10 } }}>
+    <Box sx={{ py: { xs: 5, md: 7 } }}>
       <Container maxWidth="lg">
         <Grid container spacing={{ xs: 4, md: 6 }} alignItems="center">
           <Grid item xs={12} md={6}>
@@ -325,7 +325,7 @@ export function HeroSplit({ section }: SectionProps<HeroSection>) {
 export function HeroCentered({ section }: SectionProps<HeroSection>) {
   const { eyebrow, title, subtitle, buttons } = useHeroContent(section);
   return (
-    <Box sx={{ py: { xs: 8, md: 14 }, textAlign: 'center' }}>
+    <Box sx={{ py: { xs: 6, md: 10 }, textAlign: 'center' }}>
       <Container maxWidth="md">
         <Stack alignItems="center" spacing={2.5}>
           {eyebrow ? (

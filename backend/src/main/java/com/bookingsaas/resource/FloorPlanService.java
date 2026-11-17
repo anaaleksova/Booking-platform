@@ -2,6 +2,7 @@ package com.bookingsaas.resource;
 
 import com.bookingsaas.common.error.ApiException;
 import com.bookingsaas.common.security.CurrentTenant;
+import com.bookingsaas.media.MediaService;
 import com.bookingsaas.resource.dto.FloorPlanDtos.Decor;
 import com.bookingsaas.resource.dto.FloorPlanDtos.FloorPlanRequest;
 import com.bookingsaas.resource.dto.FloorPlanDtos.FloorPlanResponse;
@@ -17,7 +18,9 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -33,15 +36,18 @@ public class FloorPlanService {
     private final ResourceTypeService typeService;
     private final ResourceService resourceService;
     private final CurrentTenant currentTenant;
+    private final MediaService mediaService;
 
     public FloorPlanService(FloorPlanRepository repository,
                             ResourceTypeService typeService,
                             ResourceService resourceService,
-                            CurrentTenant currentTenant) {
+                            CurrentTenant currentTenant,
+                            MediaService mediaService) {
         this.repository = repository;
         this.typeService = typeService;
         this.resourceService = resourceService;
         this.currentTenant = currentTenant;
+        this.mediaService = mediaService;
     }
 
     /** Plans for the given types, by type id and in order — what the booking pages show. */
@@ -110,7 +116,13 @@ public class FloorPlanService {
             if (plan.id() != null && !existing.containsKey(plan.id())) {
                 throw ApiException.notFound("Floor plan", plan.id());
             }
+            mediaService.requireOwned(businessId, plan.backgroundMediaId());
         }
+        // Pictures no floor uses any more: replaced, removed, or on a deleted floor.
+        Set<UUID> backgroundsKept = request.plans().stream().map(FloorPlanRequest::backgroundMediaId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        List<UUID> backgroundsDropped = existing.values().stream().map(FloorPlan::getBackgroundMediaId)
+                .filter(id -> id != null && !backgroundsKept.contains(id)).toList();
 
         // Hibernate inserts before it deletes: empty every floor and drop the
         // removed ones first, so a desk moving between floors never meets itself.
@@ -130,10 +142,12 @@ public class FloorPlanService {
             plan.setName(source.name().trim());
             plan.setPosition(position);
             plan.setAspectRatio(source.aspectRatio());
+            plan.setBackgroundMediaId(source.backgroundMediaId());
             fill(plan, source);
             saved.add(repository.save(plan));
         }
         repository.flush();
+        backgroundsDropped.forEach(id -> mediaService.discardIfReplaced(businessId, id, null));
         return saved.stream().map(FloorPlanResponse::from).toList();
     }
 

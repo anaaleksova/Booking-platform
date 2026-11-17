@@ -111,7 +111,23 @@ export function BusinessShell({
             ) : null}
             <AccountButton />
             {business && !hideBookButton ? (
-              <Button component={RouterLink} to={`/b/${business.slug}/book`} variant="contained" sx={{ borderRadius: 'var(--site-radius-button, 999px)', px: 2.5 }}>
+              <Button
+                component={RouterLink}
+                to={`/b/${business.slug}/book`}
+                variant="contained"
+                sx={{
+                  borderRadius: 'var(--site-radius-button, 999px)',
+                  px: 2.5,
+                  // Over the hero photo an outline or text button is drawn in white, as the hero's own are.
+                  ...(transparentHeader && siteTheme.components.buttonStyle !== 'FILLED'
+                    ? {
+                        color: '#fff',
+                        boxShadow: siteTheme.components.buttonStyle === 'OUTLINE' ? 'inset 0 0 0 2px #fff' : 'none',
+                        '&:hover': { bgcolor: 'rgba(255,255,255,0.12)' },
+                      }
+                    : {}),
+                }}
+              >
                 Book now
               </Button>
             ) : null}

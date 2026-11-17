@@ -133,6 +133,35 @@ class FloorPlanIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void a_floor_keeps_a_picture_to_trace_over_that_customers_do_not_see() throws Exception {
+        String picture = uploadImage(token);
+        JsonNode saved = send(put(plansUrl()), token, floors(withBackground(
+                floor(null, "Ground floor", spot(window, 20, 30, "ROUND")), picture)), 200);
+        long ground = saved.get(0).get("id").asLong();
+
+        JsonNode floor = send(get(plansUrl()), token, null, 200).get(0);
+        assertThat(floor.get("backgroundMediaId").asText()).isEqualTo(picture);
+        assertThat(floor.get("backgroundUrl").asText()).isEqualTo("/api/public/media/" + picture);
+        assertThat(choosable().get("floorPlans").get(0).has("backgroundUrl")).isFalse();
+
+        // Replacing it deletes the old picture; so does removing it.
+        String replacement = uploadImage(token);
+        send(put(plansUrl()), token, floors(withBackground(
+                floor(ground, "Ground floor", spot(window, 20, 30, "ROUND")), replacement)), 200);
+        send(get("/api/public/media/" + picture), null, null, 404);
+
+        send(put(plansUrl()), token, floors(floor(ground, "Ground floor", spot(window, 20, 30, "ROUND"))), 200);
+        assertThat(send(get(plansUrl()), token, null, 200).get(0).has("backgroundMediaId")).isFalse();
+        send(get("/api/public/media/" + replacement), null, null, 404);
+    }
+
+    @Test
+    void another_business_s_picture_cannot_be_used_as_a_background() throws Exception {
+        String foreign = uploadImage(registerAndLogin("other@bistro.test", "Other Bistro"));
+        send(put(plansUrl()), token, floors(withBackground(floor(null, "Ground floor"), foreign)), 400);
+    }
+
+    @Test
     void a_floor_without_tables_is_not_shown_to_customers() throws Exception {
         send(put(plansUrl()), token, floors(
                 floor(null, "Ground floor", spot(window, 20, 30, "ROUND")),
@@ -215,6 +244,10 @@ class FloorPlanIT extends AbstractIntegrationTest {
     private static String floor(Long id, String name, String... spots) {
         return "{" + (id == null ? "" : "\"id\":" + id + ",") + "\"name\":\"" + name
                 + "\",\"aspectRatio\":1.6,\"items\":[" + String.join(",", spots) + "]}";
+    }
+
+    private static String withBackground(String floor, String mediaId) {
+        return floor.substring(0, floor.length() - 1) + ",\"backgroundMediaId\":\"" + mediaId + "\"}";
     }
 
     private static String spot(long resourceId, int x, int y, String shape) {

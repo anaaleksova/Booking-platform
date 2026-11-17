@@ -56,7 +56,7 @@ public class PrincipalLoader {
             active = membershipProvider.platformAccessTo(requestedBusinessId).orElse(active);
         }
         return new AuthenticatedUser(user.getId(), user.getEmail(), user.getFullName(),
-                user.getPasswordHash(), user.isActive(), memberships, active, platformAdmin);
+                user.getPasswordHash(), user.isActive(), memberships, active, platformAdmin, user.getPhone());
     }
 
     /**

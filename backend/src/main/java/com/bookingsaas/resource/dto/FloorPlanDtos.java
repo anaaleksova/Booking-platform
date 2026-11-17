@@ -1,5 +1,6 @@
 package com.bookingsaas.resource.dto;
 
+import com.bookingsaas.media.Media;
 import com.bookingsaas.resource.FloorPlan;
 import com.bookingsaas.resource.FloorPlanDecor;
 import com.bookingsaas.resource.FloorPlanItem;
@@ -12,6 +13,7 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 /** Request and response shapes of the floor-plan API. */
 public final class FloorPlanDtos {
@@ -28,13 +30,16 @@ public final class FloorPlanDtos {
 
     /**
      * One floor. {@code id} is null for a new floor; {@code decor} may be omitted.
+     *
+     * @param backgroundMediaId an uploaded picture of the place to trace over; null = none
      */
     public record FloorPlanRequest(
             Long id,
             @NotBlank @Size(max = 60) String name,
             @NotNull @DecimalMin("0.25") @DecimalMax("4") BigDecimal aspectRatio,
             @NotNull @Size(max = 200) List<@Valid @NotNull Item> items,
-            @Size(max = 100) List<@Valid @NotNull Decor> decor
+            @Size(max = 100) List<@Valid @NotNull Decor> decor,
+            UUID backgroundMediaId
     ) {
 
         public List<Decor> decorOrEmpty() {
@@ -80,19 +85,23 @@ public final class FloorPlanDtos {
         }
     }
 
+    /** A floor as the owner edits it; the background is for the editor only. */
     public record FloorPlanResponse(
             Long id,
             Long resourceTypeId,
             String name,
             BigDecimal aspectRatio,
             List<Item> items,
-            List<Decor> decor
+            List<Decor> decor,
+            UUID backgroundMediaId,
+            String backgroundUrl
     ) {
 
         public static FloorPlanResponse from(FloorPlan plan) {
             return new FloorPlanResponse(plan.getId(), plan.getResourceTypeId(), plan.getName(), plan.getAspectRatio(),
                     plan.getItems().stream().map(Item::from).toList(),
-                    plan.getDecor().stream().map(Decor::from).toList());
+                    plan.getDecor().stream().map(Decor::from).toList(),
+                    plan.getBackgroundMediaId(), Media.urlOf(plan.getBackgroundMediaId()));
         }
     }
 }

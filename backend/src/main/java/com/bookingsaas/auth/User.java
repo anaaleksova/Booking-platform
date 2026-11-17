@@ -40,6 +40,10 @@ public class User extends Auditable {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** The phone last typed when booking; fills in the next booking form. */
+    @Column(length = 40)
+    private String phone;
+
     public User(String email, String passwordHash, String fullName) {
         this.email = email;
         this.passwordHash = passwordHash;

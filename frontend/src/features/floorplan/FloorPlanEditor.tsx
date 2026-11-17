@@ -16,7 +16,9 @@ import { LoadingState } from '@/components/states';
 import { useToast } from '@/components/ToastProvider';
 import { useFloorPlans, useResources, useSaveFloorPlans } from '@/features/catalog/api';
 import type { FloorPlan, Resource, ResourceType } from '@/types/api';
+import { mediaUrl } from '@/features/media/api';
 import { DecorShape, FloorPlanScene, TableShape, decorDrawOrder } from './FloorPlanScene';
+import type { BackdropView } from './editor/BackgroundControls';
 import { decorKind } from './editor/decorKinds';
 import { FloorTabs, NoFloors, PieceControls, TableControls } from './editor/EditorControls';
 import { MAX_FLOORS, floorNamesProblem, type FloorDraft } from './editor/editorModel';
@@ -85,6 +87,8 @@ function EditorBody({
   const { floors, floor, aspectRatio, items, decor, byId, selection, setSelection, selectedTable, selectedPiece } = drafts;
   const [deletingFloor, setDeletingFloor] = useState<FloorDraft | null>(null);
   const [focusName, setFocusName] = useState(false);
+  const [backdropView, setBackdropView] = useState<BackdropView>({ visible: true, opacity: 0.5 });
+  const backdrop = floor?.background && backdropView.visible ? { url: mediaUrl(floor.background.url)!, opacity: backdropView.opacity } : null;
   const svgRef = useRef<SVGSVGElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const dragProps = useDragOnPlan(svgRef, drafts);
@@ -125,6 +129,7 @@ function EditorBody({
           id: draft.id,
           name: draft.name.trim(),
           aspectRatio: draft.aspectRatio,
+          backgroundMediaId: draft.background?.mediaId ?? null,
           items: draft.items,
           decor: draft.decor.map(({ key: _key, ...piece }) => piece),
         })),
@@ -165,7 +170,7 @@ function EditorBody({
                 ...(wide ? { display: 'flex', flexDirection: 'column', minHeight: 0 } : {}),
               }}
             >
-              {items.length === 0 && decor.length === 0 ? (
+              {items.length === 0 && decor.length === 0 && !backdrop ? (
                 <Stack
                   alignItems="center"
                   justifyContent="center"
@@ -193,6 +198,7 @@ function EditorBody({
                   fill={wide}
                   label={`Floor plan of ${floor.name}`}
                   onBackgroundPointerDown={() => setSelection(null)}
+                  backdrop={backdrop}
                 >
                   {decorDrawOrder(decor).map((piece) => (
                     <DecorShape
@@ -255,6 +261,8 @@ function EditorBody({
                   drafts={drafts}
                   resourceCount={resources.length}
                   nameRef={nameRef}
+                  backdropView={backdropView}
+                  onBackdropViewChange={setBackdropView}
                   onDeleteFloor={(target) =>
                     target.items.length || target.decor.length ? setDeletingFloor(target) : deleteFloor(target)
                   }

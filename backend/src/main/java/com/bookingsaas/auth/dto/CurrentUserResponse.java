@@ -15,7 +15,9 @@ public record CurrentUserResponse(
         /* Runs the platform: may open the platform area and enter any business. */
         boolean platformAdmin,
         /* The active business is one entered as platform administrator, not a membership. */
-        boolean platformView
+        boolean platformView,
+        /* The phone last typed when booking, to fill in the next booking form; omitted if none yet. */
+        String phone
 ) {
 
     public record MembershipResponse(Long businessId, String businessName, String businessSlug, String role) {
@@ -34,6 +36,7 @@ public record CurrentUserResponse(
                 user.activeMembership().map(MembershipResponse::from).orElse(null),
                 user.memberships().stream().map(MembershipResponse::from).toList(),
                 user.isPlatformAdmin(),
-                user.inBusinessAsPlatformAdmin());
+                user.inBusinessAsPlatformAdmin(),
+                user.phone());
     }
 }

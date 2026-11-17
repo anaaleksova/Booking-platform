@@ -4,6 +4,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
@@ -34,6 +35,15 @@ const COMMON_TIMEZONES = [
 ];
 
 const DEFAULT_TIMEZONE = 'Europe/Skopje';
+
+/** Fields two by two on larger screens, one under the other on phones. */
+const PAIRS = {
+  display: 'grid',
+  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+  columnGap: 2,
+  rowGap: 2.5,
+  alignItems: 'start',
+} as const;
 
 const schema = z.object({
   fullName: z.string().min(1, 'Your name is required').max(160),
@@ -137,6 +147,7 @@ export function RegisterPage() {
 
   return (
     <AuthShell
+      wide
       title="Create your business"
       subtitle="One account, one booking page. You can invite staff and change everything later."
     >
@@ -150,80 +161,82 @@ export function RegisterPage() {
               <BusinessTypePicker value={field.value} onChange={field.onChange} error={fieldState.error?.message} />
             )}
           />
-          <TextField
-            label="Your name"
-            autoFocus
-            fullWidth
-            error={Boolean(errors.fullName)}
-            helperText={errors.fullName?.message}
-            {...register('fullName')}
-          />
-          <TextField
-            label="Business name"
-            fullWidth
-            error={Boolean(errors.businessName)}
-            helperText={errors.businessName?.message ?? 'Used for your public booking page address'}
-            {...register('businessName')}
-          />
-          <TextField
-            label="Email"
-            type="email"
-            autoComplete="email"
-            fullWidth
-            error={Boolean(errors.email)}
-            helperText={errors.email?.message ?? 'We will send a code to confirm it.'}
-            {...register('email')}
-          />
-          <PasswordField
-            label="Password"
-            autoComplete="new-password"
-            fullWidth
-            error={Boolean(errors.password)}
-            helperText={errors.password?.message ?? 'At least 8 characters'}
-            {...register('password')}
-          />
-          <TextField
-            select
-            label="Timezone"
-            fullWidth
-            defaultValue={DEFAULT_TIMEZONE}
-            error={Boolean(errors.timezone)}
-            helperText={errors.timezone?.message ?? 'All booking times are shown in this zone'}
-            {...timezoneField}
-            onChange={(event) => {
-              void timezoneField.onChange(event);
-              // The currency follows the zone until the owner picks one themselves.
-              if (!getFieldState('currency').isDirty) {
-                setValue('currency', currencyForTimezone(event.target.value));
-              }
-            }}
-          >
-            {timezones.map((zone) => (
-              <MenuItem key={zone} value={zone}>
-                {zone}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Controller
-            name="currency"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                select
-                label="Currency"
-                fullWidth
-                value={field.value}
-                onChange={field.onChange}
-                helperText="Your prices are in this currency"
-              >
-                {CURRENCIES.map((code) => (
-                  <MenuItem key={code} value={code}>
-                    {code}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
-          />
+          <Box sx={PAIRS}>
+            <TextField
+              label="Your name"
+              autoFocus
+              fullWidth
+              error={Boolean(errors.fullName)}
+              helperText={errors.fullName?.message}
+              {...register('fullName')}
+            />
+            <TextField
+              label="Business name"
+              fullWidth
+              error={Boolean(errors.businessName)}
+              helperText={errors.businessName?.message ?? 'Used for your public booking page address'}
+              {...register('businessName')}
+            />
+            <TextField
+              label="Email"
+              type="email"
+              autoComplete="email"
+              fullWidth
+              error={Boolean(errors.email)}
+              helperText={errors.email?.message ?? 'We will send a code to confirm it.'}
+              {...register('email')}
+            />
+            <PasswordField
+              label="Password"
+              autoComplete="new-password"
+              fullWidth
+              error={Boolean(errors.password)}
+              helperText={errors.password?.message ?? 'At least 8 characters'}
+              {...register('password')}
+            />
+            <TextField
+              select
+              label="Timezone"
+              fullWidth
+              defaultValue={DEFAULT_TIMEZONE}
+              error={Boolean(errors.timezone)}
+              helperText={errors.timezone?.message ?? 'All booking times are shown in this zone'}
+              {...timezoneField}
+              onChange={(event) => {
+                void timezoneField.onChange(event);
+                // The currency follows the zone until the owner picks one themselves.
+                if (!getFieldState('currency').isDirty) {
+                  setValue('currency', currencyForTimezone(event.target.value));
+                }
+              }}
+            >
+              {timezones.map((zone) => (
+                <MenuItem key={zone} value={zone}>
+                  {zone}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Controller
+              name="currency"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  select
+                  label="Currency"
+                  fullWidth
+                  value={field.value}
+                  onChange={field.onChange}
+                  helperText="Your prices are in this currency"
+                >
+                  {CURRENCIES.map((code) => (
+                    <MenuItem key={code} value={code}>
+                      {code}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+            />
+          </Box>
           <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
             {isSubmitting ? 'Sending code…' : 'Create account'}
           </Button>

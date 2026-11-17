@@ -20,14 +20,20 @@ export function seatingRules(requirement: ChoosableRequirement, slot: Slot, peop
   /** The server's ways to seat the group at this time, best first (combinable requirements only). */
   const suggestions: AllocationOption[] =
     slot.requirements.find((candidate) => candidate.requirementId === requirement.requirementId)?.allocations ?? [];
+  /** Whether a way of seating puts the group at a shared table, with others. */
+  const sharedIds = new Set(requirement.resources.filter((option) => option.shared).map((option) => option.id));
+  const usesShared = (allocation: AllocationOption) => allocation.resources.some((resource) => sharedIds.has(resource.id));
   /**
-   * The most suitable of those — as few tables and as few spare seats as the
-   * best one. A couple is shown the two-seat tables, not the six-seat one; the
-   * bigger tables stay free to pick on the map.
+   * The most suitable of those — as private, as few tables and as few spare
+   * seats as the best one. A couple is shown the two-seat tables, not the
+   * six-seat one; a group shown its own tables is not also shown a shared
+   * one. The rest stay free to pick on the map.
    */
   const recommended = suggestions.filter(
     (allocation) =>
-      allocation.resources.length === suggestions[0].resources.length && allocation.capacity === suggestions[0].capacity,
+      usesShared(allocation) === usesShared(suggestions[0]) &&
+      allocation.resources.length === suggestions[0].resources.length &&
+      allocation.capacity === suggestions[0].capacity,
   );
   const suggestionWith = (id: number) =>
     suggestions.find((allocation) => allocation.resources.some((resource) => resource.id === id));

@@ -109,3 +109,7 @@ databaseChangeLog:
       file: db/changelog/changes/032-meta-connection.sql
   - include:
       file: db/changelog/changes/033-event-social-posts.sql
+  - include:
+      file: db/changelog/changes/034-floor-plan-background.sql
+  - include:
+      file: db/changelog/changes/035-account-phone.sql

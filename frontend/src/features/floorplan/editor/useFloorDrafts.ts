@@ -9,6 +9,7 @@ import {
   nextFloorName,
   reshaped,
   turned,
+  type Background,
   type FloorDraft,
   type Piece,
   type Selection,
@@ -54,7 +55,7 @@ export function useFloorDrafts(plans: FloorPlan[], resources: Resource[]) {
 
   /** Adds a floor and shows it; returns its key. */
   const addFloor = () => {
-    const draft: FloorDraft = { key: newKey(), name: nextFloorName(floors), aspectRatio, items: [], decor: [] };
+    const draft: FloorDraft = { key: newKey(), name: nextFloorName(floors), aspectRatio, items: [], decor: [], background: null };
     setFloors((current) => [...current, draft]);
     switchFloor(draft.key);
     return draft.key;
@@ -87,6 +88,16 @@ export function useFloorDrafts(plans: FloorPlan[], resources: Resource[]) {
 
   const renameFloor = (name: string) => floor && updateFloor(floor.key, () => ({ name: name.slice(0, 60) }));
   const changeAspect = (next: number) => floor && updateFloor(floor.key, (draft) => reshaped(draft, next));
+  /**
+   * Puts a picture behind this floor, or takes it away. With {@code aspectRatio}
+   * the room takes the picture's shape, so the picture is not stretched.
+   */
+  const setBackground = (background: Background | null, aspectRatio?: number) =>
+    floor &&
+    updateFloor(floor.key, (draft) => ({
+      background,
+      ...(aspectRatio !== undefined && aspectRatio !== draft.aspectRatio ? reshaped(draft, aspectRatio) : {}),
+    }));
 
   const updateTable = (id: number, change: (item: FloorPlanSpot) => Partial<FloorPlanSpot>) =>
     setItems((current) => current.map((item) => (item.resourceId === id ? keepTableInside({ ...item, ...change(item) }) : item)));
@@ -159,6 +170,7 @@ export function useFloorDrafts(plans: FloorPlan[], resources: Resource[]) {
     deleteFloor,
     renameFloor,
     changeAspect,
+    setBackground,
     updateTable,
     updatePiece,
     move,

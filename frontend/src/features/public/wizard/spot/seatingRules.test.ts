@@ -122,6 +122,23 @@ describe('seatingRules — the best fit is recommended', () => {
     );
     expect(rules.recommended).toHaveLength(1);
   });
+
+  it('a group shown tables of its own is not also shown a shared one', () => {
+    // Six people: the server ranks the private pairs first; a mixed pair seats six too.
+    const rules = seatingRules(
+      requirement({ combinable: true, resources: [option(1, 2), option(3, 4), option(4, 4), option(5, 2, { shared: true })] }),
+      slot(free(1, 3, 4, 5), [
+        { ids: [1, 3], capacity: 6 },
+        { ids: [1, 4], capacity: 6 },
+        { ids: [5, 3], capacity: 6 },
+      ]),
+      6,
+    );
+    expect(rules.recommended.map((allocation) => allocation.resources.map((resource) => resource.id))).toEqual([
+      [1, 3],
+      [1, 4],
+    ]);
+  });
 });
 
 describe('withoutTakenPicks', () => {

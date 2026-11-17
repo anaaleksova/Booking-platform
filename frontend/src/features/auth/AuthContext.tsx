@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, setSessionExpiredHandler } from '@/api/client';
 import type { AuthResponse, BusinessType, CurrentUser, SignupStarted } from '@/types/api';
 
@@ -60,8 +61,28 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  * nobody), which also picks up a role change made since sign-in.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<CurrentUser | null>(null);
+  const queryClient = useQueryClient();
+  const [user, setUserState] = useState<CurrentUser | null>(null);
   const [initialising, setInitialising] = useState(true);
+  /** Whose data the cache holds; undefined until the first session check, which fetched with the same cookie. */
+  const current = useRef<string | undefined>(undefined);
+
+  /**
+   * Who is signed in. When that is another account or business, everything
+   * cached for the previous one (business name, bookings, settings) is
+   * dropped, so nothing of it shows under the new one.
+   */
+  const setUser = useCallback(
+    (next: CurrentUser | null) => {
+      const identity = identityOf(next);
+      if (current.current !== undefined && identity !== current.current) {
+        queryClient.clear();
+      }
+      current.current = identity;
+      setUserState(next);
+    },
+    [queryClient],
+  );
 
   const logout = useCallback(async () => {
     setUser(null);
@@ -70,23 +91,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Signed out here regardless; the cookie expires on its own.
     }
-  }, []);
+  }, [setUser]);
 
   useEffect(() => {
     setSessionExpiredHandler(() => setUser(null));
-  }, []);
+  }, [setUser]);
+
+  const checkSession = useCallback(
+    () =>
+      apiClient
+        .get<CurrentUser | ''>('/api/auth/session')
+        .then((response) => setUser(response.status === 200 && response.data ? response.data : null)),
+    [setUser],
+  );
 
   useEffect(() => {
-    apiClient
-      .get<CurrentUser | ''>('/api/auth/session')
-      .then((response) => setUser(response.status === 200 && response.data ? response.data : null))
+    checkSession()
       .catch(() => setUser(null))
       .finally(() => setInitialising(false));
-  }, []);
+  }, [checkSession, setUser]);
 
-  const applySession = useCallback((data: AuthResponse) => {
-    setUser(data.user);
-  }, []);
+  // Every tab shares one session cookie: signing in elsewhere changes who this
+  // tab is too. Look again whenever the tab comes back into view.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        checkSession().catch(() => undefined);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [checkSession]);
+
+  const applySession = useCallback(
+    (data: AuthResponse) => {
+      setUser(data.user);
+    },
+    [setUser],
+  );
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -172,6 +214,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+/** The account and the business it is working in: what cached data belongs to. */
+function identityOf(user: CurrentUser | null): string {
+  return user ? `${user.id}:${user.activeBusiness?.businessId ?? ''}` : '';
 }
 
 export function useAuth(): AuthContextValue {

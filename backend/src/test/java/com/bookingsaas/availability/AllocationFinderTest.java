@@ -139,6 +139,39 @@ class AllocationFinderTest {
         }
 
         @Test
+        void a_group_gets_tables_of_its_own_before_a_shared_one() {
+            // Six people; 2, 2, 4, 4 private and a shared eight: 4 + 2 to themselves, not the shared table.
+            ResourceSpec sharedEight = shared(5, 8);
+            List<Allocation> found = find(6, table(1, 2), table(2, 2), table(3, 4), table(4, 4), sharedEight);
+
+            assertThat(found.get(0).usesShared()).isFalse();
+            assertThat(found.get(0).capacity()).isEqualTo(6);
+            assertThat(found).isSortedAccordingTo(AllocationFinder.RANKING);
+            assertThat(found).filteredOn(Allocation::usesShared).allSatisfy(allocation ->
+                    assertThat(found.indexOf(allocation)).isGreaterThan(0));
+        }
+
+        @Test
+        void the_best_private_option_is_found_even_when_only_one_is_wanted() {
+            // The search meets the shared eight first; with room for one result it must still
+            // go on to the private pair.
+            List<Allocation> found = AllocationFinder.find(
+                    List.of(table(1, 2), table(3, 4), shared(5, 8)), 1, 6, 1);
+
+            assertThat(ids(found)).containsExactly(List.of(1L, 3L));
+        }
+
+        @Test
+        void a_shared_table_is_used_when_no_private_tables_seat_the_group() {
+            assertThat(ids(find(6, table(1, 2), table(2, 2), shared(5, 8)))).first().isEqualTo(List.of(5L));
+        }
+
+        @Test
+        void a_private_table_is_preferred_to_a_shared_one_of_the_same_size() {
+            assertThat(ids(find(3, shared(1, 4), table(2, 4)))).first().isEqualTo(List.of(2L));
+        }
+
+        @Test
         void no_more_than_the_limit_is_returned() {
             List<ResourceSpec> tables = new ArrayList<>();
             for (long id = 1; id <= 12; id++) {
@@ -253,6 +286,11 @@ class AllocationFinderTest {
 
     private static ResourceSpec table(long id, int capacity) {
         return new ResourceSpec(id, TYPE, "Table " + id, capacity);
+    }
+
+    /** A table other groups can join, with all its seats free. */
+    private static ResourceSpec shared(long id, int capacity) {
+        return new ResourceSpec(id, TYPE, "Shared " + id, capacity, true, null);
     }
 
     private static ResourceSpec desk(long id) {
